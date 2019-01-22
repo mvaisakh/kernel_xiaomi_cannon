@@ -88,5 +88,9 @@ extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
 extern void *fixmap_remap_fdt(phys_addr_t dt_phys);
 extern void mark_linear_text_alias_ro(void);
 
+#ifdef CONFIG_BUILD_ARM64_EMBEDDED_DTB
+extern void select_embedded_dt(void *dt_virt) __init;
+#endif
+
 #endif	/* !__ASSEMBLY__ */
 #endif

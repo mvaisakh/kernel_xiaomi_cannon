@@ -1252,6 +1252,12 @@ config BUILD_ARM64_DTB_OVERLAY_IMAGE_NAMES
 	  Space separated list of names of dtbs to append when
 	  building a concatenated overlay image
 
+config BUILD_ARM64_EMBEDDED_DTB
+	bool "Embed DTB into kernel image"
+	depends on OF
+	help
+	  Embed DTB directly into kernel image and ignore DTB from bootloader.
+
 config BUILD_ARM64_DT_OVERLAY
 	bool "enable DT overlay compilation support"
 	depends on OF
