@@ -26,7 +26,7 @@
 #if defined(CONFIG_MTK_ULTRASND_PROXIMITY)
 extern unsigned int elliptic_add_platform_controls(void *platform);
 #endif
-static const char * const mt6853_sgen_mode_str[] = {
+static const char * mt6853_sgen_mode_str[] = {
 	"I0I1",   "I2",     "I3I4",   "I5I6",
 	"I7I8",   "I9",     "I10I11", "I12I13",
 	"I14",    "I15I16", "I17I18", "I19I20",
@@ -45,7 +45,7 @@ static const char * const mt6853_sgen_mode_str[] = {
 	"O4",
 };
 
-static const int const mt6853_sgen_mode_idx[] = {
+static const int mt6853_sgen_mode_idx[] = {
 	0, 1, 2, 3,
 	4, 5, 6, 7,
 	8, 9, 10, 11,
@@ -64,14 +64,14 @@ static const int const mt6853_sgen_mode_idx[] = {
 	-1,
 };
 
-static const char * const mt6853_sgen_rate_str[] = {
+static const char * mt6853_sgen_rate_str[] = {
 	"8K", "11K", "12K", "16K",
 	"22K", "24K", "32K", "44K",
 	"48K", "88k", "96k", "176k",
 	"192k"
 };
 
-static const int const mt6853_sgen_rate_idx[] = {
+static const int mt6853_sgen_rate_idx[] = {
 	0, 1, 2, 4,
 	5, 6, 8, 9,
 	10, 11, 12, 13,
@@ -79,10 +79,10 @@ static const int const mt6853_sgen_rate_idx[] = {
 };
 
 /* this order must match reg bit amp_div_ch1/2 */
-static const char * const mt6853_sgen_amp_str[] = {
+static const char * mt6853_sgen_amp_str[] = {
 	"1/128", "1/64", "1/32", "1/16", "1/8", "1/4", "1/2", "1" };
 
-static const char * const mt6853_sgen_mute_str[] = {
+static const char * mt6853_sgen_mute_str[] = {
 	"Off", "On"
 };
 
@@ -291,7 +291,7 @@ static const struct snd_kcontrol_new mt6853_afe_sgen_controls[] = {
 };
 
 /* audio debug log */
-static const char * const mt6853_afe_off_on_str[] = {
+static const char * mt6853_afe_off_on_str[] = {
 	"Off", "On"
 };
 
