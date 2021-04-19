@@ -2,16 +2,10 @@
 # Bluetooth character device driver
 
 ###############################################################################
-# Necessary Check
-
-ifeq ($(AUTOCONF_H),)
-    $(error AUTOCONF_H is not defined)
-endif
-
 USE_DEVICE_NODE := y
 #CUSTOMER_FW_UPDATE := y
 
-ccflags-y += -imacros $(AUTOCONF_H) -DCHIP_IF_BTIF
+ccflags-y += -DCHIP_IF_BTIF
 
 # Force build fail on modpost warning
 KBUILD_MODPOST_FAIL_ON_WARNINGS := y
