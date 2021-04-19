@@ -2,11 +2,6 @@
 # Bluetooth character device driver
 
 ###############################################################################
-# Necessary Check
-
-ifeq ($(AUTOCONF_H),)
-    $(error AUTOCONF_H is not defined)
-endif
 
 ifneq ($(CFG_BT_PM_QOS_CONTROL),)
     $(warning set PM_QOS_CONTROL=1)
@@ -14,8 +9,6 @@ ifneq ($(CFG_BT_PM_QOS_CONTROL),)
 else
     ccflags-y += -D PM_QOS_CONTROL=0
 endif
-
-ccflags-y += -imacros $(AUTOCONF_H)
 
 # Force build fail on modpost warning
 KBUILD_MODPOST_FAIL_ON_WARNINGS := y
