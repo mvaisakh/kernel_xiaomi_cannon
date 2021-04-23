@@ -763,7 +763,7 @@ static int fts_irq_registration(struct fts_ts_data *ts_data)
     tpd_gpio_as_int(ts_data->pdata->irq_gpio);
 
     ts_data->irq = irq_of_parse_and_map(node, 0);
-    ts_data->pdata->irq_gpio_flags = IRQF_TRIGGER_FALLING;
+    ts_data->pdata->irq_gpio_flags = IRQF_TRIGGER_FALLING | IRQF_PERF_AFFINE;
     FTS_INFO("irq:%d, flag:%x", ts_data->irq, ts_data->pdata->irq_gpio_flags);
     ret = request_irq(ts_data->irq, fts_irq_handler,
                       ts_data->pdata->irq_gpio_flags,
