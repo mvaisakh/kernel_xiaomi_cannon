@@ -888,7 +888,7 @@ static int __mt_gpufreq_is_dfd_completed(void)
 
 static void __mt_gpufreq_dbgtop_pwr_on(bool enable)
 {
-#if MT_GPUFREQ_DFD_ENABLE
+#ifdef CONFIG_MTK_DBGTOP
 	unsigned int rgu_pwr;
 	int ret;
 	int retry = 10;
@@ -930,8 +930,9 @@ static void __mt_gpufreq_config_dfd(bool enable)
 		writel(0x00000000, g_mfg_base + 0xA2C);
 		// [8] enable
 		writel(0x0F001100, g_mfg_base + 0xA00);
-
+#ifdef CONFIG_MTK_DBGTOP
 		mtk_dbgtop_dfd_timeout(0x3E8, 0); // 500 ms
+#endif
 
 	} else {
 		writel(0x00000000, g_mfg_base + 0xA00);
@@ -960,7 +961,7 @@ void mt_gpufreq_power_control(enum mt_power_state power, enum mt_cg_state cg,
 		power, g_power_count, cg, mtcmos, buck);
 
 	if (__mt_gpufreq_is_dfd_triggered()) {
-#if MT_GPUFREQ_DFD_DEBUG
+#ifdef CONFIG_MTK_DBGTOP
 		unsigned int dfd_status = readl(g_infracfg_ao + 0x600);
 		unsigned int rgu_pwr = readl(g_dbgtop + 0x060);
 
@@ -3486,12 +3487,12 @@ static void __mt_gpufreq_gpu_dfd_clear(void)
 	writel(0x0F000011, g_mfg_base + 0xA00);
 
 	/* 3. clear wdt_mfg_pwr_on, let power control back to SPM */
-#if MT_GPUFREQ_DFD_DEBUG
+#ifdef CONFIG_MTK_DBGTOP
 	gpufreq_pr_info("[GPU_DFD] step3: clear wdt_mfg_pwr_on\n");
-#endif
+
 	//writel(0x77 << 24, g_dbgtop + 0x060);
 	__mt_gpufreq_dbgtop_pwr_on(false);
-
+#endif
 	/* 4. clear gpu dfd setting */
 	/* 5. disable drm power */
 #if MT_GPUFREQ_DFD_DEBUG
@@ -3510,10 +3511,10 @@ static void __mt_gpufreq_gpu_dfd_clear(void)
 		__mt_gpufreq_is_dfd_triggered());
 #endif
 
-#if MT_GPUFREQ_DFD_DEBUG
+#ifdef CONFIG_MTK_DBGTOP
 	gpufreq_pr_info("[GPU_DFD] step8: enable wdt_mfg_pwr_on\n");
-#endif
 	__mt_gpufreq_dbgtop_pwr_on(true);
+#endif
 }
 
 /*
@@ -3530,7 +3531,7 @@ static int __mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 	if (!node)
 		gpufreq_pr_info("@%s: find GPU node failed\n", __func__);
 
-#if MT_GPUFREQ_DFD_ENABLE
+#ifdef CONFIG_MTK_DBGTOP
 	if (mtk_dbgtop_mfg_pwr_en(1)) {
 		gpufreq_pr_info("[GPU_DFD] wait dbgtop ready\n");
 		return EPROBE_DEFER;
@@ -3552,7 +3553,7 @@ static int __mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 	/* init opp table */
 	__mt_gpufreq_init_table();
 
-#if MT_GPUFREQ_DFD_ENABLE
+#ifdef CONFIG_MTK_DBGTOP
 	__mt_gpufreq_dbgtop_pwr_on(true);
 #endif
 
