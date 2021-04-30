@@ -79,8 +79,10 @@ int dfd_setup(int version)
 		if (ret < 0)
 			return ret;
 
+#ifdef CONFIG_MTK_DBGTOP
 		if (set_sram_flag_dfd_valid() < 0)
 			return -1;
+#endif
 
 		return ret;
 	} else
