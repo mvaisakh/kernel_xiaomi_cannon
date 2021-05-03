@@ -15,6 +15,7 @@ endif
 
 $(warning set PM_QOS_CONTROL=1)
 ccflags-y += -D PM_QOS_CONTROL=1
+ccflags-y += -Wno-unused-variable
 
 # Force build fail on modpost warning
 KBUILD_MODPOST_FAIL_ON_WARNINGS := y
