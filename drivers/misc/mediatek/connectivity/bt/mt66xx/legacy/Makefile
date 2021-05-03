@@ -13,12 +13,8 @@ ifndef TOP
     TOP := $(srctree)/..
 endif
 
-ifneq ($(CFG_BT_PM_QOS_CONTROL),)
-    $(warning set PM_QOS_CONTROL=1)
-    ccflags-y += -D PM_QOS_CONTROL=1
-else
-    ccflags-y += -D PM_QOS_CONTROL=0
-endif
+$(warning set PM_QOS_CONTROL=1)
+ccflags-y += -D PM_QOS_CONTROL=1
 
 # Force build fail on modpost warning
 KBUILD_MODPOST_FAIL_ON_WARNINGS := y
