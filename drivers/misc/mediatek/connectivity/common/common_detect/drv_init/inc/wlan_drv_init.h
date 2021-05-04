@@ -18,12 +18,8 @@
 
 extern int do_wlan_drv_init(int chip_id);
 
-extern int mtk_wcn_wmt_wifi_init(void);
-
 extern int mtk_wcn_wlan_gen2_init(void);
 
 extern int mtk_wcn_wlan_gen3_init(void);
-
-extern int mtk_wcn_wlan_gen4_init(void);
 
 #endif

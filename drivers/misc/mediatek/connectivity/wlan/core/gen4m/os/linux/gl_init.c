@@ -5277,13 +5277,13 @@ int mtk_wcn_wlan_gen4_init(void)
 {
 	return initWlan();
 }
-EXPORT_SYMBOL(mtk_wcn_wlan_gen4_init);
+late_initcall(mtk_wcn_wlan_gen4_init);
 
 void mtk_wcn_wlan_gen4_exit(void)
 {
 	return exitWlan();
 }
-EXPORT_SYMBOL(mtk_wcn_wlan_gen4_exit);
+module_exit(mtk_wcn_wlan_gen4_exit);
 
 #elif ((MTK_WCN_HIF_SDIO == 0) && (CFG_BUILT_IN_DRIVER == 1))
 

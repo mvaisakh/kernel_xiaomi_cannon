@@ -790,13 +790,13 @@ int mtk_wcn_wmt_wifi_init(void)
 {
 	return WIFI_init();
 }
-EXPORT_SYMBOL(mtk_wcn_wmt_wifi_init);
+device_initcall(mtk_wcn_wmt_wifi_init);
 
 void mtk_wcn_wmt_wifi_exit(void)
 {
 	return WIFI_exit();
 }
-EXPORT_SYMBOL(mtk_wcn_wmt_wifi_exit);
+module_exit(mtk_wcn_wmt_wifi_exit);
 
 #else
 
