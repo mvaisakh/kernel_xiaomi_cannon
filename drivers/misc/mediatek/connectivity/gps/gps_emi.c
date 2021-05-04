@@ -545,7 +545,7 @@ static void gps_emi_mod_exit(void)
 	GPS_ERR("Done\n");
 }
 
-int mtk_gps_emi_init(void)
+int __init mtk_gps_emi_init(void)
 {
 	GPS_ERR("gps emi mod init begin");
 	return gps_emi_mod_init();
