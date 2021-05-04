@@ -289,7 +289,7 @@ build_kernel() {
 	fi
 
 	msg "|| Started Compilation ||"
-	make -j"$PROCS" O=out \
+	make -j"$PROCS" O=out CONFIG_DEBUG_SECTION_MISMATCH=y \
 		NM=llvm-nm \
 		OBJCOPY=llvm-objcopy \
 		"${MAKE[@]}" 2>&1 | tee error.log
