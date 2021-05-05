@@ -20,6 +20,8 @@
 
 #Kernel building script
 
+set -e
+
 # Function to show an informational message
 msg() {
 	echo
@@ -158,7 +160,7 @@ KERVER=$(make kernelversion)
 COMMIT_HEAD=$(git log --oneline -1)
 
 # Set Date 
-DATE=$(TZ=Asia/Kolkata date +"%Y%m%d-%T")
+DATE=$(TZ=Asia/Kolkata date +"%Y%m%d-%s")
 
 #Now Its time for other stuffs like cloning, exporting, etc
 
@@ -175,10 +177,16 @@ DATE=$(TZ=Asia/Kolkata date +"%Y%m%d-%T")
 	
 	if [ $COMPILER = "clang" ]
 	then
-		msg "|| Cloning Clang-13 ||"
-		git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b android-11.0.0_r35 clang-llvm
+		msg "|| Downloading Clang-12 ||"
+		mkdir clang-llvm
+		mkdir gcc-aosp
+		wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r416183b.tar.gz
+		tar -C clang-llvm/ -zxvf clang-r416183b.tar.gz
 		# Toolchain Directory defaults to clang-llvm
-		TC_DIR=$KERNEL_DIR/clang-llvm/clang-r353983c1
+		TC_DIR=$KERNEL_DIR/clang-llvm/
+		wget https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-11.0.0_r35.tar.gz
+		tar -C gcc-aosp/ -zxvf android-11.0.0_r35.tar.gz
+		export GCC_DIR=$KERNEL_DIR/gcc-aosp
 	fi
 
 	msg "|| Cloning Anykernel ||"
@@ -247,7 +255,7 @@ build_kernel() {
 
 	if [ "$PTTG" = 1 ]
  	then
-		tg_post_msg "<b>$KBUILD_BUILD_VERSION CI Build Triggered</b>%0A<b>Docker OS: </b><code>$DISTRO</code>%0A<b>Kernel Version : </b><code>$KERVER</code>%0A<b>Date : </b><code>$(TZ=Asia/Jakarta date)</code>%0A<b>Device : </b><code>$MODEL [$DEVICE]</code>%0A<b>Pipeline Host : </b><code>$KBUILD_BUILD_HOST</code>%0A<b>Host Core Count : </b><code>$PROCS</code>%0A<b>Compiler Used : </b><code>$KBUILD_COMPILER_STRING</code>%0A<b>Branch : </b><code>$CI_BRANCH</code>%0A<b>Top Commit : </b><code>$COMMIT_HEAD</code>%0A<a href='$SERVER_URL'>Link</a>"
+		tg_post_msg "<b>$KBUILD_BUILD_VERSION CI Build Triggered</b>%0A<b>Docker OS: </b><code>$DISTRO</code>%0A<b>Kernel Version : </b><code>$KERVER</code>%0A<b>Date : </b><code>$(TZ=Asia/Kolkata date)</code>%0A<b>Device : </b><code>$MODEL [$DEVICE]</code>%0A<b>Pipeline Host : </b><code>$KBUILD_BUILD_HOST</code>%0A<b>Host Core Count : </b><code>$PROCS</code>%0A<b>Compiler Used : </b><code>$KBUILD_COMPILER_STRING</code>%0A<b>Branch : </b><code>$CI_BRANCH</code>%0A<b>Top Commit : </b><code>$COMMIT_HEAD</code>%0A<a href='$SERVER_URL'>Link</a>"
 	fi
 
 	make O=out $DEFCONFIG
@@ -265,13 +273,10 @@ build_kernel() {
 	if [ $COMPILER = "clang" ]
 	then
 		MAKE+=(
-			CROSS_COMPILE=aarch64-linux-gnu- \
-			CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+			CROSS_COMPILE=$GCC_DIR/bin/aarch64-linux-android- \
+			CLANG_TRIPLE=aarch64-linux-gnu- \
 			CC=clang \
 			LD=ld.lld \
-			AR=llvm-ar \
-			OBJDUMP=llvm-objdump \
-			STRIP=llvm-strip
 		)
 	elif [ $COMPILER = "gcc" ]
 	then
@@ -291,8 +296,6 @@ build_kernel() {
 
 	msg "|| Started Compilation ||"
 	make -j"$PROCS" O=out \
-		NM=llvm-nm \
-		OBJCOPY=llvm-objcopy \
 		"${MAKE[@]}" 2>&1 | tee error.log
 
 		BUILD_END=$(date +"%s")
