@@ -18,6 +18,8 @@
  # limitations under the License.
  #
 
+set -e
+
 #Kernel building script
 
 # Function to show an informational message
