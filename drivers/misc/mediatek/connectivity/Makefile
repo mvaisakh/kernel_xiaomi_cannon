@@ -51,7 +51,7 @@ endif
         export WLAN_CHIP_ID=6853
         export MTK_ANDROID_WMT=y
         export MTK_ANDROID_EMI=y
-        export WIFI_IP_SET=2
+        export WIFI_IP_SET=3
         export WIFI_ECO_VER=1
 
         # Do build-in for xxx.c checking
