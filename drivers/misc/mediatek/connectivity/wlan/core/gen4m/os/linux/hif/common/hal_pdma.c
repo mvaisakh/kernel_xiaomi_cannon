@@ -2078,9 +2078,6 @@ enum ENUM_CMD_TX_RESULT halWpdmaWriteCmd(IN struct GLUE_INFO *prGlueInfo,
 	pTxD->Burst = 0;
 	pTxD->DMADONE = 0;
 
-	/* Increase TX_CTX_IDX, but write to register later. */
-	INC_RING_INDEX(prTxRing->TxCpuIdx, TX_RING_SIZE);
-
 	prTxRing->u4UsedCnt++;
 	kalDevRegWrite(prGlueInfo, prTxRing->hw_cidx_addr, prTxRing->TxCpuIdx);
 
