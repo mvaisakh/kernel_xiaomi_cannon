@@ -290,8 +290,6 @@ build_kernel() {
 
 	msg "|| Started Compilation ||"
 	make -j"$PROCS" O=out \
-		NM=llvm-nm \
-		OBJCOPY=llvm-objcopy \
 		"${MAKE[@]}" 2>&1 | tee error.log
 
 		BUILD_END=$(date +"%s")
