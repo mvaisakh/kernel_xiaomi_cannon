@@ -198,7 +198,7 @@ exports() {
 	if [ $COMPILER = "clang" ]
 	then
 		KBUILD_COMPILER_STRING=$("$TC_DIR"/bin/clang --version | head -n 1 | perl -pe 's/\(http.*?\)//gs' | sed -e 's/  */ /g' -e 's/[[:space:]]*$//')
-		PATH=$TC_DIR/bin/:$PATH
+		PATH=$TC_DIR/bin/:$GCC_DIR/bin/:$PATH
 	elif [ $COMPILER = "gcc" ]
 	then
 		KBUILD_COMPILER_STRING=$("$GCC64_DIR"/bin/aarch64-elf-gcc --version | head -n 1)
@@ -267,7 +267,7 @@ build_kernel() {
 	if [ $COMPILER = "clang" ]
 	then
 		MAKE+=(
-			CROSS_COMPILE=$GCC_DIR/bin/aarch64-linux-android- \
+			CROSS_COMPILE=aarch64-linux-android- \
 			CLANG_TRIPLE=aarch64-linux-gnu- \
 			CC=clang \
 			LD=ld.lld \
