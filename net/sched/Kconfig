@@ -274,8 +274,7 @@ config NET_SCH_FQ_CODEL
 	  If unsure, say N.
 
 config NET_SCH_FQ
-	bool "Fair Queue"
-        default y
+	tristate "Fair Queue"
 	help
 	  Say Y here if you want to use the FQ packet scheduling algorithm.
 
@@ -353,9 +352,8 @@ config NET_SCH_PLUG
 	  To compile this code as a module, choose M here: the
 	  module will be called sch_plug.
 
-menuconfig NET_SCH_DEFAULT_BBRP
+menuconfig NET_SCH_DEFAULT
 	bool "Allow override default queue discipline"
-        default y
 	---help---
 	  Support for selection of default queuing discipline.
 
@@ -365,15 +363,11 @@ menuconfig NET_SCH_DEFAULT_BBRP
 
 	  If unsure, say N.
 
-if NET_SCH_DEFAULT_BBRP
-
-config NET_SCH_DEFAULT
-        bool
-        default NET_SCH_DEFAULT_BBRP
+if NET_SCH_DEFAULT
 
 choice
 	prompt "Default queuing discipline"
-	default DEFAULT_FQ
+	default DEFAULT_PFIFO_FAST
 	help
 	  Select the queueing discipline that will be used by default
 	  for all network devices.
@@ -400,7 +394,7 @@ config DEFAULT_NET_SCH
 	default "fq" if DEFAULT_FQ
 	default "fq_codel" if DEFAULT_FQ_CODEL
 	default "sfq" if DEFAULT_SFQ
-	default "fq"        
+	default "pfifo_fast"
 endif
 
 comment "Classification"
