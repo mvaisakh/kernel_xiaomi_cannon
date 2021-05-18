@@ -413,6 +413,12 @@ config MTK_GCOV_KERNEL
 	  Select "Y" if you want to use.
 	  Select "N" if you are not sure.
 
+config MTK_TC10_FEATURE
+	bool "MTK_TC10_FEATURE"
+	default n
+	help
+	  MTK_TC10_FEATURE is defined specifically for TC10 customer
+
 source "drivers/misc/mediatek/freqhopping/Kconfig"
 source "drivers/misc/mediatek/sspm/Kconfig"
 source "drivers/misc/mediatek/gpu/Kconfig"
