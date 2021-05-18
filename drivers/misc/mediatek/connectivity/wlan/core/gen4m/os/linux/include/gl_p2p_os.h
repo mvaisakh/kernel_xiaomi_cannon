@@ -68,6 +68,7 @@
 #ifndef _GL_P2P_OS_H
 #define _GL_P2P_OS_H
 
+#define VENDOR_SPECIFIC_IE_LENGTH 400
 /******************************************************************************
  *                         C O M P I L E R   F L A G S
  ******************************************************************************
@@ -188,15 +189,15 @@ struct GL_P2P_INFO {
 	/*UINT_8 ucWSCRunning;*//* TH3 multiple P2P */
 
 	/* 0: beacon, 1: probe req, 2:probe response, 3: assoc response */
-	uint8_t aucWSCIE[4][400];
+	uint8_t aucWSCIE[4][VENDOR_SPECIFIC_IE_LENGTH];
 	uint16_t u2WSCIELen[4];
 
-	uint8_t aucP2PIE[MAX_P2P_IE_SIZE][400];
+	uint8_t aucP2PIE[MAX_P2P_IE_SIZE][VENDOR_SPECIFIC_IE_LENGTH];
 	uint16_t u2P2PIELen[MAX_P2P_IE_SIZE];
 
 #if CFG_SUPPORT_WFD
 	/* 0 for beacon, 1 for probe req, 2 for probe response */
-	uint8_t aucWFDIE[400];
+	uint8_t aucWFDIE[VENDOR_SPECIFIC_IE_LENGTH];
 	uint16_t u2WFDIELen;
 	/* Save the other IE for probe resp */
 #endif
@@ -356,7 +357,7 @@ u_int8_t glRegisterP2P(struct GLUE_INFO *prGlueInfo,
 int glSetupP2P(struct GLUE_INFO *prGlueInfo,
 		struct wireless_dev *prP2pWdev,
 		struct net_device *prP2pDev,
-		int u4Idx,
+		uint8_t u4Idx,
 		u_int8_t fgIsApMode);
 
 u_int8_t glUnregisterP2P(struct GLUE_INFO *prGlueInfo, uint8_t ucIdx);

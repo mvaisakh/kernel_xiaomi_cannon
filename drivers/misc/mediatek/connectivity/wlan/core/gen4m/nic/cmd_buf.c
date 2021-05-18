@@ -268,12 +268,11 @@ struct CMD_INFO *cmdBufAllocateCmdInfo(IN struct ADAPTER
 		       prCmdInfo, u4Length, prAdapter->rFreeCmdList.u4NumElem);
 
 	} else {
-
 		/* dump debug log */
-		prAdapter->u4HifDbgFlag |= DEG_HIF_PDMA;
+		prAdapter->u4HifDbgFlag |= DEG_HIF_DEFAULT_DUMP;
 		kalSetHifDbgEvent(prAdapter->prGlueInfo);
 
-			DBGLOG(MEM, ERROR,
+		DBGLOG(MEM, ERROR,
 		       "CMD allocation failed! LEN[%04u], Rest[%u]\n",
 		       u4Length, prAdapter->rFreeCmdList.u4NumElem);
 	}

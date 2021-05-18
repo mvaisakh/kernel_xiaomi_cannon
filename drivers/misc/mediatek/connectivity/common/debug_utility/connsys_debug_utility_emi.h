@@ -13,8 +13,6 @@
 #ifndef _CONN_DEDICATED_LOG_EMI_H_
 #define _CONN_DEDICATED_LOG_EMI_H_
 
-#define CONNLOG_EMI_SIZE (192*1024) /* 192KB */
-#define CONNLOG_EMI_LOG_BASE_OFFSET 0x36500
 #define CONNLOG_EMI_32_BYTE_ALIGNED 32 /* connsys EMI cache is 32-byte aligned */
 #define CONNLOG_CONTROL_RING_BUFFER_BASE_SIZE 64 /* Reserve for setup ring buffer base address  */
 #define CONNLOG_CONTROL_RING_BUFFER_RESERVE_SIZE 32
@@ -22,43 +20,52 @@
 #define CONNLOG_READY_PATTERN_BASE 56
 #define CONNLOG_READY_PATTERN_BASE_SIZE 8
 
-/* define subsys EMI log buffer size */
-#define CONNLOG_EMI_MCU_SIZE        (16*1024)
-#define CONNLOG_EMI_WIFI_SIZE       (64*1024)
-#define CONNLOG_EMI_BT_SIZE         (64*1024)
-#define CONNLOG_EMI_GPS_SIZE        (32*1024)
-
-#define CONNLOG_EMI_MCU_BASE_OFFESET CONNLOG_CONTROL_RING_BUFFER_BASE_SIZE
-#define CONNLOG_EMI_MCU_READ         (CONNLOG_EMI_MCU_BASE_OFFESET + 0)
-#define CONNLOG_EMI_MCU_WRITE        (CONNLOG_EMI_MCU_BASE_OFFESET + 4)
-#define CONNLOG_EMI_MCU_BUF          (CONNLOG_EMI_MCU_BASE_OFFESET + \
-				      CONNLOG_EMI_32_BYTE_ALIGNED)
-
-#define CONNLOG_EMI_WIFI_BASE_OFFESET (CONNLOG_EMI_MCU_BASE_OFFESET + \
-				       CONNLOG_EMI_MCU_SIZE + \
-				       CONNLOG_EMI_32_BYTE_ALIGNED + \
-				       CONNLOG_CONTROL_RING_BUFFER_RESERVE_SIZE)
-#define CONNLOG_EMI_WIFI_READ         (CONNLOG_EMI_WIFI_BASE_OFFESET + 0)
-#define CONNLOG_EMI_WIFI_WRITE        (CONNLOG_EMI_WIFI_BASE_OFFESET + 4)
-#define CONNLOG_EMI_WIFI_BUF          (CONNLOG_EMI_WIFI_BASE_OFFESET + \
-				       CONNLOG_EMI_32_BYTE_ALIGNED)
-
-#define CONNLOG_EMI_BT_BASE_OFFESET (CONNLOG_EMI_WIFI_BASE_OFFESET + \
-				     CONNLOG_EMI_WIFI_SIZE + \
-				     CONNLOG_EMI_32_BYTE_ALIGNED + \
-				     CONNLOG_CONTROL_RING_BUFFER_RESERVE_SIZE)
-#define CONNLOG_EMI_BT_READ         (CONNLOG_EMI_BT_BASE_OFFESET + 0)
-#define CONNLOG_EMI_BT_WRITE        (CONNLOG_EMI_BT_BASE_OFFESET + 4)
-#define CONNLOG_EMI_BT_BUF          (CONNLOG_EMI_BT_BASE_OFFESET + \
-				     CONNLOG_EMI_32_BYTE_ALIGNED)
-
-#define CONNLOG_EMI_GPS_BASE_OFFESET (CONNLOG_EMI_BT_BASE_OFFESET + \
-				      CONNLOG_EMI_BT_SIZE + \
-				      CONNLOG_EMI_32_BYTE_ALIGNED + \
-				      CONNLOG_CONTROL_RING_BUFFER_RESERVE_SIZE)
-#define CONNLOG_EMI_GPS_READ         (CONNLOG_EMI_GPS_BASE_OFFESET + 0)
-#define CONNLOG_EMI_GPS_WRITE        (CONNLOG_EMI_GPS_BASE_OFFESET + 4)
-#define CONNLOG_EMI_GPS_BUF          (CONNLOG_EMI_GPS_BASE_OFFESET + \
-				      CONNLOG_EMI_32_BYTE_ALIGNED)
+/* Init emi_offset_table */
+/* EMI structure
+ * +-+-+ +----------------------+ Offset
+ *   |   |       Header         |
+ *   |   |      size: 0x40      |
+ *   |   +----------------------+ +0x40 //CONNLOG_CONTROL_RING_BUFFER_BASE_SIZE
+ *   |   |                      |   +0x00: read
+ *   |   |        MCU           |   +0x04: write
+ *   |   |                      |   +0x20: buf start //CONNLOG_CONTROL_RING_BUFFER_RESERVE_SIZE
+ *   |   +----------------------+
+ *   |   |                      | //reserved, CONNLOG_EMI_32_BYTE_ALIGNED
+ *   |   +----------------------+ +(0x40 + 0x20 + MCU_SIZE + 0x20)
+ *   |   |                      |   +0x00: read
+ *   |   |       WIFI           |   +0x04: write
+ *   v   |                      |   +0x20: buf
+ *       |                      |
+ *       +----------------------+
+ * Size  |                      | //reserved, CONNLOG_EMI_32_BYTE_ALIGNED
+ *       +----------------------+ +(0x40 + 0x20 + MCU_SIZE + 0x20) +
+ *       |                      |  (WIFI_SIZE + 0x20 + 0x20)
+ *       |        BT            |   +0x00: read
+ *   ^   |                      |   +0x04: write
+ *   |   |                      |   +0x20: buf
+ *   |   +----------------------+
+ *   |   |                      | //reserved, CONNLOG_EMI_32_BYTE_ALIGNED
+ *   |   +----------------------+ +(0x40 + 0x20 + MCU_SIZE + 0x20) +
+ *   |   |                      |  (WIFI_SIZE + 0x20 + 0x20) +
+ *   |   |        GPS           |  (BT_SIZE + 0x20 + 0x20)
+ *   |   |                      |   +0x00: read
+ *   |   +----------------------+   +0x04: write
+ *   |   |       padding        |   +0x20: buf
+ * +-+-+ +----------------------+
+ *
+ * Header detail:
+ *       +---------------+--------------+---------------+--------------+ Offset
+ *       |  MCU base     |  MCU size    |    WIFI base  |  WIFI size   |
+ *       +---------------+--------------+---------------+--------------+ +0x10
+ *       |  BT base      |   BT size    |     GPS base  |  GPS size    |
+ *       +---------------+--------------+---------------+--------------+ +0x20
+ *       |                       Reserved 16 byte                      |
+ *       +---------------+--------------+---------------+--------------+ +0x30
+ *       |  IRQ count    |  IRQ submit  |                              |
+ *       | received by   |    by MCU    |          "EMIFWLOG"          |
+ *       |   driver      |              |                              |
+ *       +---------------+--------------+---------------+--------------+ +0x40
+ *      +0              +4             +8              +C             +F
+ */
 
 #endif

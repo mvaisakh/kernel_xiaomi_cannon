@@ -24,6 +24,10 @@
 
 #define MAX_CPU_FREQ (3 * 1024 * 1024) /* in kHZ */
 #define MAX_CLUSTER_NUM  3
+#define CPU_BIG_CORE (0xf0)
+#define CPU_SMALL_CORE (0xff - CPU_BIG_CORE)
+
+#define CONNSYS_VERSION_ID  0x20010000
 
 enum ENUM_CPU_BOOST_STATUS {
 	ENUM_CPU_BOOST_STATUS_INIT = 0,
@@ -35,8 +39,8 @@ enum ENUM_CPU_BOOST_STATUS {
 uint32_t kalGetCpuBoostThreshold(void)
 {
 	DBGLOG(SW4, TRACE, "enter kalGetCpuBoostThreshold\n");
-	/*  8, stands for 500Mbps */
-	return 8;
+	/*  3, stands for 100Mbps */
+	return 3;
 }
 
 int32_t kalBoostCpu(IN struct ADAPTER *prAdapter,
@@ -64,7 +68,7 @@ int32_t kalBoostCpu(IN struct ADAPTER *prAdapter,
 
 	if (fgRequested == ENUM_CPU_BOOST_STATUS_INIT) {
 		/* initially enable rps working at all cores */
-		kalSetRpsMap(prGlueInfo, 0xff);
+		kalSetRpsMap(prGlueInfo, CPU_SMALL_CORE);
 		fgRequested = ENUM_CPU_BOOST_STATUS_STOP;
 	}
 
@@ -73,12 +77,13 @@ int32_t kalBoostCpu(IN struct ADAPTER *prAdapter,
 		set_task_util_min_pct(prGlueInfo->u4TxThreadPid, 100);
 		set_task_util_min_pct(prGlueInfo->u4RxThreadPid, 100);
 		set_task_util_min_pct(prGlueInfo->u4HifThreadPid, 100);
-
+		kalSetRpsMap(prGlueInfo, CPU_BIG_CORE);
 	} else {
 		pr_info("kalBoostCpu stop\n");
 		set_task_util_min_pct(prGlueInfo->u4TxThreadPid, 0);
 		set_task_util_min_pct(prGlueInfo->u4RxThreadPid, 0);
 		set_task_util_min_pct(prGlueInfo->u4HifThreadPid, 0);
+		kalSetRpsMap(prGlueInfo, CPU_SMALL_CORE);
 	}
 
 	update_userlimit_cpu_freq(CPU_KIR_WIFI, u4ClusterNum, freq_to_set);
@@ -106,30 +111,41 @@ int32_t kalBoostCpu(IN struct ADAPTER *prAdapter,
 #ifdef CFG_MTK_ANDROID_EMI
 void kalSetEmiMpuProtection(phys_addr_t emiPhyBase, bool enable)
 {
+}
+
+void kalSetDrvEmiMpuProtection(phys_addr_t emiPhyBase, uint32_t offset,
+			       uint32_t size)
+{
 	struct emimpu_region_t region;
+	unsigned long long start = emiPhyBase + offset;
+	unsigned long long end = emiPhyBase + offset + size - 1;
+	int ret;
 
-	/*set MPU for EMI share Memory */
-	unsigned long long start = emiPhyBase + WIFI_EMI_MEM_OFFSET;
-	unsigned long long end = emiPhyBase + WIFI_EMI_MEM_OFFSET
-		+ WIFI_EMI_MEM_SIZE - 1;
+	DBGLOG(INIT, INFO, "emiPhyBase: 0x%p, offset: %d, size: %d\n",
+				emiPhyBase, offset, size);
 
-	mtk_emimpu_init_region(&region, REGION_WIFI);
+	ret = mtk_emimpu_init_region(&region, 18);
+	if (ret) {
+		DBGLOG(INIT, ERROR, "mtk_emimpu_init_region failed, ret: %d\n",
+				ret);
+		return;
+	}
 	mtk_emimpu_set_addr(&region, start, end);
 	mtk_emimpu_set_apc(&region, DOMAIN_AP, MTK_EMIMPU_NO_PROTECTION);
 	mtk_emimpu_set_apc(&region, DOMAIN_CONN, MTK_EMIMPU_NO_PROTECTION);
-	mtk_emimpu_lock_region(&region,
-		enable ? MTK_EMIMPU_LOCK:MTK_EMIMPU_UNLOCK);
-	mtk_emimpu_set_protection(&region);
+	mtk_emimpu_lock_region(&region, MTK_EMIMPU_LOCK);
+	ret = mtk_emimpu_set_protection(&region);
+	if (ret)
+		DBGLOG(INIT, ERROR,
+			"mtk_emimpu_set_protection failed, ret: %d\n",
+			ret);
 	mtk_emimpu_free_region(&region);
-
-	DBGLOG_LIMITED(INIT, TRACE
-	  , "MPU for EMI PhyBase star:0x%x ,PhyBase end: 0x%x, Enable:%d\n"
-		, start, end, enable);
 }
+
 #endif
 
-int32_t kalGetFwFlavor(uint8_t *flavor)
+int32_t kalGetConnsysVerId(void)
 {
-	*flavor = 'a';
-	return 1;
+	return CONNSYS_VERSION_ID;
 }
+

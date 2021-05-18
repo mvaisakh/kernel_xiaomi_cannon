@@ -1133,7 +1133,10 @@ s_int32 mt_op_start_tx(
 	s_int32 ret = SERV_STATUS_SUCCESS;
 	struct test_ru_info *ru_sta = &configs->ru_info_list[0];
 	struct param_mtk_wifi_test_struct rf_at_info;
-	u_int32 i, tx_cnt = 0, buf_len = 0;
+	u_int32 tx_cnt = 0, buf_len = 0;
+#if (CFG_WAIT_TSSI_READY == 1)
+	u_char i;
+#endif
 
 	if (pr_oid_funcptr == NULL)
 		return SERV_STATUS_HAL_OP_INVALID_NULL_POINTER;
@@ -1227,7 +1230,9 @@ s_int32 mt_op_start_tx(
 		RF_AT_FUNCID_COMMAND, RF_AT_COMMAND_STARTTX);
 
 	/* For production line test, get tx count for wait calibration ready */
+#if (CFG_WAIT_TSSI_READY == 1)
 	for (i = 0; i < 100; i++) {
+#endif
 		if (band_idx == TEST_DBDC_BAND0)
 			rf_at_info.func_idx = RF_AT_FUNCID_TXED_COUNT;
 		else
@@ -1247,10 +1252,9 @@ s_int32 mt_op_start_tx(
 			break;
 
 		msleep(20);
-#else
-		break;
-#endif
 	}
+#endif
+
 
 	return ret;
 }
@@ -1281,7 +1285,6 @@ s_int32 mt_op_start_rx(
 	s_int32 ret = SERV_STATUS_SUCCESS;
 	wlan_oid_handler_t pr_oid_funcptr = winfos->oid_funcptr;
 	u_int32 func_data;
-	u_int8 nullAddr[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 	struct param_mtk_wifi_test_struct rf_at_info;
 	u_int32 buf_len = 0;
 
@@ -1308,30 +1311,14 @@ s_int32 mt_op_start_rx(
 					0xf800);/* 0xf800 to disable */
 	}
 
-	if (sys_ad_cmp_mem(nullAddr,
-			configs->own_mac,
-			SERV_MAC_ADDR_LEN) != 0) {
+	sys_ad_move_mem(&func_data, configs->own_mac, 4);
+	tm_rftest_set_auto_test(winfos,
+		RF_AT_FUNCID_SET_TA, func_data);
 
-		sys_ad_move_mem(&func_data, nullAddr, 4);
-
-		tm_rftest_set_auto_test(winfos,
-			RF_AT_FUNCID_SET_MAC_ADDRESS, func_data);
-
-		func_data = 0;
-		sys_ad_move_mem(&func_data, nullAddr + 4, 2);
-		tm_rftest_set_auto_test(winfos,
-			(RF_AT_FUNCID_SET_MAC_ADDRESS | BIT(18)),
-			func_data);
-
-		sys_ad_move_mem(&func_data, configs->own_mac, 4);
-		tm_rftest_set_auto_test(winfos,
-			RF_AT_FUNCID_SET_TA, func_data);
-
-		func_data = 0;
-		sys_ad_move_mem(&func_data, configs->own_mac + 4, 2);
-		tm_rftest_set_auto_test(winfos,
-			(RF_AT_FUNCID_SET_TA | BIT(18)), func_data);
-	}
+	func_data = 0;
+	sys_ad_move_mem(&func_data, configs->own_mac + 4, 2);
+	tm_rftest_set_auto_test(winfos,
+		(RF_AT_FUNCID_SET_TA | BIT(18)), func_data);
 
 	ret = tm_rftest_set_auto_test(winfos,
 		RF_AT_FUNCID_SET_DBDC_BAND_IDX, band_idx);
@@ -1447,7 +1434,6 @@ s_int32 mt_op_set_tx_content(
 	u_int32 tx_len = configs->tx_len;
 	s_int32 ret = SERV_STATUS_SUCCESS;
 	wlan_oid_handler_t pr_oid_funcptr = winfos->oid_funcptr;
-	u_int8 nullAddr[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 	if (pr_oid_funcptr == NULL)
 		return SERV_STATUS_HAL_OP_INVALID_NULL_POINTER;
@@ -1471,35 +1457,26 @@ s_int32 mt_op_set_tx_content(
 	tm_rftest_set_auto_test(winfos,
 		RF_AT_FUNCID_PKTLEN, tx_len);
 
-	if (sys_ad_cmp_mem(nullAddr,
-			configs->addr1[0],
-			SERV_MAC_ADDR_LEN) != 0) {
 
-		sys_ad_move_mem(&func_data, configs->addr1[0], 4);
+	sys_ad_move_mem(&func_data, configs->addr1[0], 4);
 
-		tm_rftest_set_auto_test(winfos,
-			RF_AT_FUNCID_SET_MAC_ADDRESS, func_data);
+	tm_rftest_set_auto_test(winfos,
+		RF_AT_FUNCID_SET_MAC_ADDRESS, func_data);
 
-		func_data = 0;
-		sys_ad_move_mem(&func_data, configs->addr1[0] + 4, 2);
-		tm_rftest_set_auto_test(winfos,
-			(RF_AT_FUNCID_SET_MAC_ADDRESS | BIT(18)),
-			func_data);
-	}
+	func_data = 0;
+	sys_ad_move_mem(&func_data, configs->addr1[0] + 4, 2);
+	tm_rftest_set_auto_test(winfos,
+		(RF_AT_FUNCID_SET_MAC_ADDRESS | BIT(18)),
+		func_data);
 
-	if (sys_ad_cmp_mem(nullAddr,
-			configs->addr2[0],
-			SERV_MAC_ADDR_LEN) != 0) {
+	sys_ad_move_mem(&func_data, configs->addr2[0], 4);
+	tm_rftest_set_auto_test(winfos,
+		RF_AT_FUNCID_SET_TA, func_data);
 
-		sys_ad_move_mem(&func_data, configs->addr2[0], 4);
-		tm_rftest_set_auto_test(winfos,
-			RF_AT_FUNCID_SET_TA, func_data);
-
-		func_data = 0;
-		sys_ad_move_mem(&func_data, configs->addr2[0] + 4, 2);
-		tm_rftest_set_auto_test(winfos,
-			(RF_AT_FUNCID_SET_TA | BIT(18)), func_data);
-	}
+	func_data = 0;
+	sys_ad_move_mem(&func_data, configs->addr2[0] + 4, 2);
+	tm_rftest_set_auto_test(winfos,
+		(RF_AT_FUNCID_SET_TA | BIT(18)), func_data);
 
 	return ret;
 }
@@ -1959,9 +1936,7 @@ s_int32 mt_op_set_icap_start(
 	pr_rbist_info->emi_end_addr =
 		(u_int32) ((winfos->emi_phy_base +
 			winfos->emi_phy_size) & 0xFFFFFFFF);
-	pr_rbist_info->emi_msb_addr =
-		(u_int32) ((((u_int64) winfos->emi_phy_base) >> 32) &
-			0xFFFFFFFF);
+	pr_rbist_info->emi_msb_addr = 0; /*CONNAC 1.x useless*/
 
 	SERV_LOG(SERV_DBG_CAT_MISC, SERV_DBG_LVL_WARN,
 		("%s: StartAddr=0x%08x,EndAddr=0x%08x,MsbAddr=0x%08x\n",
@@ -2454,8 +2429,8 @@ s_int32 mt_op_get_recal_content(
 		OP_WLAN_OID_GET_RECAL_CONTENT,
 		NULL,
 		0,
-		content,
-		NULL);
+		NULL,
+		content);
 
 	return ret;
 }

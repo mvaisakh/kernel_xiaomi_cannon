@@ -3151,7 +3151,7 @@ struct SW_RFB *qmHandleRxPackets(IN struct ADAPTER *prAdapter,
 				(prAisBssInfo->eConnectionState ==
 				MEDIA_STATE_CONNECTED)) {
 				/* rx header translation */
-				log_dbg(QM, LOUD, "RXD Trans: FrameCtrl=0x%02x GVLD=0x%x, StaRecIdx=%d, WlanIdx=%d PktLen=%d\n",
+				log_dbg(QM, WARN, "RXD Trans: FrameCtrl=0x%02x GVLD=0x%x, StaRecIdx=%d, WlanIdx=%d PktLen=%d\n",
 					u2FrameCtrl, prCurrSwRfb->ucGroupVLD,
 					prCurrSwRfb->ucStaRecIdx,
 					prCurrSwRfb->ucWlanIdx,
@@ -5657,6 +5657,27 @@ void mqmProcessScanResult(IN struct ADAPTER *prAdapter,
 			prStaRec->fgSupportBTM =
 				!!((*(uint32_t *)(pucIE + 2)) &
 			BIT(ELEM_EXT_CAP_BSS_TRANSITION_BIT));
+#if CFG_TC10_FEATURE
+			prStaRec->fgSupportProxyARP =
+				!!((*(uint32_t *)(pucIE + 2)) &
+			BIT(ELEM_EXT_CAP_PROXY_ARP_BIT));
+
+			prStaRec->fgSupportTFS =
+				!!((*(uint32_t *)(pucIE + 2)) &
+			BIT(ELEM_EXT_CAP_TFS_BIT));
+
+			prStaRec->fgSupportWNMSleep =
+				!!((*(uint32_t *)(pucIE + 2)) &
+			BIT(ELEM_EXT_CAP_WNM_SLEEP_BIT));
+
+			prStaRec->fgSupportTIMBcast =
+				!!((*(uint32_t *)(pucIE + 2)) &
+			BIT(ELEM_EXT_CAP_TIM_BCAST_BIT));
+
+			prStaRec->fgSupportDMS =
+				!!((*(uint32_t *)(pucIE + 2)) &
+			BIT(ELEM_EXT_CAP_DMS_BIT));
+#endif
 #endif
 			break;
 
@@ -8168,11 +8189,30 @@ u_int8_t qmHandleRxReplay(struct ADAPTER *prAdapter,
 
 #if CFG_SUPPORT_LOWLATENCY_MODE || CFG_SUPPORT_OSHARE
 u_int8_t
+qmIsIPLayerPacket(uint8_t *pucPkt)
+{
+	uint16_t u2EtherType =
+		(pucPkt[ETH_TYPE_LEN_OFFSET] << 8)
+			| (pucPkt[ETH_TYPE_LEN_OFFSET + 1]);
+
+	if (u2EtherType == ETH_P_IPV4 || u2EtherType == ETH_P_IPV6) {
+		uint8_t *pucEthBody = &pucPkt[ETH_HLEN];
+		uint8_t ucIpProto =
+			(u2EtherType == ETH_P_IPV4 ?
+				pucEthBody[IP_PROTO_HLEN] :
+				pucEthBody[IPV6_HDR_PROTOCOL_OFFSET]);
+
+		if (ucIpProto == IP_PRO_UDP || ucIpProto == IP_PRO_TCP)
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
+u_int8_t
 qmIsNoDropPacket(IN struct ADAPTER *prAdapter, IN struct SW_RFB *prSwRfb)
 {
 	uint8_t *pucData = (uint8_t *) prSwRfb->pvHeader;
-	uint16_t u2Etype = (pucData[ETH_TYPE_LEN_OFFSET] << 8)
-		| (pucData[ETH_TYPE_LEN_OFFSET + 1]);
 	uint8_t ucBssIndex
 		= secGetBssIdxByWlanIdx(prAdapter, prSwRfb->ucWlanIdx);
 	u_int8_t fgCheckDrop = FALSE;
@@ -8191,13 +8231,8 @@ qmIsNoDropPacket(IN struct ADAPTER *prAdapter, IN struct SW_RFB *prSwRfb)
 		fgCheckDrop = TRUE;
 #endif
 
-	if (fgCheckDrop && u2Etype == ETH_P_IP) {
-		uint8_t *pucEthBody = &pucData[ETH_HLEN];
-		uint8_t ucIpProto = pucEthBody[IP_PROTO_HLEN];
-
-		if (ucIpProto == IP_PRO_UDP || ucIpProto == IP_PRO_TCP)
-			return TRUE;
-	}
+	if (fgCheckDrop && qmIsIPLayerPacket(pucData))
+		return TRUE;
 
 	/* For some special packet, like DNS, DHCP,
 	 * do not drop evan fall behind.

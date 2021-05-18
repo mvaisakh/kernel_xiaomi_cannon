@@ -79,7 +79,12 @@
  */
 
 #define P2P_INF_NAME "p2p%d"
+
+#if CFG_TC10_FEATURE
+#define AP_INF_NAME  "swlan%d"
+#else
 #define AP_INF_NAME  "ap%d"
+#endif
 
 /******************************************************************************
  *                             D A T A   T Y P E S
@@ -217,14 +222,13 @@ void p2pSetMode(IN uint8_t ucAPMode)
 /*---------------------------------------------------------------------------*/
 u_int8_t p2pRemove(struct GLUE_INFO *prGlueInfo)
 {
-	int idx = 0;
+	u_int8_t idx = 0;
 
 	if (prGlueInfo->prAdapter->fgIsP2PRegistered == FALSE) {
 		DBGLOG(P2P, INFO, "p2p is not registered\n");
 		return FALSE;
 	}
 
-	DBGLOG(P2P, INFO, "fgIsP2PRegistered FALSE\n");
 	prGlueInfo->prAdapter->fgIsP2PRegistered = FALSE;
 	prGlueInfo->prAdapter->p2p_scan_report_all_bss = FALSE;
 

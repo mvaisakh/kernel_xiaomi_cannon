@@ -757,8 +757,7 @@ int mtk_p2p_cfg80211_add_key(struct wiphy *wiphy,
 	if (params->key)
 		kalMemCopy(rKey.aucKeyMaterial, params->key, params->key_len);
 	rKey.u4KeyLength = params->key_len;
-	rKey.u4Length = ((unsigned long)
-		&(((struct P2P_PARAM_KEY *) 0)->aucKeyMaterial))
+	rKey.u4Length = OFFSET_OF(struct P2P_PARAM_KEY, aucKeyMaterial)
 		+ rKey.u4KeyLength;
 
 	rStatus = kalIoctl(prGlueInfo,
@@ -2227,8 +2226,7 @@ int mtk_p2p_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev)
 			(struct MSG_HDR *) prP2pStopApMsg,
 			MSG_SEND_METHOD_BUF);
 
-		if (p2pFuncIsAPMode(prGlueInfo->prAdapter->rWifiVar.
-				prP2PConnSettings[ucRoleIdx])) {
+		if (1) { /* AP or GO */
 			uint32_t waitRet = 0;
 
 			waitRet = wait_for_completion_timeout(
@@ -3211,6 +3209,7 @@ void mtk_p2p_cfg80211_mgmt_frame_register(IN struct wiphy *wiphy,
 		(struct MSG_P2P_MGMT_FRAME_REGISTER *) NULL;
 #endif
 	struct GLUE_INFO *prGlueInfo = (struct GLUE_INFO *) NULL;
+	int iftype = 0;
 	uint8_t ucRoleIdx = 0;
 	uint32_t *pu4P2pPacketFilter = NULL;
 	struct P2P_ROLE_FSM_INFO *prP2pRoleFsmInfo =
@@ -3258,6 +3257,19 @@ void mtk_p2p_cfg80211_mgmt_frame_register(IN struct wiphy *wiphy,
 				DBGLOG(P2P, TRACE,
 					"Open packet filer probe request\n");
 			} else {
+				iftype = wdev->netdev->ieee80211_ptr->iftype;
+
+				/* Skip disabling of Probe Request
+				 * while in AP mode.
+				 */
+				if (iftype == NL80211_IFTYPE_AP ||
+					iftype == NL80211_IFTYPE_P2P_GO) {
+					DBGLOG(P2P, INFO,
+						"Skip disabling of probe request for %d\n",
+						iftype);
+					break;
+				}
+
 				*pu4P2pPacketFilter
 					&= ~PARAM_PACKET_FILTER_PROBE_REQ;
 				DBGLOG(P2P, TRACE,
@@ -3456,6 +3468,12 @@ int mtk_p2p_cfg80211_testmode_cmd(struct wiphy *wiphy,
 			i4Status =
 				mtk_p2p_cfg80211_testmode_hotspot_config_cmd(
 					wiphy, data, len);
+			break;
+
+		case TESTMODE_CMD_ID_STR_CMD:
+			i4Status =
+				mtk_cfg80211_process_str_cmd(wiphy,
+					wdev, data, len);
 			break;
 
 		default:

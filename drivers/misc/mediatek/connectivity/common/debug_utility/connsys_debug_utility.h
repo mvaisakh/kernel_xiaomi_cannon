@@ -37,8 +37,24 @@ enum CONNLOG_TYPE {
 };
 
 typedef void (*CONNLOG_EVENT_CB) (void);
-typedef void (*CONNLOG_EIRQ_CB) (void);
+typedef void (*CONNLOG_IRQ_CB) (void);
 
+struct connlog_emi_config {
+	/* basic information */
+	phys_addr_t emi_offset;
+	unsigned int emi_size_total;
+	/* for individual radio */
+	unsigned int emi_size_mcu;
+	unsigned int emi_size_wifi;
+	unsigned int emi_size_bt;
+	unsigned int emi_size_gps;
+};
+
+struct connlog_irq_config {
+	unsigned int irq_num;
+	unsigned int irq_flag;
+	CONNLOG_IRQ_CB irq_callback;
+};
 
 /*******************************************************************************
 *                  F U N C T I O N   D E C L A R A T I O N S
@@ -46,7 +62,10 @@ typedef void (*CONNLOG_EIRQ_CB) (void);
 */
 
 /* Common Driver API */
-int connsys_dedicated_log_path_apsoc_init(phys_addr_t emiaddr, unsigned int irq_num, unsigned int irq_flag);
+int connsys_dedicated_log_path_apsoc_init(
+	phys_addr_t emi_base,
+	const struct connlog_emi_config *emi_config,
+	const struct connlog_irq_config *irq_config);
 void connsys_dedicated_log_path_apsoc_deinit(void);
 void __iomem *connsys_log_get_emi_log_base_vir_addr(void);
 void connsys_dedicated_log_get_utc_time(unsigned int *second, unsigned int *usecond);
@@ -54,9 +73,6 @@ void connsys_dedicated_log_flush_emi(void);
 void connsys_dedicated_log_set_log_mode(int mode);
 int connsys_dedicated_log_get_log_mode(void);
 void connsys_dedicated_log_dump_emi(int offset, int size);
-
-void connsys_dedicated_log_enable_flush_emi_loop(void);
-void connsys_dedicated_log_disable_flush_emi_loop(void);
 
 /* Debug Utility API */
 int connsys_log_init(int conn_type);
@@ -70,5 +86,4 @@ int connsys_log_alarm_enable(unsigned int sec);
 int connsys_log_alarm_disable(void);
 int connsys_log_blank_state_changed(int blank_state);
 
-void connsys_log_register_eirq_cb(CONNLOG_EIRQ_CB func);
 #endif /*_CONNSYS_DEBUG_UTILITY_H_*/

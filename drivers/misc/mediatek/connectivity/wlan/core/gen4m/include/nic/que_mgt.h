@@ -691,19 +691,6 @@ enum ENUM_WMM_ACI {
 	WMM_AC_INDEX_NUM
 };
 
-/* WMM QOS user priority from 802.1D/802.11e */
-enum ENUM_WMM_UP {
-	WMM_UP_BE_INDEX = 0,
-	WMM_UP_BK_INDEX,
-	WMM_UP_RESV_INDEX,
-	WMM_UP_EE_INDEX,
-	WMM_UP_CL_INDEX,
-	WMM_UP_VI_INDEX,
-	WMM_UP_VO_INDEX,
-	WMM_UP_NC_INDEX,
-	WMM_UP_INDEX_NUM
-};
-
 /* Used for CMD Queue Operation */
 enum ENUM_FRAME_ACTION {
 	FRAME_ACTION_DROP_PKT = 0,
@@ -1247,6 +1234,7 @@ void qmReleaseCHAtFinishedDhcp(struct ADAPTER *prAdapter,
 extern struct QUE_MGT g_rQM;
 #endif
 extern const uint8_t aucTid2ACI[TX_DESC_TID_NUM];
+extern const uint8_t aucACI2TxQIdx[WMM_AC_INDEX_NUM];
 extern const uint8_t arNetwork2TcResource[MAX_BSSID_NUM +
 		1][NET_TC_NUM];
 

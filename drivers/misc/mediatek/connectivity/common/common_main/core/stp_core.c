@@ -124,7 +124,7 @@ static MTK_WCN_BOOL stp_check_crc(PUINT8 buffer, UINT32 length, UINT16 crc);
 static VOID stp_update_tx_queue(UINT32 txseq);
 static VOID stp_rest_ctx_state(VOID);
 static VOID stp_change_rx_state(mtkstp_parser_state next);
-static void stp_tx_timeout_handler(ULONG data);
+static void stp_tx_timeout_handler(timer_handler_arg arg);
 static VOID stp_dump_data(const PUINT8 buf, const PUINT8 title, const UINT32 len);
 static VOID stp_dump_tx_queue(UINT32 txseq);
 static INT32 stp_is_apply_powersaving(VOID);
@@ -571,6 +571,9 @@ static void stp_update_tx_queue(UINT32 txseq)
 	UINT8 checksum = 0;
 
 	tx_read = stp_core_ctx.tx_start_addr[txseq];
+	if (tx_read < 0)
+		return;
+
 	stp_core_ctx.tx_buf[tx_read] &= 0xf8;
 	stp_core_ctx.tx_buf[tx_read] |= stp_core_ctx.sequence.txack;
 
@@ -645,7 +648,7 @@ static VOID stp_change_rx_state(mtkstp_parser_state next)
 }
 
 /* static void stp_tx_timeout_handler(void){ */
-static void stp_tx_timeout_handler(ULONG data)
+static void stp_tx_timeout_handler(timer_handler_arg arg)
 {
 	if (mtk_wcn_stp_coredump_start_get() == 1) {
 		STP_WARN_FUNC("Starting coredump, skip tx retry.\n");
@@ -2244,6 +2247,10 @@ static INT32 stp_parser_data_in_full_mode(UINT32 length, UINT8 *p_data)
 
 			if (mtk_wcn_stp_get_wmt_trg_assert() == 1)
 				stp_btm_stop_trigger_assert_timer(STP_BTM_CORE(stp_core_ctx));
+			else
+				/* clear debug info if triggered by fw */
+				stp_dbg_clear_cpupcr_reg_info();
+
 			if (STP_IS_READY(stp_core_ctx))
 				mtk_wcn_stp_dbg_dump_package();
 
@@ -3367,7 +3374,7 @@ INT32 mtk_wcn_stp_wakeup_consys(VOID)
 * RETURNS
 *  always 0
 *****************************************************************************/
-INT32 mtk_wcn_stp_dpidle_ctrl(enum _ENUM_BTIF_DPIDLE_ en_flag)
+INT32 mtk_wcn_stp_dpidle_ctrl(UINT32 en_flag)
 {
 	mtk_wcn_consys_stp_btif_dpidle_ctrl(en_flag);
 

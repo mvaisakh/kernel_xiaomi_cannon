@@ -24,6 +24,7 @@
 #endif
 
 #include <linux/interrupt.h>
+#include <linux/ratelimit.h>
 
 #define CONNADP_LOG_LOUD    4
 #define CONNADP_LOG_DBG     3
@@ -141,8 +142,11 @@ void mtk_wcn_cmb_stub_clock_fail_dump(void)
 
 int mtk_wcn_conninfra_reg_readable(void)
 {
+	static DEFINE_RATELIMIT_STATE(_rs, 5*HZ, 1);
+
 	if (unlikely(!bridge.conninfra_reg_readable_cb)) {
-		CONNADP_WARN_FUNC("reg_readable not registered\n");
+		if (__ratelimit(&_rs))
+			CONNADP_WARN_FUNC("reg_readable not registered\n");
 		return -1;
 	} else
 		return bridge.conninfra_reg_readable_cb();
@@ -150,8 +154,11 @@ int mtk_wcn_conninfra_reg_readable(void)
 
 int mtk_wcn_conninfra_is_bus_hang(void)
 {
+	static DEFINE_RATELIMIT_STATE(_rs, 5*HZ, 1);
+
 	if (unlikely(!bridge.conninfra_reg_is_bus_hang_cb)) {
-		CONNADP_WARN_FUNC("is_bus_hang not registered\n");
+		if (__ratelimit(&_rs))
+			CONNADP_WARN_FUNC("is_bus_hang not registered\n");
 		return -1;
 	} else
 		return bridge.conninfra_reg_is_bus_hang_cb();
@@ -218,18 +225,15 @@ static irqreturn_t mtk_wcn_cmb_sdio_eirq_handler_stub(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-static void mtk_wcn_cmb_sdio_request_eirq(msdc_sdio_irq_handler_t irq_handler,
-					  void *data)
+void mtk_wcn_cmb_sdio_request_eirq_by_wmt(void)
 {
 #ifdef CONFIG_OF
-	struct device_node *node;
 	int ret = -EINVAL;
+	struct device_node *node;
 
 	CONNADP_INFO_FUNC("enter\n");
 	_mtk_wcn_sdio_irq_flag_set(0);
 	atomic_set(&irq_enable_flag, 1);
-	mtk_wcn_cmb_sdio_eirq_data = data;
-	mtk_wcn_cmb_sdio_eirq_handler = irq_handler;
 
 	node = (struct device_node *)of_find_compatible_node(NULL, NULL,
 					"mediatek,connectivity-combo");
@@ -245,6 +249,20 @@ static void mtk_wcn_cmb_sdio_request_eirq(msdc_sdio_irq_handler_t irq_handler,
 			mtk_wcn_cmb_sdio_disable_eirq();/*state:power off*/
 	} else
 		CONNADP_WARN_FUNC("can't find connectivity compatible node\n");
+
+	CONNADP_INFO_FUNC("exit\n");
+	return;
+#endif
+}
+EXPORT_SYMBOL(mtk_wcn_cmb_sdio_request_eirq_by_wmt);
+
+static void mtk_wcn_cmb_sdio_request_eirq(msdc_sdio_irq_handler_t irq_handler,
+					  void *data)
+{
+#ifdef CONFIG_OF
+	CONNADP_INFO_FUNC("enter\n");
+	mtk_wcn_cmb_sdio_eirq_data = data;
+	mtk_wcn_cmb_sdio_eirq_handler = irq_handler;
 
 	CONNADP_INFO_FUNC("exit\n");
 #else
@@ -266,7 +284,7 @@ static void mtk_wcn_cmb_sdio_enable_eirq(void)
 		CONNADP_DBG_FUNC("wifi eint has been enabled\n");
 	else {
 		atomic_set(&irq_enable_flag, 1);
-		if (wifi_irq != 0xfffffff) {
+		if (wifi_irq != 0xffffffff) {
 			enable_irq(wifi_irq);
 			CONNADP_DBG_FUNC(" enable WIFI EINT %d!\n", wifi_irq);
 		}
@@ -278,7 +296,7 @@ static void mtk_wcn_cmb_sdio_disable_eirq(void)
 	if (!atomic_read(&irq_enable_flag))
 		CONNADP_DBG_FUNC("wifi eint has been disabled!\n");
 	else {
-		if (wifi_irq != 0xfffffff) {
+		if (wifi_irq != 0xffffffff) {
 			disable_irq_nosync(wifi_irq);
 			CONNADP_DBG_FUNC("disable WIFI EINT %d!\n", wifi_irq);
 		}

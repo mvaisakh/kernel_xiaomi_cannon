@@ -132,10 +132,12 @@ void scnFsmSteps(IN struct ADAPTER *prAdapter,
 	prScanParam = &prScanInfo->rScanParam;
 
 	do {
-		log_dbg(SCN, STATE, "[SCAN]TRANSITION: [%s] -> [%s]\n",
-			apucDebugScanState[prScanInfo->eCurrentState],
-			apucDebugScanState[eNextState]);
-
+		/* Coverity */
+		if (prScanInfo->eCurrentState >= 0 && eNextState >= 0) {
+			log_dbg(SCN, STATE, "[SCAN]TRANSITION: [%s] -> [%s]\n",
+				apucDebugScanState[prScanInfo->eCurrentState],
+				apucDebugScanState[eNextState]);
+		}
 		/* NOTE(Kevin): This is the only place to change the
 		 * eCurrentState(except initial)
 		 */
@@ -250,13 +252,18 @@ void scnSendScanReqV2(IN struct ADAPTER *prAdapter)
 		log_dbg(SCN, ERROR, "alloc CmdScanReq V2 fail\n");
 		return;
 	}
+
+	/* Abort SWIPS when scan starts */
+	scanAbortBeaconRecv(prAdapter, prScanParam->ucBssIndex,
+			    SWPIS_ABORT_SCAN_STARTS);
+
 	/* send command packet for scan */
 	kalMemZero(prCmdScanReq, sizeof(struct CMD_SCAN_REQ_V2));
 	/* Modify channelList number from 32 to 54 */
 	COPY_MAC_ADDR(prCmdScanReq->aucBSSID, prScanParam->aucBSSID);
 	if (!EQUAL_MAC_ADDR(prCmdScanReq->aucBSSID, "\xff\xff\xff\xff\xff\xff"))
-		DBGLOG(SCN, INFO, "Include BSSID %pM in probe request\n",
-		       prCmdScanReq->aucBSSID);
+		DBGLOG(SCN, INFO, "Include BSSID "MACSTR" in probe request\n",
+			MAC2STR(prCmdScanReq->aucBSSID));
 
 	prCmdScanReq->ucSeqNum = prScanParam->ucSeqNum;
 	prCmdScanReq->ucBssIndex = prScanParam->ucBssIndex;
@@ -265,7 +272,8 @@ void scnSendScanReqV2(IN struct ADAPTER *prAdapter)
 	prCmdScanReq->auVersion[0] = 1;
 	prCmdScanReq->ucScnFuncMask |= prScanParam->ucScnFuncMask;
 	if (kalIsValidMacAddr(prScanParam->aucRandomMac)) {
-		prCmdScanReq->ucScnFuncMask |= ENUM_SCN_RANDOM_MAC_EN;
+		prCmdScanReq->ucScnFuncMask |= (ENUM_SCN_RANDOM_MAC_EN |
+						ENUM_SCN_RANDOM_SN_EN);
 		kalMemCopy(prCmdScanReq->aucRandomMac,
 			prScanParam->aucRandomMac, MAC_ADDR_LEN);
 	}
@@ -364,6 +372,9 @@ void scnSendScanReqV2(IN struct ADAPTER *prAdapter)
 	prCmdScanReq->u2ChannelMinDwellTime =
 		prScanParam->u2ChannelMinDwellTime;
 	prCmdScanReq->u2TimeoutValue = prScanParam->u2TimeoutValue;
+	prCmdScanReq->u2OpChStayTimeMs = prScanParam->u2OpChStayTime;
+	prCmdScanReq->ucDfsChDwellTimeMs = prScanParam->ucDfsChDwellTime;
+	prCmdScanReq->ucPerScanChannelCnt = prScanParam->ucPerScanChCnt;
 
 	if (prScanParam->u2IELen <= MAX_IE_LENGTH)
 		prCmdScanReq->u2IELen = prScanParam->u2IELen;
@@ -375,7 +386,7 @@ void scnSendScanReqV2(IN struct ADAPTER *prAdapter)
 			sizeof(uint8_t) * prCmdScanReq->u2IELen);
 
 	log_dbg(SCN, INFO, "ScanReqV2: ScanType=%d,BSS=%u,SSIDType=%d,Num=%u,Ext=%u,ChannelType=%d,Num=%d,Ext=%u,Seq=%u,Ver=%u,Dw=%u,Min=%u,Func=0x%X,Mac="
-		MACSTR "\n",
+		MACSTR " OpChT=%d,DfsChDw=%d,ScnChCnt=%d\n",
 		prCmdScanReq->ucScanType,
 		prCmdScanReq->ucBssIndex,
 		prCmdScanReq->ucSSIDType,
@@ -388,7 +399,10 @@ void scnSendScanReqV2(IN struct ADAPTER *prAdapter)
 		prCmdScanReq->u2ChannelDwellTime,
 		prCmdScanReq->u2ChannelMinDwellTime,
 		prCmdScanReq->ucScnFuncMask,
-		prCmdScanReq->aucRandomMac);
+		MAC2STR(prCmdScanReq->aucRandomMac),
+		prCmdScanReq->u2OpChStayTimeMs,
+		prCmdScanReq->ucDfsChDwellTimeMs,
+		prCmdScanReq->ucPerScanChannelCnt);
 
 	scanLogCacheFlushAll(&(prScanInfo->rScanLogCache),
 		LOG_SCAN_REQ_D2F, SCAN_LOG_MSG_MAX_LEN);
@@ -612,7 +626,6 @@ void scnFsmHandleScanMsg(IN struct ADAPTER *prAdapter,
 	prScanParam->u2ChannelDwellTime = prScanReqMsg->u2ChannelDwellTime;
 	prScanParam->u2TimeoutValue = prScanReqMsg->u2TimeoutValue;
 	prScanParam->ucSeqNum = prScanReqMsg->ucSeqNum;
-
 	prScanParam->eMsgId = prScanReqMsg->rMsgHdr.eMsgId;
 	prScanParam->fgIsScanV2 = FALSE;
 }
@@ -697,9 +710,12 @@ void scnFsmHandleScanMsgV2(IN struct ADAPTER *prAdapter,
 	prScanParam->u2ChannelDwellTime = prScanReqMsg->u2ChannelDwellTime;
 	prScanParam->u2ChannelMinDwellTime =
 		prScanReqMsg->u2ChannelMinDwellTime;
+	prScanParam->u2OpChStayTime = prScanReqMsg->u2OpChStayTime;
+	prScanParam->ucDfsChDwellTime = prScanReqMsg->ucDfsChDwellTime;
+	prScanParam->ucPerScanChCnt = prScanReqMsg->ucPerScanChCnt;
+
 	prScanParam->u2TimeoutValue = prScanReqMsg->u2TimeoutValue;
 	prScanParam->ucSeqNum = prScanReqMsg->ucSeqNum;
-
 	prScanParam->eMsgId = prScanReqMsg->rMsgHdr.eMsgId;
 	prScanParam->fgIsScanV2 = TRUE;
 }
@@ -842,11 +858,15 @@ void scnEventScanDone(IN struct ADAPTER *prAdapter,
 			= prScanDone->rSparseChannel.ucChannelNum;
 		num = prScanInfo->ucSparseChannelArrayValidNum
 			= prScanDone->ucSparseChannelArrayValidNum;
-		log_dbg(SCN, INFO, "Country Code = %c%c, Detected_Channel_Num = %d\n",
-			((prAdapter->rWifiVar.u2CountryCode
-				& 0xff00) >> 8),
-			(prAdapter->rWifiVar.u2CountryCode
-				& 0x00ff), num);
+		if (prAdapter->rWifiVar.u2CountryCode != (uint16_t)NULL) {
+			log_dbg(SCN, INFO, "Country Code = %c%c, Detected_Channel_Num = %d\n",
+				((prAdapter->rWifiVar.u2CountryCode
+					& 0xff00) >> 8),
+				(prAdapter->rWifiVar.u2CountryCode
+					& 0x00ff), num);
+		} else {
+			log_dbg(SCN, INFO, "Country Code is NULL!!");
+		}
 
 #define print_info(_Mod, _Clz, _Fmt, var) \
 		do { \
@@ -863,8 +883,8 @@ void scnEventScanDone(IN struct ADAPTER *prAdapter,
 		} while (0)
 
 		print_info(SCN, INFO, "Channel  : %s\n", aucChannelNum);
-		print_info(SCN, LOUD, "IdleTime : %s\n", au2ChannelIdleTime);
-		print_info(SCN, LOUD, "MdrdyCnt : %s\n", aucChannelMDRDYCnt);
+		print_info(SCN, INFO, "IdleTime : %s\n", au2ChannelIdleTime);
+		print_info(SCN, INFO, "MdrdyCnt : %s\n", aucChannelMDRDYCnt);
 		print_info(SCN, INFO, "BAndPCnt : %s\n", aucChannelBAndPCnt);
 		if (prScanDone->ucScanDoneVersion >= 4)
 			print_info(SCN, LOUD,
@@ -1100,6 +1120,7 @@ scnFsmSchedScanRequest(IN struct ADAPTER *prAdapter,
 	prSchedScanParam->ucBssIndex = prAisBssInfo->ucBssIndex;
 	prSchedScanParam->fgStopAfterIndication = FALSE;
 
+	prSchedScanCmd->ucBssIndex = prSchedScanParam->ucBssIndex;
 	if (!IS_NET_ACTIVE(prAdapter, prAisBssInfo->ucBssIndex)) {
 		SET_NET_ACTIVE(prAdapter, prAisBssInfo->ucBssIndex);
 		/* sync with firmware */
@@ -1113,8 +1134,8 @@ scnFsmSchedScanRequest(IN struct ADAPTER *prAdapter,
 	for (i = 0; i < prSchedScanCmd->ucSsidNum; i++) {
 		kalMemCopy(&(prSsid[i]), &(prRequest->arSsid[i]),
 			sizeof(struct PARAM_SSID));
-		log_dbg(SCN, TRACE, "ssid set(%d) %s\n",
-			i, HIDE(prSsid[i].aucSsid));
+		log_dbg(SCN, TRACE, "ssid set(%d) %s\n", i,
+			HIDE(prSsid[i].aucSsid));
 	}
 
 	prSchedScanCmd->ucMatchSsidNum = prRequest->u4MatchSsidNum;

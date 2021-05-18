@@ -92,6 +92,8 @@
 #define SOC3_0_TX_DESC_APPEND_LENGTH   32
 #define SOC3_0_RX_DESC_LENGTH   24
 #define SOC3_0_ARB_AC_MODE_ADDR (0x820e3020)
+#define MTK_CUSTOM_OID_INTERFACE_VERSION     0x00000200	/* for WPDWifi DLL */
+#define MTK_EM_INTERFACE_VERSION		0x0001
 
 #define CONN_HOST_CSR_TOP_BASE_ADDR 0x18060000
 #define CONN_INFRA_CFG_BASE_ADDR 0x18001000
@@ -119,7 +121,7 @@
 #define WFSYS_VERSION_ID_ADDR (WF_TOP_MISC_OFF_BASE_ADDR + 0x10)
 #define CONN_CFG_AP2WF_REMAP_1_ADDR (CONN_INFRA_CFG_BASE_ADDR + 0x0120)
 #define CONN_MCU_CONFG_HS_BASE 0x89040000
-#define CONNSYS_VERSION_ID  0x20010000
+#define WFSYS_VERSION_ID  0x20010000
 #define WF_DYNAMIC_BASE 0x18500000
 #define MCU_EMI_ENTRY_OFFSET 0x01DC
 #define WF_EMI_ENTRY_OFFSET 0x01E0
@@ -139,8 +141,6 @@
 #define WMMCU_MCU_ROM_EMI_DATE_ADDR 0xF027F0E0
 #define WMMCU_WIFI_ROM_EMI_DATE_ADDR 0xF027F0F0
 #define DATE_CODE_SIZE 16
-
-#define MTK_EM_INTERFACE_VERSION		0x0001
 
 union soc3_0_WPDMA_INT_MASK {
 
@@ -233,6 +233,7 @@ extern struct completion g_triggerComp;
 extern bool g_IsTriggerTimeout;
 extern u_int8_t fgIsResetting;
 extern u_int8_t g_fgRstRecover;
+extern struct regmap *g_regmap;
 #endif
 /*******************************************************************************
 *                           P R I V A T E   D A T A
@@ -267,6 +268,8 @@ void soc3_0_show_wfdma_info_by_type_without_adapter(
 void soc3_0_DumpWFDMACr(struct ADAPTER *prAdapter);
 
 void soc3_0_show_dmashdl_info(
+	IN struct ADAPTER *prAdapter);
+void soc3_0_dump_mac_info(
 	IN struct ADAPTER *prAdapter);
 void soc3_0EnableInterrupt(
 	struct ADAPTER *prAdapter);

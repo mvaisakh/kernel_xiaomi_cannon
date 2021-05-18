@@ -347,7 +347,7 @@ static VOID stp_uart_tty_receive(struct tty_struct *tty, const unsigned char *da
 	{
 		struct timeval now;
 
-		do_gettimeofday(&now);
+		osal_do_gettimeofday(&now);
 		pr_warn("[+STP][  ][R] %4d --> sec = %lu, --> usec --> %lu\n",
 			count, now.tv_sec, now.tv_usec);
 	}
@@ -372,7 +372,7 @@ static VOID stp_uart_tty_receive(struct tty_struct *tty, const unsigned char *da
 	{
 		struct timeval now;
 
-		do_gettimeofday(&now);
+		osal_do_gettimeofday(&now);
 		pr_warn("[-STP][  ][R] %4d --> sec = %lu, --> usec --> %lu\n",
 			count, now.tv_sec, now.tv_usec);
 	}
@@ -532,7 +532,7 @@ static VOID stp_uart_tty_receive(struct tty_struct *tty, const PUINT8 data, PINT
 	{
 		struct timeval now;
 
-		do_gettimeofday(&now);
+		osal_do_gettimeofday(&now);
 	}
 #endif
 
@@ -551,7 +551,7 @@ static VOID stp_uart_tty_receive(struct tty_struct *tty, const PUINT8 data, PINT
 	{
 		struct timeval now;
 
-		do_gettimeofday(&now);
+		osal_do_gettimeofday(&now);
 	}
 #endif
 }

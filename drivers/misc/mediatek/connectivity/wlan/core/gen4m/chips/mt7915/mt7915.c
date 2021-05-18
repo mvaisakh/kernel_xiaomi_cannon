@@ -530,6 +530,7 @@ struct CHIP_DBG_OPS mt7915_debug_ops = {
 	.showUmacFwtblInfo = connac2x_show_umac_wtbl_info,
 	.showCsrInfo = NULL,
 	.showDmaschInfo = NULL,
+	.dumpMacInfo = NULL,
 	.showHifInfo = NULL,
 	.printHifDbgInfo = NULL,
 	.show_rx_rate_info = connac2x_show_rx_rate_info,
@@ -556,6 +557,7 @@ struct mt66xx_chip_info mt66xx_chip_info_mt7915 = {
 	.is_support_wacpu = TRUE,
 	.txd_append_size = MT7915_TX_DESC_APPEND_LENGTH,
 	.rxd_size = MT7915_RX_DESC_LENGTH,
+	.init_evt_rxd_size = MT7915_RX_DESC_LENGTH,
 	.pse_header_length = CONNAC2X_NIC_TX_PSE_HEADER_LENGTH,
 	.init_event_size = CONNAC2X_RX_INIT_EVENT_LENGTH,
 	.eco_info = mt7915_eco_table,
@@ -586,6 +588,7 @@ struct mt66xx_chip_info mt66xx_chip_info_mt7915 = {
 	.wlanCheckAsicCap = mt7915CheckAsicCap,
 	.u4LmacWtblDUAddr = CONNAC2X_WIFI_LWTBL_BASE,
 	.u4UmacWtblDUAddr = CONNAC2X_WIFI_UWTBL_BASE,
+	.cmd_max_pkt_size = CFG_TX_MAX_PKT_SIZE, /* size 1600 */
 };
 
 struct mt66xx_hif_driver_data mt66xx_driver_data_mt7915 = {

@@ -654,7 +654,7 @@ extern INT32 mtk_wcn_stp_close_btif(VOID);
 extern INT32 mtk_wcn_stp_rxcb_register(MTK_WCN_BTIF_RX_CB rx_cb);
 extern INT32 mtk_wcn_stp_tx(UINT8 *pBuf, UINT32 len, UINT32 *written_len);
 extern INT32 mtk_wcn_stp_wakeup_consys(VOID);
-extern INT32 mtk_wcn_stp_dpidle_ctrl(enum _ENUM_BTIF_DPIDLE_ en_flag);
+extern INT32 mtk_wcn_stp_dpidle_ctrl(UINT32 en_flag);
 extern INT32 mtk_wcn_stp_lpbk_ctrl(enum _ENUM_BTIF_LPBK_MODE_ mode);
 extern INT32 mtk_wcn_stp_logger_ctrl(enum _ENUM_BTIF_DBG_ID_ flag);
 extern VOID mtk_wcn_stp_ctx_save(VOID);

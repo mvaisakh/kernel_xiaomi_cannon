@@ -361,7 +361,10 @@ void rlmObssTriggerScan(struct ADAPTER *prAdapter, struct BSS_INFO *prBssInfo)
 {
 	struct MSG_SCN_SCAN_REQ_V2 *prScanReqMsg;
 
-	ASSERT(prBssInfo);
+	if (prBssInfo == NULL) {
+		DBGLOG(RLM, WARN, "BssInfo = NULL!");
+		return;
+	}
 
 	prScanReqMsg = (struct MSG_SCN_SCAN_REQ_V2 *)
 	    cnmMemAlloc(prAdapter, RAM_TYPE_MSG,

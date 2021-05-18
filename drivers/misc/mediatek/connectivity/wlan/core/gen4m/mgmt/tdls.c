@@ -1480,6 +1480,7 @@ void TdlsEventTearDown(struct GLUE_INFO *prGlueInfo,
 	uint16_t u2ReasonCode = TDLS_REASON_CODE_NONE;
 	uint32_t u4TearDownSubId;
 	uint8_t *pMac, aucZeroMac[6];
+	struct net_device *prDev = NULL;
 
 	/* init */
 	u4TearDownSubId = *(uint32_t *) prInBuf;
@@ -1501,13 +1502,16 @@ void TdlsEventTearDown(struct GLUE_INFO *prGlueInfo,
 			return;
 	}
 
+	prDev = wlanGetNetDev(prGlueInfo, prStaRec->ucBssIndex);
+	if (prDev == NULL)
+		return;
+
 	if (u4TearDownSubId == TDLS_HOST_EVENT_TD_PTI_TIMEOUT) {
 		DBGLOG(TDLS, INFO,
 	       "TDLS_HOST_EVENT_TD_PTI_TIMEOUT TDLS_REASON_CODE_UNSPECIFIED\n");
 		u2ReasonCode = TDLS_REASON_CODE_UNSPECIFIED;
 
-		cfg80211_tdls_oper_request(wlanGetNetDev(prGlueInfo,
-				prStaRec->ucBssIndex),
+		cfg80211_tdls_oper_request(prDev,
 				prStaRec->aucMacAddr,
 				NL80211_TDLS_TEARDOWN,
 				WLAN_REASON_TDLS_TEARDOWN_UNREACHABLE,
@@ -1519,8 +1523,7 @@ void TdlsEventTearDown(struct GLUE_INFO *prGlueInfo,
 	       "TDLS_HOST_EVENT_TD_AGE_TIMEOUT TDLS_REASON_CODE_UNREACHABLE\n");
 		u2ReasonCode = TDLS_REASON_CODE_UNREACHABLE;
 
-		cfg80211_tdls_oper_request(wlanGetNetDev(prGlueInfo,
-				prStaRec->ucBssIndex),
+		cfg80211_tdls_oper_request(prDev,
 				prStaRec->aucMacAddr, NL80211_TDLS_TEARDOWN,
 				WLAN_REASON_TDLS_TEARDOWN_UNREACHABLE,
 				GFP_ATOMIC);

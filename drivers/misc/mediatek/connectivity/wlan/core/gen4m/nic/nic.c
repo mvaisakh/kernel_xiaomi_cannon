@@ -535,7 +535,7 @@ uint32_t nicProcessISTWithSpecifiedCount(IN struct ADAPTER *prAdapter,
 	for (i = 0; i < u4HifIstLoopCount; i++) {
 
 		HAL_READ_INT_STATUS(prAdapter, &u4IntStatus);
-		/* DBGLOG(INIT, TRACE, ("u4IntStatus: 0x%x\n", u4IntStatus)); */
+		/* DBGLOG(INIT, TRACE, "u4IntStatus: 0x%x\n", u4IntStatus); */
 
 		if (u4IntStatus == 0) {
 			if (i == 0)
@@ -1040,7 +1040,6 @@ nicMediaStateChange(IN struct ADAPTER *prAdapter,
 {
 	struct GLUE_INFO *prGlueInfo;
 	struct AIS_FSM_INFO *prAisFsmInfo;
-	struct BSS_INFO *prAisBssInfo;
 
 	ASSERT(prAdapter);
 	prGlueInfo = prAdapter->prGlueInfo;
@@ -1049,7 +1048,6 @@ nicMediaStateChange(IN struct ADAPTER *prAdapter,
 				      ucBssIndex)->eNetworkType) {
 	case NETWORK_TYPE_AIS:
 		prAisFsmInfo = aisGetAisFsmInfo(prAdapter, ucBssIndex);
-		prAisBssInfo = aisGetAisBssInfo(prAdapter, ucBssIndex);
 		if (prConnectionStatus->ucMediaStatus ==
 		    MEDIA_STATE_DISCONNECTED) {	/* disconnected */
 			if (kalGetMediaStateIndicated(prGlueInfo,
@@ -1074,26 +1072,7 @@ nicMediaStateChange(IN struct ADAPTER *prAdapter,
 			   MEDIA_STATE_CONNECTED) {	/* connected */
 			struct PARAM_BSSID_EX *prCurrBssid =
 				aisGetCurrBssId(prAdapter, ucBssIndex);
-			uint8_t ucAuthorized = FALSE;
 
-			if (prAisBssInfo->ucReasonOfDisconnect ==
-			    DISCONNECT_REASON_CODE_ROAMING &&
-			    EQUAL_SSID(prCurrBssid->rSsid.aucSsid,
-			    prCurrBssid->rSsid.u4SsidLen,
-			    prConnectionStatus->aucSsid,
-			    prConnectionStatus->ucSsidLen) &&
-			    EQUAL_MAC_ADDR(prCurrBssid->arMacAddress,
-			    prConnectionStatus->aucBssid)) {
-				struct BSS_DESC *prBssDesc;
-
-				prBssDesc = scanSearchBssDescByBssidAndSsid(
-				prAdapter, prCurrBssid->arMacAddress,
-				TRUE, &prCurrBssid->rSsid);
-				if (prBssDesc && prBssDesc->fgIsConnected) {
-					ucAuthorized = TRUE;
-					DBGLOG(TX, INFO,  "pre-authorized\n");
-				}
-			}
 			prAdapter->rWlanInfo.u4SysTime = kalGetTimeTick();
 
 			/* fill information for association result */
@@ -1138,8 +1117,8 @@ nicMediaStateChange(IN struct ADAPTER *prAdapter,
 				/* connected -> connected : roaming ? */
 				kalIndicateStatusAndComplete(prGlueInfo,
 					WLAN_STATUS_ROAM_OUT_FIND_BEST,
-					&ucAuthorized,
-					sizeof(ucAuthorized), ucBssIndex);
+					NULL,
+					0, ucBssIndex);
 			}
 		}
 		break;
@@ -1456,9 +1435,6 @@ uint32_t nicActivateNetwork(IN struct ADAPTER *prAdapter,
 	ASSERT(prAdapter);
 	ASSERT(ucBssIndex <= prAdapter->ucHwBssIdNum);
 
-	/* Enable tx hang detect */
-	prAdapter->u4TxHangFlag |= BIT(ucBssIndex);
-
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
 
 	prBssInfo->fg40mBwAllowed = FALSE;
@@ -1485,7 +1461,7 @@ uint32_t nicActivateNetwork(IN struct ADAPTER *prAdapter,
 
 #if 1				/* DBG */
 	DBGLOG_LIMITED(RSN, INFO,
-	       "[wlan index]=%d OwnMac%d=" MACSTR " BSSID=" MACSTR
+	       "[BSS index]=%d OwnMac%d=" MACSTR " BSSID=" MACSTR
 	       " BMCIndex = %d NetType=%d\n",
 	       ucBssIndex,
 	       prBssInfo->ucOwnMacIndex,
@@ -1493,15 +1469,6 @@ uint32_t nicActivateNetwork(IN struct ADAPTER *prAdapter,
 	       MAC2STR(prBssInfo->aucBSSID),
 	       prBssInfo->ucBMCWlanIndex, prBssInfo->eNetworkType);
 #endif
-
-	/* Free the pending msdu in rTxMgmtTxingQueue.
-	 * Move this action from "deactive" to "active" to avoid the KE issue.
-	 * Deactive remove pending msdu but HIF thread use it after deactive.
-	 */
-	nicFreePendingTxMsduInfo(prAdapter, ucBssIndex,
-		MSDU_REMOVE_BY_BSS_INDEX);
-	kalClearSecurityFramesByBssIdx(prAdapter->prGlueInfo,
-				       ucBssIndex);
 
 	return wlanSendSetQueryCmd(prAdapter,
 				   CMD_ID_BSS_ACTIVATE_CTRL,
@@ -1534,9 +1501,6 @@ uint32_t nicDeactivateNetwork(IN struct ADAPTER *prAdapter,
 	ASSERT(prAdapter);
 	ASSERT(ucBssIndex <= prAdapter->ucHwBssIdNum);
 
-	/* Disable tx hang detect */
-	prAdapter->u4TxHangFlag &= ~BIT(ucBssIndex);
-
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
 
 	/* FW only supports BMCWlan index 0 ~ 31.
@@ -1562,7 +1526,7 @@ uint32_t nicDeactivateNetwork(IN struct ADAPTER *prAdapter,
 		prBssInfo->ucBMCWlanIndex;
 
 	DBGLOG_LIMITED(RSN, INFO,
-	       "[wlan index]=%d OwnMac=" MACSTR " BSSID=" MACSTR
+	       "[BSS index]=%d OwnMac=" MACSTR " BSSID=" MACSTR
 	       " BMCIndex = %d NetType=%d\n",
 	       ucBssIndex,
 	       MAC2STR(prBssInfo->aucOwnMacAddr),
@@ -1588,6 +1552,10 @@ uint32_t nicDeactivateNetwork(IN struct ADAPTER *prAdapter,
 		nicTxDirectClearBssAbsentQ(prAdapter, ucBssIndex);
 	else
 		qmFreeAllByBssIdx(prAdapter, ucBssIndex);
+
+	nicFreePendingTxMsduInfo(prAdapter, ucBssIndex,
+			MSDU_REMOVE_BY_BSS_INDEX);
+	kalClearSecurityFramesByBssIdx(prAdapter->prGlueInfo, ucBssIndex);
 
 	cnmFreeWmmIndex(prAdapter, prBssInfo);
 	return u4Status;
@@ -1746,47 +1714,31 @@ uint32_t nicUpdateBss(IN struct ADAPTER *prAdapter,
 	if (IS_BSS_AIS(prBssInfo) &&
 	    (prBssInfo->eCurrentOPMode == OP_MODE_INFRASTRUCTURE) &&
 	    (prBssInfo->prStaRecOfAP != NULL)) {
+		struct BSS_DESC *prBssDesc;
+		struct AIS_FSM_INFO *prAisFsmInfo;
+
 		rCmdSetBssInfo.ucStaRecIdxOfAP =
 			prBssInfo->prStaRecOfAP->ucIndex;
-
 		cnmAisInfraConnectNotify(prAdapter);
+		prAisFsmInfo = aisGetAisFsmInfo(prAdapter, ucBssIndex);
+		prBssDesc = prAisFsmInfo->prTargetBssDesc;
+		if (prBssDesc != NULL)
+			rCmdSetBssInfo.ucIotApAct = prBssDesc->ucIotApAct;
 #if CFG_SUPPORT_SMART_GEAR
-		DBGLOG(SW4, INFO,
-				"[SG]cnmAisInfraConnectNotify,%d\n",
-				prBssInfo->eConnectionState);
+		DBGLOG(SW4, INFO, "[SG]cnmAisInfraConnectNotify,%d\n",
+		       prBssInfo->eConnectionState);
 		if (prBssInfo->eConnectionState == MEDIA_STATE_CONNECTED) {
 			uint8_t ucSGEnable = TRUE, ucRetValNss = 0;
-			#if CFG_SUPPORT_IOT_AP_BLACKLIST
-			struct BSS_DESC *prBssDesc;
-			struct AIS_FSM_INFO *prAisFsmInfo;
-
-			prAisFsmInfo = aisGetAisFsmInfo(prAdapter,
-							ucBssIndex);
-			prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter,
-							ucBssIndex);
-			ucRetValNss = wlanGetSupportNss(prAdapter,
-							ucBssIndex);
-			DBGLOG(SW4, INFO,
-					"[SG]SG Get NSS,%d\n", ucRetValNss);
-			if (IS_BSS_AIS(prBssInfo)) {
-				prBssDesc = prAisFsmInfo->prTargetBssDesc;
-				if (prBssDesc != NULL && bssGetIotApAction
-					(prAdapter, prBssDesc) ==
-					WLAN_IOT_AP_DIS_SG) {
-					DBGLOG(SW4, INFO,
-						"[SG]Hit SG blacklist, Invoke Event to disable SG\n");
-					ucSGEnable = FALSE;
-				}
-			/*Send Event  to Enable/Disable SG*/
-			/*Here is SG REAL TRIGGER POINT!*/
-				wlandioSetSGStatus(prAdapter,
-				ucSGEnable, 0xFF, ucRetValNss);
+			ucRetValNss = wlanGetSupportNss(prAdapter, ucBssIndex);
+			DBGLOG(SW4, INFO, "[SG]SG Get NSS,%d\n", ucRetValNss);
+			if (rCmdSetBssInfo.ucIotApAct == WLAN_IOT_AP_DIS_SG) {
+				DBGLOG(SW4, INFO,
+					"[SG]Hit SG blacklist, disable SG\n");
+				ucSGEnable = FALSE;
 			}
-			#else
-			/*Here is SG REAL TRIGGER POINT!!*/
+			/*Send Event  to Enable/Disable SG*/
 			wlandioSetSGStatus(prAdapter,
 			ucSGEnable, 0xFF, ucRetValNss);
-			#endif
 		}
 #endif
 	}
@@ -1829,11 +1781,12 @@ uint32_t nicUpdateBss(IN struct ADAPTER *prAdapter,
 
 	DBGLOG(BSS, INFO,
 	       "Update Bss[%u] ConnState[%u] OPmode[%u] BSSID[" MACSTR
-	       "] AuthMode[%u] EncStatus[%u]\n", ucBssIndex,
+	       "] AuthMode[%u] EncStatus[%u] IotAct[%u]\n", ucBssIndex,
 	       prBssInfo->eConnectionState,
 	       prBssInfo->eCurrentOPMode, MAC2STR(prBssInfo->aucBSSID),
 	       rCmdSetBssInfo.ucAuthMode,
-	       rCmdSetBssInfo.ucEncStatus);
+	       rCmdSetBssInfo.ucEncStatus,
+	       rCmdSetBssInfo.ucIotApAct);
 
 	u4Status = wlanSendSetQueryCmd(prAdapter,
 				       CMD_ID_SET_BSS_INFO,
@@ -1958,6 +1911,12 @@ uint32_t nicPmIndicateBssConnected(IN struct ADAPTER
 
 	/* rCmdIndicatePmBssConnected.ucBmpDeliveryAC, */
 	/* rCmdIndicatePmBssConnected.ucBmpTriggerAC); */
+
+	log_dbg(NIC, INFO, "DTIMPeriod[%u] BCN_Interval[%u] BSSID["
+		MACSTR "]\n",
+	       prBssInfo->ucDTIMPeriod,
+	       prBssInfo->u2BeaconInterval,
+	       MAC2STR(prBssInfo->aucBSSID));
 
 	if ((GET_BSS_INFO_BY_INDEX(prAdapter,
 		ucBssIndex)->eNetworkType == NETWORK_TYPE_AIS)
@@ -2863,11 +2822,10 @@ uint32_t nicRlmUpdateSRParams(IN struct ADAPTER *prAdapter,
 
 	ASSERT(prAdapter);
 
-	DBGLOG(RLM, INFO, "Update Spatial Reuse parameters for BSS[%u]\n",
-		ucBssIndex);
-
-	DBGLOG(RLM, EVENT, "sizeof(struct _CMD_RLM_UPDATE_SR_PARMS_T): %d\n",
-		sizeof(struct _CMD_RLM_UPDATE_SR_PARMS_T));
+	DBGLOG(RLM, INFO,
+		"Update Spatial Reuse parameters for BSS[%u] size: %d\n",
+			ucBssIndex,
+			sizeof(struct _CMD_RLM_UPDATE_SR_PARMS_T));
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
 	rCmdUpdateSRParms.ucBssIndex = ucBssIndex;

@@ -27,6 +27,9 @@
 #define	PRIMARY_ADIE	0x6631
 #define	SECONDARY_ADIE	0x6635
 
+/* if clock of TCXO is controlled by GPIO, CLK_CTRL_TCXOENA_REQ should be 1. */
+#define CLK_CTRL_TCXOENA_REQ 0
+
 /*******************************************************************************
 *                    E X T E R N A L   R E F E R E N C E S
 ********************************************************************************
@@ -146,6 +149,7 @@ static INT32 consys_sleep_info_enable_ctrl(UINT32 enable);
 static INT32 consys_sleep_info_read_ctrl(WMT_SLEEP_COUNT_TYPE type, PUINT64 sleep_counter, PUINT64 sleep_timer);
 static INT32 consys_sleep_info_clear(VOID);
 static VOID consys_conn2ap_sw_irq_clear(VOID);
+static UINT64 consys_get_options(VOID);
 
 /*******************************************************************************
 *                            P U B L I C   D A T A
@@ -249,6 +253,16 @@ WMT_CONSYS_IC_OPS consys_ic_ops = {
 	.consys_ic_sleep_info_enable_ctrl = consys_sleep_info_enable_ctrl,
 	.consys_ic_sleep_info_read_ctrl = consys_sleep_info_read_ctrl,
 	.consys_ic_sleep_info_clear = consys_sleep_info_clear,
+	.consys_ic_get_options = consys_get_options,
+};
+
+static const struct connlog_emi_config connsys_fw_log_parameter = {
+	.emi_offset = 0x36500,
+	.emi_size_total = (192*1024),/* 192KB */
+	.emi_size_mcu = (16*1024),
+	.emi_size_wifi = (64*1024),
+	.emi_size_bt = (64*1024),
+	.emi_size_gps = (32*1024),
 };
 
 /*******************************************************************************
@@ -478,11 +492,14 @@ static VOID consys_set_if_pinmux(MTK_WCN_BOOL enable)
 				(CONSYS_REG_READ(consys_if_pinmux_driving_base +
 				CONSYS_IF_PINMUX_DRIVING_OFFSET_2) &
 				CONSYS_IF_PINMUX_DRIVING_MASK_2) | CONSYS_IF_PINMUX_DRIVING_VALUE_2);
+#if CLK_CTRL_TCXOENA_REQ
 		if (wmt_plat_soc_co_clock_flag_get() == 0) {
 			CONSYS_REG_WRITE(consys_if_pinmux_reg_base + CONSYS_CLOCK_TCXO_MODE_OFFSET,
 					(CONSYS_REG_READ(consys_if_pinmux_reg_base + CONSYS_CLOCK_TCXO_MODE_OFFSET) &
 					CONSYS_CLOCK_TCXO_MODE_MASK) | CONSYS_CLOCK_TCXO_MODE_VALUE);
+			WMT_PLAT_PR_INFO("set GPIO137 pinmux for TCXO mode (Aux5)\n");
 		}
+#endif
 	} else {
 		CONSYS_REG_WRITE(consys_if_pinmux_reg_base + CONSYS_IF_PINMUX_01_OFFSET,
 				CONSYS_REG_READ(consys_if_pinmux_reg_base +
@@ -490,11 +507,13 @@ static VOID consys_set_if_pinmux(MTK_WCN_BOOL enable)
 		CONSYS_REG_WRITE(consys_if_pinmux_reg_base + CONSYS_IF_PINMUX_02_OFFSET,
 				CONSYS_REG_READ(consys_if_pinmux_reg_base +
 				CONSYS_IF_PINMUX_02_OFFSET) & CONSYS_IF_PINMUX_02_MASK);
+#if CLK_CTRL_TCXOENA_REQ
 		if (wmt_plat_soc_co_clock_flag_get() == 0) {
 			CONSYS_REG_WRITE(consys_if_pinmux_reg_base + CONSYS_CLOCK_TCXO_MODE_OFFSET,
 					CONSYS_REG_READ(consys_if_pinmux_reg_base + CONSYS_CLOCK_TCXO_MODE_OFFSET) &
 					CONSYS_CLOCK_TCXO_MODE_MASK);
 		}
+#endif
 	}
 
 	iounmap(consys_if_pinmux_reg_base);
@@ -1382,11 +1401,23 @@ static INT32 consys_hw_bt_vcn33_ctrl(UINT32 enable)
 		/* 6631 not supported */
 		return 0;
 	if (enable) {
-		/* request VS2 to 1.4V by VS2 VOTER (use bit 4) */
+		if (consys_is_rc_mode_enable()) {
+			KERNEL_pmic_set_register_value(PMIC_RG_LDO_VCN18_LP, 0);
+			KERNEL_pmic_set_register_value(PMIC_RG_LDO_VCN13_LP, 0);
+			udelay(50);
+		}
+
+		/* Set VS2 to 1.4625V */
+		KERNEL_pmic_set_register_value(PMIC_RG_BUCK_VS2_VOSEL, 0x35);
+
+		/* request VS2 to 1.4625V by VS2 VOTER (use bit 4) */
 		KERNEL_pmic_set_register_value(PMIC_RG_BUCK_VS2_VOTER_EN_SET, 0x10);
 
-		/* Set VCN13 to 1.32V */
-		KERNEL_pmic_set_register_value(PMIC_RG_VCN13_VOCAL, 0x2);
+		/* Set VS2 sleep voltage to 1.375V */
+		KERNEL_pmic_set_register_value(PMIC_RG_BUCK_VS2_VOSEL_SLEEP, 0x2E);
+
+		/* Set VCN13 to 1.37V */
+		KERNEL_pmic_set_register_value(PMIC_RG_VCN13_VOCAL, 0x7);
 
 		if (consys_is_rc_mode_enable()) {
 			WMT_PLAT_PR_INFO("Turn on reg_VCN33_1_BT in RC mode\n");
@@ -1397,6 +1428,11 @@ static INT32 consys_hw_bt_vcn33_ctrl(UINT32 enable)
 			KERNEL_pmic_set_register_value(PMIC_RG_LDO_VCN33_1_LP, 0);
 			if (reg_VCN33_1_BT)
 				regulator_set_voltage(reg_VCN33_1_BT, 3300000, 3300000);
+
+			udelay(50);
+			KERNEL_pmic_set_register_value(PMIC_RG_LDO_VCN18_LP, 1);
+			KERNEL_pmic_set_register_value(PMIC_RG_LDO_VCN13_LP, 1);
+
 			/* SW_EN=0 */
 			/* For RC mode, we don't have to control VCN33_1 & VCN33_2 */
 			/* regulator_disable(reg_VCN33_1_BT); */
@@ -1417,14 +1453,24 @@ static INT32 consys_hw_bt_vcn33_ctrl(UINT32 enable)
 		WMT_PLAT_PR_DBG("WMT do BT PMIC on\n");
 	} else {
 		/*do BT PMIC off */
-		/*switch BT PALDO control from HW mode to SW mode:0x416[5]-->0x0 */
+		if (consys_is_rc_mode_enable()) {
+			KERNEL_pmic_set_register_value(PMIC_RG_LDO_VCN18_LP, 0);
+			KERNEL_pmic_set_register_value(PMIC_RG_LDO_VCN13_LP, 0);
+			udelay(50);
+		}
+
 		/* restore VCN13 to 1.3V */
 		KERNEL_pmic_set_register_value(PMIC_RG_VCN13_VOCAL, 0);
 		/* clear bit 4 of VS2 VOTER then VS2 can restore to 1.35V */
 		KERNEL_pmic_set_register_value(PMIC_RG_BUCK_VS2_VOTER_EN_CLR, 0x10);
 
+		/* Restore VS2 sleep voltage to 1.35V */
+		KERNEL_pmic_set_register_value(PMIC_RG_BUCK_VS2_VOSEL_SLEEP, 0x2C);
+
 		if (consys_is_rc_mode_enable()) {
-			WMT_PLAT_PR_INFO("Do nothing for reg_VCN33_1_BT under RC mode when disable\n");
+			udelay(50);
+			KERNEL_pmic_set_register_value(PMIC_RG_LDO_VCN18_LP, 1);
+			KERNEL_pmic_set_register_value(PMIC_RG_LDO_VCN13_LP, 1);
 		} else {
 			if (reg_VCN33_1_BT)
 				regulator_disable(reg_VCN33_1_BT);
@@ -1862,13 +1908,41 @@ static VOID consys_set_dl_rom_patch_flag(INT32 flag)
 	rom_patch_dl_flag = flag;
 }
 
+static VOID consys_conn2ap_sw_irq_clear(VOID)
+{
+	UINT32 ret;
+
+	if (!conn_reg.mcu_base)
+		return;
+
+	if (osal_trylock_unsleepable_lock(&g_pwr_off_lock) == 0) {
+		WMT_PLAT_PR_INFO("fail to get pwr off lock\n");
+		return;
+	}
+
+	if (atomic_read(&g_power_on) == 1) {
+		/* clear 0x1800214c[27:24] */
+		CONSYS_REG_WRITE(conn_reg.mcu_base + CONN2AP_SW_IRQ_CLR_OFFSET,
+			CONSYS_REG_READ(conn_reg.mcu_base + CONN2AP_SW_IRQ_CLR_OFFSET)
+			| (0xf << 24));
+
+		ret = CONSYS_REG_READ(conn_reg.mcu_base + CONN2AP_SW_IRQ_OFFSET) & (0xf << 24);
+		if (ret > 0)
+			WMT_PLAT_PR_INFO("CONN2AP_SW_IRQ[27:24] = 0x%x\n", ret);
+	}
+
+	osal_unlock_unsleepable_lock(&g_pwr_off_lock);
+}
+
 static INT32 consys_dedicated_log_path_init(struct platform_device *pdev)
 {
 	struct device_node *node;
 	UINT32 irq_num;
 	UINT32 irq_flag;
 	INT32 iret = -1;
+	struct connlog_irq_config irq_config;
 
+	memset(&irq_config, 0, sizeof(struct connlog_irq_config));
 	node = pdev->dev.of_node;
 	if (node) {
 		irq_num = irq_of_parse_and_map(node, 2);
@@ -1880,8 +1954,14 @@ static INT32 consys_dedicated_log_path_init(struct platform_device *pdev)
 		return iret;
 	}
 	osal_unsleepable_lock_init(&g_pwr_off_lock);
-	connsys_dedicated_log_path_apsoc_init(gConEmiPhyBase, irq_num, irq_flag);
-	connsys_log_register_eirq_cb(consys_conn2ap_sw_irq_clear);
+
+	irq_config.irq_num = irq_num;
+	irq_config.irq_flag = irq_flag;
+	irq_config.irq_callback = consys_conn2ap_sw_irq_clear;
+
+	connsys_dedicated_log_path_apsoc_init(
+		gConEmiPhyBase, &connsys_fw_log_parameter, &irq_config);
+
 #ifdef CONFIG_MTK_CONNSYS_DEDICATED_LOG_PATH
 	fw_log_wmt_init();
 #endif
@@ -1901,12 +1981,12 @@ static INT32 consys_emi_coredump_remapping(UINT8 __iomem **addr, UINT32 enable)
 {
 	if (enable) {
 		*addr = ioremap_nocache(gConEmiPhyBase + CONSYS_EMI_COREDUMP_OFFSET,
-				CONSYS_EMI_MEM_SIZE);
+				CONSYS_EMI_COREDUMP_MEM_SIZE);
 		if (*addr) {
 			WMT_PLAT_PR_INFO("COREDUMP EMI mapping OK virtual(0x%p) physical(0x%x)\n",
 					*addr, (UINT32) gConEmiPhyBase +
 					CONSYS_EMI_COREDUMP_OFFSET);
-			memset_io(*addr, 0, CONSYS_EMI_MEM_SIZE);
+			memset_io(*addr, 0, CONSYS_EMI_COREDUMP_MEM_SIZE);
 		} else {
 			WMT_PLAT_PR_INFO("EMI mapping fail\n");
 			return -1;
@@ -1926,11 +2006,8 @@ static INT32 consys_reset_emi_coredump(UINT8 __iomem *addr)
 		WMT_PLAT_PR_INFO("get virtual address fail\n");
 		return -1;
 	}
-	WMT_PLAT_PR_INFO("Reset EMI(0xF0068000 ~ 0xF0068400) and (0xF0070400 ~ 0xF0078400)\n");
-	/* reset 0xF0068000 ~ 0xF0068400 (1K) */
-	memset_io(addr, 0, 0x400);
-	/* reset 0xF0070400 ~ 0xF0078400 (32K)  */
-	memset_io(addr + CONSYS_EMI_PAGED_DUMP_OFFSET, 0, 0x8000);
+	WMT_PLAT_PR_INFO("Reset EMI(0xF0068000 ~ 0xF0107FFF)\n");
+	memset_io(addr, 0, CONSYS_EMI_COREDUMP_MEM_SIZE);
 	return 0;
 }
 
@@ -2462,29 +2539,16 @@ INT32 consys_sleep_info_read_ctrl(WMT_SLEEP_COUNT_TYPE type, PUINT64 sleep_count
 	return 0;
 }
 
-static VOID consys_conn2ap_sw_irq_clear(VOID)
+static UINT64 consys_get_options(VOID)
 {
-	UINT32 ret;
-
-	if (!conn_reg.mcu_base)
-		return;
-
-	if (osal_trylock_unsleepable_lock(&g_pwr_off_lock) == 0) {
-		WMT_PLAT_PR_INFO("fail to get pwr off lock\n");
-		return;
-	}
-
-	if (atomic_read(&g_power_on) == 1) {
-		/* clear 0x1800214c[27:24] */
-		CONSYS_REG_WRITE(conn_reg.mcu_base + CONN2AP_SW_IRQ_CLR_OFFSET,
-			CONSYS_REG_READ(conn_reg.mcu_base + CONN2AP_SW_IRQ_CLR_OFFSET)
-			| (0xf << 24));
-
-		ret = CONSYS_REG_READ(conn_reg.mcu_base + CONN2AP_SW_IRQ_OFFSET) & (0xf << 24);
-		if (ret > 0)
-			WMT_PLAT_PR_INFO("CONN2AP_SW_IRQ[27:24] = 0x%x\n", ret);
-	}
-
-	osal_unlock_unsleepable_lock(&g_pwr_off_lock);
+	UINT64 options = OPT_QUERY_ADIE |
+			OPT_WIFI_LTE_COEX |
+			OPT_BT_TSSI_FROM_WIFI_CONFIG_NEW_OPID |
+			OPT_COEX_CONFIG_ADJUST |
+			OPT_COEX_CONFIG_ADJUST_NEW_FLAG |
+			OPT_WIFI_LTE_COEX_TABLE_3 |
+			OPT_NORMAL_PATCH_DWN_3 |
+			OPT_PATCH_CHECKSUM;
+	return options;
 }
 

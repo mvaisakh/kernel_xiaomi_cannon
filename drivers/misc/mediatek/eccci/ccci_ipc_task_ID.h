@@ -26,6 +26,7 @@
 #define MD_UNIFY_ID_FLAG (0<<31)
 
 /* ---------------------------------------------------------- */
+#define    MD_MOD_GMMGR  13
 #define    MD_MOD_L4C    0
 #define    MD_MOD_L4C_1  1
 #define    MD_MOD_L4C_2  2

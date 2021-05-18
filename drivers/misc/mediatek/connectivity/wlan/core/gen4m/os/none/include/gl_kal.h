@@ -177,9 +177,10 @@ extern int g_u4WlanInitFlag;
 #endif
 
 /* performance monitor feature */
-#define PERF_MON_DISABLE_BIT    (0)
-#define PERF_MON_STOP_BIT       (1)
-#define PERF_MON_RUNNING_BIT    (2)
+#define PERF_MON_INIT_BIT       (0)
+#define PERF_MON_DISABLE_BIT    (1)
+#define PERF_MON_STOP_BIT       (2)
+#define PERF_MON_RUNNING_BIT    (3)
 
 #define PERF_MON_UPDATE_INTERVAL (1000)
 #define PERF_MON_TP_MAX_THRESHOLD (10)
@@ -877,16 +878,17 @@ KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__)
 /*----------------------------------------------------------------------------*/
 /* Macros of show stack operations for using in Driver Layer                  */
 /*----------------------------------------------------------------------------*/
-#ifdef CONFIG_X86
 #define kal_show_stack(_adapter, _task, _sp)
-#else
-#define kal_show_stack(_adapter, _task, _sp) \
-{ \
-	if (_adapter->chip_info->showTaskStack) { \
-		_adapter->chip_info->showTaskStack(_task, _sp); \
-	} \
-}
-#endif
+
+/*----------------------------------------------------------------------------*/
+/* Macros of systrace operations for using in Driver Layer                    */
+/*----------------------------------------------------------------------------*/
+#define kalTraceBegin(_fmt, ...)
+#define kalTraceEnd()
+#define kalTraceInt(_value, _fmt, ...)
+#define kalTraceCall()
+#define kalTraceEvent(_fmt, ...)
+#define TRACE(_expr, _fmt, ...) _expr
 
 /*******************************************************************************
  *                  F U N C T I O N   D E C L A R A T I O N S
@@ -1971,13 +1973,6 @@ u_int8_t kalIsResetting(void);
 #if CFG_CHIP_RESET_SUPPORT
 void kalRemoveProbe(IN struct GLUE_INFO *prGlueInfo);
 #endif
-
-#define kalTraceBegin(_fmt, ...)
-#define kalTraceEnd()
-#define kalTraceInt(_value, _fmt, ...)
-#define kalTraceCall()
-#define kalTraceEvent(_fmt, ...)
-#define TRACE(_expr, _fmt, ...) _expr
 
 #endif /* _GL_KAL_H */
 

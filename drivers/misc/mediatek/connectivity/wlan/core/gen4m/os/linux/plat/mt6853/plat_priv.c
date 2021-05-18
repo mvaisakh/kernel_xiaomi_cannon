@@ -21,6 +21,8 @@
 
 #define MAX_CPU_FREQ (3 * 1024 * 1024) /* in kHZ */
 #define MAX_CLUSTER_NUM  3
+#define CPU_BIG_CORE (0xc0)
+#define CPU_SMALL_CORE (0xff - CPU_BIG_CORE)
 
 enum ENUM_CPU_BOOST_STATUS {
 	ENUM_CPU_BOOST_STATUS_INIT = 0,
@@ -78,7 +80,7 @@ int32_t kalBoostCpu(IN struct ADAPTER *prAdapter,
 
 	if (fgRequested == ENUM_CPU_BOOST_STATUS_INIT) {
 		/* initially enable rps working at small cores */
-		kalSetRpsMap(prGlueInfo, 0x0f);
+		kalSetRpsMap(prGlueInfo, CPU_SMALL_CORE);
 		fgRequested = ENUM_CPU_BOOST_STATUS_STOP;
 	}
 
@@ -91,7 +93,7 @@ int32_t kalBoostCpu(IN struct ADAPTER *prAdapter,
 			set_task_util_min_pct(prGlueInfo->u4TxThreadPid, 100);
 			set_task_util_min_pct(prGlueInfo->u4RxThreadPid, 100);
 			set_task_util_min_pct(prGlueInfo->u4HifThreadPid, 100);
-			kalSetRpsMap(prGlueInfo, 0xf0); /* big cores */
+			kalSetRpsMap(prGlueInfo, CPU_BIG_CORE);
 			update_userlimit_cpu_freq(CPU_KIR_WIFI,
 				u4ClusterNum, freq_to_set);
 
@@ -112,7 +114,7 @@ int32_t kalBoostCpu(IN struct ADAPTER *prAdapter,
 			set_task_util_min_pct(prGlueInfo->u4TxThreadPid, 0);
 			set_task_util_min_pct(prGlueInfo->u4RxThreadPid, 0);
 			set_task_util_min_pct(prGlueInfo->u4HifThreadPid, 0);
-			kalSetRpsMap(prGlueInfo, 0x0f); /* small cores */
+			kalSetRpsMap(prGlueInfo, CPU_SMALL_CORE);
 			update_userlimit_cpu_freq(CPU_KIR_WIFI,
 				u4ClusterNum, freq_to_set);
 
@@ -131,32 +133,6 @@ int32_t kalBoostCpu(IN struct ADAPTER *prAdapter,
 #ifdef CONFIG_MEDIATEK_EMI
 void kalSetEmiMpuProtection(phys_addr_t emiPhyBase, bool enable)
 {
-	struct emimpu_region_t region;
-	unsigned long long start = emiPhyBase + WIFI_EMI_MEM_OFFSET;
-	unsigned long long end = emiPhyBase + WIFI_EMI_MEM_OFFSET +
-			WIFI_EMI_MEM_SIZE - 1;
-	int ret;
-
-	DBGLOG(INIT, INFO, "emiPhyBase: 0x%p, enable: %d\n",
-				emiPhyBase, enable);
-
-	ret = mtk_emimpu_init_region(&region, 26);
-	if (ret) {
-		DBGLOG(INIT, ERROR, "mtk_emimpu_init_region failed, ret: %d\n",
-				ret);
-		return;
-	}
-	mtk_emimpu_set_addr(&region, start, end);
-	mtk_emimpu_set_apc(&region, DOMAIN_AP, MTK_EMIMPU_NO_PROTECTION);
-	mtk_emimpu_set_apc(&region, DOMAIN_CONN, MTK_EMIMPU_NO_PROTECTION);
-	mtk_emimpu_lock_region(&region,
-			enable ? MTK_EMIMPU_LOCK : MTK_EMIMPU_UNLOCK);
-	ret = mtk_emimpu_set_protection(&region);
-	if (ret)
-		DBGLOG(INIT, ERROR,
-			"mtk_emimpu_set_protection failed, ret: %d\n",
-			ret);
-	mtk_emimpu_free_region(&region);
 }
 
 void kalSetDrvEmiMpuProtection(phys_addr_t emiPhyBase, uint32_t offset,

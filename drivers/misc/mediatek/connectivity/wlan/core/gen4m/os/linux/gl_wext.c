@@ -149,6 +149,8 @@ static const struct iw_priv_args rIwPrivTable[] = {
 	 IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_FIXED | 1024, "AP_SET_MAC_FLTR"},
 	{IOC_AP_STA_DISASSOC, IW_PRIV_TYPE_CHAR | 256,
 	 IW_PRIV_TYPE_CHAR | 1024, "AP_STA_DISASSOC"},
+	{IOC_AP_SET_NSS, IW_PRIV_TYPE_CHAR | 256,
+	 IW_PRIV_TYPE_CHAR | 1024, "AP_SET_NSS"},
 
 	/* sub-ioctl definitions */
 #if 0
@@ -254,6 +256,7 @@ static const iw_handler rIwPrivHandler[] = {
 	[IOC_AP_SET_MAC_FLTR - SIOCIWFIRSTPRIV] = priv_set_ap,
 	[IOC_AP_SET_CFG - SIOCIWFIRSTPRIV] = priv_set_ap,
 	[IOC_AP_STA_DISASSOC - SIOCIWFIRSTPRIV] = priv_set_ap,
+	[IOC_AP_SET_NSS - SIOCIWFIRSTPRIV] = priv_set_ap,
 #if CFG_SUPPORT_QA_TOOL
 	[IOCTL_QA_TOOL_DAEMON - SIOCIWFIRSTPRIV] = priv_qa_agent,
 	[IOCTL_IWPRIV_ATE - SIOCIWFIRSTPRIV] = priv_ate_set
@@ -4816,6 +4819,26 @@ static int std_set_priv(struct net_device *prDev,
 		char *pcExtra)
 {
 	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
+#ifdef CONFIG_COMPAT
+	if (rIwReqInfo->flags & IW_REQUEST_FLAG_COMPAT) {
+		int ret = 0;
+		struct compat_iw_point *iwp_compat = NULL;
+		struct iw_point iwp;
+
+		iwp_compat = (struct compat_iw_point *) &prData->data;
+		iwp.pointer = compat_ptr(iwp_compat->pointer);
+		iwp.length = iwp_compat->length;
+		iwp.flags = iwp_compat->flags;
+
+		ret = wext_set_country(prDev, &iwp);
+
+		iwp_compat->pointer = ptr_to_compat(iwp.pointer);
+		iwp_compat->length = iwp.length;
+		iwp_compat->flags = iwp.flags;
+
+		return ret;
+	}
+#endif /* CONFIG_COMPAT */
 	return wext_set_country(prDev, &(prData->data));
 }
 

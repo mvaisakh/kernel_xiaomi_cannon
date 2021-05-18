@@ -148,6 +148,11 @@ authSendDeauthFrame(IN struct ADAPTER *prAdapter,
 		    IN struct SW_RFB *prClassErrSwRfb, IN uint16_t u2ReasonCode,
 		    IN PFN_TX_DONE_HANDLER pfTxDoneHandler);
 
+#if CFG_SUPPORT_ASSURANCE
+void deauth_build_nonwfa_vend_ie(struct ADAPTER *prAdapter,
+				struct MSDU_INFO *prMsduInfo);
+#endif
+
 uint32_t authProcessRxDeauthFrame(IN struct SW_RFB *prSwRfb,
 			IN uint8_t aucBSSID[], OUT uint16_t *pu2ReasonCode);
 

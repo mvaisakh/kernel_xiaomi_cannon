@@ -311,6 +311,7 @@ enum ENUM_CMD_ID {
 	CMD_ID_SET_OSHARE_MODE = 0x8E,
 	CMD_ID_RDD_ON_OFF_CTRL = 0x8F,      /* 0x8F(Set) */
 	CMD_ID_SET_FORCE_RTS = 0x90,
+	CMD_ID_SET_REPORT_BEACON = 0x91,    /* 0x91 (Set) */
 	CMD_ID_WFC_KEEP_ALIVE = 0xA0,       /* 0xA0 (Set) */
 	CMD_ID_RSSI_MONITOR = 0xA1,         /* 0xA1 (Set) */
 	CMD_ID_CAL_BACKUP_IN_HOST_V2 = 0xAE,    /* 0xAE (Set / Query) */
@@ -801,7 +802,8 @@ struct CMD_SET_BSS_INFO {
 	uint8_t  ucBMCWlanIndex;
 	uint8_t  ucHiddenSsidMode;
 	uint8_t  ucDisconnectDetectThreshold;
-	uint8_t  aucPadding1[3];
+	uint8_t  ucIotApAct;
+	uint8_t  aucPadding1[2];
 	uint32_t u4PrivateData;
 	struct CMD_SET_BSS_RLM_PARAM rBssRlmParam; /*68*/
 	uint8_t  ucDBDCBand;  /*90, ENUM_CMD_REQ_DBDC_BAND_T*/
@@ -1002,6 +1004,11 @@ struct CMD_SET_WMM_PS_TEST_STRUCT {
 	/* not to trigger UC on beacon TIM is matched (under U-APSD) */
 };
 
+struct CMD_SET_REPORT_BEACON_STRUCT {
+	uint8_t ucReportBcnEn;
+	uint8_t aucReserved[3];
+};
+
 struct CMD_CUSTOM_NOA_PARAM_STRUCT {
 	uint32_t  u4NoaDurationMs;   /* unit: msec*/
 	uint32_t  u4NoaIntervalMs;   /* unit: msec*/
@@ -1066,6 +1073,9 @@ struct PARAM_SSID {
 #define CMD_SCAN_REQ_V2_FUNC_RANDOM_MAC_MASK        BIT(0)
 #define CMD_SCAN_REQ_V2_FUNC_DIS_DBDC_SCAN_MASK     BIT(1)
 #define CMD_SCAN_REQ_V2_FUNC_DBDC_SCAN_TYPE_3_MASK  BIT(2)
+/* use 6*4 = 24 bytes as bssid of being scanned ap */
+#define CMD_SCAN_REQ_V2_FUNC_USE_PADDING_AS_BSSID	BIT(3)
+#define CMD_SCAN_REQ_V2_FUNC_RANDOM_PROBE_REQ_SN_MASK	BIT(4)
 
 struct CMD_SCAN_REQ_V2 {
 	uint8_t          ucSeqNum;
@@ -1092,7 +1102,12 @@ struct CMD_SCAN_REQ_V2 {
 	struct PARAM_SSID    arSSIDExtend[6];
 	uint8_t          aucBSSID[MAC_ADDR_LEN];
 	uint8_t          aucRandomMac[MAC_ADDR_LEN];
-	uint8_t          aucPadding_3[64];
+	uint8_t		 aucExtBSSID[MAC_ADDR_LEN * 4];
+	uint8_t		 ucShortSSIDNum;
+	uint16_t	 u2OpChStayTimeMs;
+	uint8_t		 ucDfsChDwellTimeMs;
+	uint8_t		 ucPerScanChannelCnt;
+	uint8_t		 aucPadding_3[35];
 };
 
 /* TLV for CMD_ID_SCAN_REQ_V2*/

@@ -1,3 +1,4 @@
+MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
 # ---------------------------------------------------
 # OS option
 # ---------------------------------------------------
@@ -47,6 +48,14 @@ endif
 
 $(info $$MTK_PLATFORM is [${MTK_PLATFORM}])
 $(info $$WLAN_CHIP_ID is [${WLAN_CHIP_ID}])
+
+#ifneq ($(CONFIG_MTK_EMI),)
+ccflags-y += -DCONFIG_MTK_EMI=1
+#endif
+
+#ifneq ($(CONFIG_MEDIATEK_EMI),)
+ccflags-y += -DCONFIG_MTK_EMI=1
+#endif
 
 ifeq ($(WLAN_CHIP_ID),)
 WLAN_CHIP_ID=$(word 1, $(MTK_COMBO_CHIP))
@@ -173,10 +182,18 @@ ifeq ($(WIFI_ENABLE_GCOV), y)
     GCOV_PROFILE := y
 endif
 
+ccflags-y += -DCFG_DRIVER_INITIAL_RUNNING_MODE=3
+
 ifneq ($(filter 6765, $(WLAN_CHIP_ID)),)
+    ccflags-y += -DCFG_SUPPORT_DUAL_STA=0
+else ifeq ($(CONFIG_MTK_TC10_FEATURE), y)
     ccflags-y += -DCFG_SUPPORT_DUAL_STA=0
 else
     ccflags-y += -DCFG_SUPPORT_DUAL_STA=1
+endif
+
+ifneq ($(filter 6779, $(WLAN_CHIP_ID)),)
+    ccflags-y += -DCFG_FORCE_AP1NSS
 endif
 
 ifeq ($(MTK_ANDROID_WMT), y)
@@ -193,18 +210,18 @@ endif
 ifeq ($(CONFIG_MTK_WIFI_CONNINFRA_SUPPORT), y)
     ccflags-y += -DCFG_SUPPORT_CONNINFRA=1
     ccflags-y += -DCFG_SUPPORT_PRE_ON_PHY_ACTION=1
-    ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/conninfra/include
+    ccflags-y += -I$(srctree)drivers/misc/mediatek/connectivity/conninfra/include
     ccflags-y += -DCFG_ANDORID_CONNINFRA_COREDUMP_SUPPORT=1
     ifneq ($(CONFIG_MTK_CONNSYS_DEDICATED_LOG_PATH),)
-        ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/conninfra/include
-        ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/conninfra/platform/include
-        ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/conninfra/base/include
-        ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/conninfra/debug_utility
-        ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/conninfra/debug_utility/include
-        ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/conninfra/debug_utility/connsyslog
-        ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/conninfra/debug_utility/coredump
-        ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/conninfra/debug_utility/coredump/platform/include
-        ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/wlan/adaptor
+        ccflags-y += -I$(srctree)drivers/misc/mediatek/connectivity/conninfra/include
+        ccflags-y += -I$(srctree)drivers/misc/mediatek/connectivity/conninfra/platform/include
+        ccflags-y += -I$(srctree)drivers/misc/mediatek/connectivity/conninfra/base/include
+        ccflags-y += -I$(srctree)drivers/misc/mediatek/connectivity/conninfra/debug_utility
+        ccflags-y += -I$(srctree)drivers/misc/mediatek/connectivity/conninfra/debug_utility/include
+        ccflags-y += -I$(srctree)drivers/misc/mediatek/connectivity/conninfra/debug_utility/connsyslog
+        ccflags-y += -I$(srctree)drivers/misc/mediatek/connectivity/conninfra/debug_utility/coredump
+        ccflags-y += -I$(srctree)drivers/misc/mediatek/connectivity/conninfra/debug_utility/coredump/platform/include
+        ccflags-y += -I$(srctree)drivers/misc/mediatek/connectivity/wlan/adaptor
     endif
 else
     ccflags-y += -DCFG_SUPPORT_CONNINFRA=0
@@ -237,7 +254,11 @@ endif
 ifneq ($(filter MTK_WCN_REMOVE_KERNEL_MODULE,$(KBUILD_SUBDIR_CCFLAGS)),)
     ccflags-y += -DCFG_BUILT_IN_DRIVER=1
 else
-    ccflags-y += -DCFG_BUILT_IN_DRIVER=0
+    ifeq ($(CONFIG_WLAN_DRV_BUILD_IN), y))
+        ccflags-y += -DCFG_BUILT_IN_DRIVER=1
+    else
+        ccflags-y += -DCFG_BUILT_IN_DRIVER=0
+    endif
 endif
 
 ifneq ($(findstring UT_TEST_MODE,$(MTK_COMBO_CHIP)),)
@@ -347,7 +368,7 @@ else
 endif
 
 ifeq ($(MODULE_NAME),)
-	MODULE_NAME := wlan_drv_gen4m
+	MODULE_NAME := wlan_$(shell echo $(strip $(WLAN_CHIP_ID)) | tr A-Z a-z)_$(CONFIG_MTK_COMBO_WIFI_HIF)
 endif
 
 ccflags-y += -DDBG=0
@@ -442,8 +463,8 @@ MGMT_DIR    := mgmt/
 CHIPS       := chips/
 CHIPS_CMM   := $(CHIPS)common/
 
-ifneq ($(MTK_PLATFORM),)
-PLAT_DIR    := os/$(os)/plat/$(MTK_PLATFORM)/
+ifneq ($(WLAN_CHIP_ID),)
+PLAT_DIR    := os/$(os)/plat/mt$(WLAN_CHIP_ID)/
 endif
 SYSDVT_DIR  := dvt/
 
@@ -487,6 +508,7 @@ OS_OBJS := 	$(OS_DIR)gl_init.o \
 		$(OS_DIR)gl_rst.o \
 		$(OS_DIR)gl_cfg80211.o \
 		$(OS_DIR)gl_proc.o \
+		$(OS_DIR)gl_sys.o \
 		$(OS_DIR)gl_vendor.o \
 		$(OS_DIR)platform.o
 endif
@@ -650,7 +672,7 @@ endif
 # ---------------------------------------------------
 # Platform Objects List
 # ---------------------------------------------------
-ifneq ($(MTK_PLATFORM),)
+ifneq ($(PLAT_DIR),)
 
 PLAT_PRIV_C = $(src)/$(PLAT_DIR)plat_priv.c
 

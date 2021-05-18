@@ -222,6 +222,7 @@ typedef struct _DEV_WMT_ {
 	OSAL_SLEEPABLE_LOCK wlan_lock;
 	OSAL_SLEEPABLE_LOCK assert_lock;
 	OSAL_SLEEPABLE_LOCK mpu_lock;
+	OSAL_SLEEPABLE_LOCK power_lock;
 	/* WMTd thread information */
 	/* struct task_struct *pWmtd;   *//* main thread (wmtd) handle */
 	OSAL_THREAD thread;
@@ -420,6 +421,9 @@ extern INT32 wmt_lib_assert_lock_trylock(VOID);
 extern INT32 wmt_lib_assert_lock_aquire(VOID);
 extern VOID wmt_lib_mpu_lock_release(VOID);
 extern INT32 wmt_lib_mpu_lock_aquire(VOID);
+extern VOID wmt_lib_power_lock_release(VOID);
+extern INT32 wmt_lib_power_lock_trylock(VOID);
+extern INT32 wmt_lib_power_lock_aquire(VOID);
 extern INT32 wmt_lib_set_stp_wmt_last_close(UINT32 value);
 
 extern VOID wmt_lib_set_patch_num(UINT32 num);
@@ -437,6 +441,7 @@ extern INT32 wmt_lib_merge_if_flag_get(UINT32 enable);
 
 extern PUINT8 wmt_lib_get_cpupcr_xml_format(PUINT32 len);
 extern PUINT8 wmt_lib_get_cpupcr_reg_info(PUINT32 len, PUINT32 consys_reg);
+extern INT32 wmt_lib_get_host_assert_info(PUINT32 type, PUINT32 reason, PUINT32 en);
 extern UINT32 wmt_lib_set_host_assert_info(UINT32 type, UINT32 reason, UINT32 en);
 extern INT8 wmt_lib_co_clock_get(VOID);
 extern UINT32 wmt_lib_soc_set_wifiver(UINT32 wifiver);
@@ -480,6 +485,7 @@ INT32 wmt_lib_dmp_consys_state(P_CONSYS_STATE_DMP_INFO dmp_info,
 
 extern INT32 wmt_lib_reg_readable(VOID);
 extern INT32 wmt_lib_reg_readable_by_addr(SIZE_T addr);
+extern INT32 wmt_lib_utc_time_sync(VOID);
 /*******************************************************************************
 *                              F U N C T I O N S
 ********************************************************************************

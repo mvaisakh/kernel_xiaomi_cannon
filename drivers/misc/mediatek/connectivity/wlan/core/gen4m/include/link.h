@@ -370,10 +370,14 @@ static __KAL_INLINE__ void __linkAdd(IN struct LINK_ENTRY
 				     *prNew, IN struct LINK_ENTRY *prPrev,
 				     IN struct LINK_ENTRY *prNext)
 {
-	prNext->prPrev = prNew;
-	prNew->prNext = prNext;
-	prNew->prPrev = prPrev;
-	prPrev->prNext = prNew;
+	if (prNext) {
+		prNext->prPrev = prNew;
+		prNew->prNext = prNext;
+	}
+	if (prPrev) {
+		prNew->prPrev = prPrev;
+		prPrev->prNext = prNew;
+	}
 }				/* end of __linkAdd() */
 
 /*----------------------------------------------------------------------------*/

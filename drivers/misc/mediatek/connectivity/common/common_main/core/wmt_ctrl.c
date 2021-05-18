@@ -551,7 +551,7 @@ INT32 wmt_ctrl_stp_open(P_WMT_CTRL_DATA pWmtCtrlData)
 		}
 
 		/*register stp rx call back to btif */
-		iRet = mtk_wcn_stp_rxcb_register((MTK_WCN_BTIF_RX_CB) mtk_wcn_stp_parser_data);
+		iRet = mtk_wcn_stp_rxcb_register((MTK_WCN_BTIF_RX_CB)mtk_wcn_stp_parser_data);
 		if (iRet) {
 			WMT_WARN_FUNC("mtk_wcn_stp_rxcb_register fail(%d)\n", iRet);
 			return -2;
@@ -612,7 +612,7 @@ INT32 wmt_ctrl_get_patch_info(P_WMT_CTRL_DATA pWmtCtrlData)
 		return -1;
 	}
 
-	downLoadSeq = pWmtCtrlData->au4CtrlData[0];
+	downLoadSeq = (UINT32)pWmtCtrlData->au4CtrlData[0];
 	WMT_DBG_FUNC("download seq is %d\n", downLoadSeq);
 
 	pPatchinfo = pDev->pWmtPatchInfo + downLoadSeq - 1;
@@ -639,10 +639,10 @@ INT32 wmt_ctrl_get_rom_patch_info(P_WMT_CTRL_DATA pWmtCtrlData)
 	INT32 ret = 0;
 	UINT8 cmdStr[NAME_MAX + 1] = { 0 };
 
-	type = pWmtCtrlData->au4CtrlData[0];
+	type = (UINT32)pWmtCtrlData->au4CtrlData[0];
 	WMT_DBG_FUNC("rom patch type is %d\n", type);
-	pDev->ip_ver = pWmtCtrlData->au4CtrlData[3];
-	pDev->fw_ver = pWmtCtrlData->au4CtrlData[4];
+	pDev->ip_ver = (UINT32)pWmtCtrlData->au4CtrlData[3];
+	pDev->fw_ver = (UINT32)pWmtCtrlData->au4CtrlData[4];
 	WMT_DBG_FUNC("ip version is [%x] [%x]\n", pDev->ip_ver, pDev->fw_ver);
 
 	if (!pDev->pWmtRomPatchInfo[WMTDRV_TYPE_WMT]) {
@@ -693,8 +693,8 @@ INT32 wmt_ctrl_update_patch_version(P_WMT_CTRL_DATA pWmtCtrlData)
 INT32 wmt_ctrl_soc_paldo_ctrl(P_WMT_CTRL_DATA pWmtCtrlData)
 {
 	INT32 iRet = 0;
-	ENUM_PALDO_TYPE ept = pWmtCtrlData->au4CtrlData[0];
-	ENUM_PALDO_OP epo = pWmtCtrlData->au4CtrlData[1];
+	ENUM_PALDO_TYPE ept = (ENUM_PALDO_TYPE)pWmtCtrlData->au4CtrlData[0];
+	ENUM_PALDO_OP epo = (ENUM_PALDO_OP)pWmtCtrlData->au4CtrlData[1];
 
 	WMT_DBG_FUNC("ept(%d),epo(%d)\n", ept, epo);
 	iRet = wmt_plat_soc_paldo_ctrl(ept, epo);
@@ -810,8 +810,8 @@ INT32 wmt_ctrl_stp_conf(P_WMT_CTRL_DATA pWmtCtrlData)
 		return -1;
 	}
 
-	type = pWmtCtrlData->au4CtrlData[0];
-	value = pWmtCtrlData->au4CtrlData[1];
+	type = (UINT32)pWmtCtrlData->au4CtrlData[0];
+	value = (UINT32)pWmtCtrlData->au4CtrlData[1];
 	iRet = wmt_ctrl_stp_conf_ex(type, value);
 
 	if (!iRet) {
@@ -885,7 +885,7 @@ INT32 wmt_ctrl_crystal_triming_get(P_WMT_CTRL_DATA pWmtCtrlData)
 	}
 	if (wmt_dev_patch_get(pFileName, &pNvram) == 0) {
 		*ppBuf = (PUINT8)(pNvram)->data;
-		*pSize = (pNvram)->size;
+		*pSize = (UINT32)(pNvram)->size;
 		gDevWmt.pNvram = pNvram;
 		return 0;
 	}
@@ -960,8 +960,8 @@ INT32 wmt_ctrl_sdio_hw(P_WMT_CTRL_DATA pWmtCtrlData)
 	UINT32 statBit = WMT_STAT_SDIO1_ON;
 	P_DEV_WMT pDev = &gDevWmt;	/* single instance */
 
-	WMT_SDIO_SLOT_NUM sdioSlotNum = pWmtCtrlData->au4CtrlData[0];
-	ENUM_FUNC_STATE funcState = pWmtCtrlData->au4CtrlData[1];
+	WMT_SDIO_SLOT_NUM sdioSlotNum = (WMT_SDIO_SLOT_NUM)pWmtCtrlData->au4CtrlData[0];
+	ENUM_FUNC_STATE funcState = (ENUM_FUNC_STATE)pWmtCtrlData->au4CtrlData[1];
 
 	if ((sdioSlotNum == WMT_SDIO_SLOT_INVALID)
 	    || (sdioSlotNum >= WMT_SDIO_SLOT_MAX)) {
@@ -1000,8 +1000,8 @@ INT32 wmt_ctrl_sdio_func(P_WMT_CTRL_DATA pWmtCtrlData)
 	UINT32 statBit = WMT_STAT_SDIO_WIFI_ON;
 	INT32 retry = 10;
 	P_DEV_WMT pDev = &gDevWmt;	/* single instance */
-	WMT_SDIO_FUNC_TYPE sdioFuncType = pWmtCtrlData->au4CtrlData[0];
-	UINT32 u4On = pWmtCtrlData->au4CtrlData[1];
+	WMT_SDIO_FUNC_TYPE sdioFuncType = (WMT_SDIO_FUNC_TYPE)pWmtCtrlData->au4CtrlData[0];
+	UINT32 u4On = (UINT32)pWmtCtrlData->au4CtrlData[1];
 
 	if (sdioFuncType >= WMT_SDIO_FUNC_MAX) {
 		WMT_ERR_FUNC("CTRL_SDIO_FUNC, invalid func type (%d)\n", sdioFuncType);

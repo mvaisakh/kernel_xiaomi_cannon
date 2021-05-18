@@ -482,7 +482,7 @@ void soc3_0_show_ple_info(
 {
 	u_int32_t int_n9_err = 0;
 	u_int32_t int_n9_err1 = 0;
-	u_int32_t ple_buf_ctrl, pg_sz, pg_num;
+	u_int32_t ple_buf_ctrl = 0, pg_sz, pg_num;
 	u_int32_t ple_stat[25] = {0}, pg_flow_ctrl[10] = {0};
 	u_int32_t sta_pause[6] = {0}, dis_sta_map[6] = {0};
 	u_int32_t fpg_cnt, ffa_cnt, fpg_head, fpg_tail, hif_max_q, hif_min_q;
@@ -1195,7 +1195,7 @@ void soc3_0_show_pse_info(
 static void DumpPPDebugCr(struct ADAPTER *prAdapter)
 {
 	uint32_t ReadRegValue[4];
-	uint32_t u4Value[4];
+	uint32_t u4Value[4] = {0};
 
 	/* 0x820CC0F0 : PP DBG_CTRL */
 	ReadRegValue[0] = 0x820CC0F0;
@@ -1230,7 +1230,7 @@ void show_wfdma_interrupt_info(
 	uint32_t u4DmaCfgCrAddr = 0;
 	uint32_t u4DmaCfgCrAddrByWFDMA[CONNAC2X_WFDMA_COUNT];
 	uint32_t u4RegValue = 0;
-	uint32_t u4RegValueByWFDMA[CONNAC2X_WFDMA_COUNT];
+	uint32_t u4RegValueByWFDMA[CONNAC2X_WFDMA_COUNT] = {0};
 
 	/* Dump Interrupt Status info */
 	if (enum_wfdma_type == WFDMA_TYPE_HOST) {
@@ -1354,8 +1354,8 @@ void show_wfdma_ring_info(
 	uint32_t queue_cnt;
 
 	/* Dump All TX Ring Info */
-	DBGLOG(HAL, TRACE, "----------- TX Ring Config -----------\n");
-	DBGLOG(HAL, TRACE, "%4s %16s %8s %10s %6s %6s %6s %6s\n",
+	DBGLOG(HAL, INFO, "----------- TX Ring Config -----------\n");
+	DBGLOG(HAL, INFO, "%4s %16s %8s %10s %6s %6s %6s %6s\n",
 		"Idx", "Attr", "Reg", "Base", "Cnt", "CIDX", "DIDX", "QCnt");
 
 	/* Dump TX Ring */
@@ -1393,8 +1393,8 @@ void show_wfdma_ring_info(
 	}
 
 	/* Dump All RX Ring Info */
-	DBGLOG(HAL, TRACE, "----------- RX Ring Config -----------\n");
-	DBGLOG(HAL, TRACE, "%4s %16s %8s %10s %6s %6s %6s %6s\n",
+	DBGLOG(HAL, INFO, "----------- RX Ring Config -----------\n");
+	DBGLOG(HAL, INFO, "%4s %16s %8s %10s %6s %6s %6s %6s\n",
 		"Idx", "Attr", "Reg", "Base", "Cnt", "CIDX", "DIDX", "QCnt");
 
 	/* Dump RX Ring */
@@ -1433,118 +1433,61 @@ void show_wfdma_ring_info(
 
 }
 
-static void dump_dbg_value(
-	IN struct ADAPTER *prAdapter,
-	IN uint32_t pdma_base_cr,
-	IN uint32_t set_value,
-	IN uint32_t isMandatoryDump)
-{
-	uint32_t set_debug_cr, get_debug_cr;
-	uint32_t get_debug_value = 0;
-
-	set_debug_cr = pdma_base_cr + 0x124;
-	get_debug_cr = pdma_base_cr + 0x128;
-
-	HAL_MCR_WR(prAdapter, set_debug_cr, set_value);
-	HAL_MCR_RD(prAdapter, get_debug_cr, &get_debug_value);
-
-	if (isMandatoryDump == 1) {
-		DBGLOG(INIT, INFO, "set(0x%08x):0x%08x, get(0x%08x):0x%08x\n",
-						set_debug_cr, set_value,
-						get_debug_cr, get_debug_value);
-	} else {
-		DBGLOG(INIT, TRACE, "set(0x%08x):0x%08x, get(0x%08x):0x%08x\n",
-						set_debug_cr, set_value,
-						get_debug_cr, get_debug_value);
-	}
-}
-
 static void dump_wfdma_dbg_value(
 	IN struct ADAPTER *prAdapter,
 	IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type,
-	IN uint32_t wfdma_idx,
-	IN uint32_t isMandatoryDump)
+	IN uint32_t wfdma_idx)
 {
+#define BUF_SIZE 1024
+
 	uint32_t pdma_base_cr;
 	uint32_t set_debug_flag_value;
+	char *buf;
+	uint32_t pos = 0;
+	uint32_t set_debug_cr, get_debug_cr, get_debug_value = 0;
 
 	if (enum_wfdma_type == WFDMA_TYPE_HOST) {
 		if (wfdma_idx == 0)
 			pdma_base_cr = CONNAC2X_HOST_WPDMA_0_BASE;
 		else
 			pdma_base_cr = CONNAC2X_HOST_WPDMA_1_BASE;
-	} else{
+	} else {
 		if (wfdma_idx == 0)
 			pdma_base_cr = CONNAC2X_MCU_WPDMA_0_BASE;
 		else
 			pdma_base_cr = CONNAC2X_MCU_WPDMA_1_BASE;
 	}
 
-	set_debug_flag_value = 0x100;
-	dump_dbg_value(prAdapter, pdma_base_cr,
-		set_debug_flag_value, isMandatoryDump);
-
-	set_debug_flag_value = 0x101;
-	dump_dbg_value(prAdapter, pdma_base_cr,
-		set_debug_flag_value, isMandatoryDump);
-
-	set_debug_flag_value = 0x102;
-	dump_dbg_value(prAdapter, pdma_base_cr,
-		set_debug_flag_value, isMandatoryDump);
-
-	set_debug_flag_value = 0x103;
-	dump_dbg_value(prAdapter, pdma_base_cr,
-		set_debug_flag_value, isMandatoryDump);
-
-	set_debug_flag_value = 0x104;
-	dump_dbg_value(prAdapter, pdma_base_cr,
-		set_debug_flag_value, isMandatoryDump);
-
-	set_debug_flag_value = 0x105;
-	dump_dbg_value(prAdapter, pdma_base_cr,
-		set_debug_flag_value, isMandatoryDump);
-
-	set_debug_flag_value = 0x107;
-	dump_dbg_value(prAdapter, pdma_base_cr,
-		set_debug_flag_value, isMandatoryDump);
-
-	set_debug_flag_value = 0x10A;
-	dump_dbg_value(prAdapter, pdma_base_cr,
-		set_debug_flag_value, isMandatoryDump);
-
-	set_debug_flag_value = 0x10D;
-	dump_dbg_value(prAdapter, pdma_base_cr,
-		set_debug_flag_value, isMandatoryDump);
-
-	set_debug_flag_value = 0x10E;
-	dump_dbg_value(prAdapter, pdma_base_cr,
-		set_debug_flag_value, isMandatoryDump);
-
-	set_debug_flag_value = 0x10F;
-	dump_dbg_value(prAdapter, pdma_base_cr,
-		set_debug_flag_value, isMandatoryDump);
-
-	set_debug_flag_value = 0x110;
-	dump_dbg_value(prAdapter, pdma_base_cr,
-		set_debug_flag_value, isMandatoryDump);
-
-	set_debug_flag_value = 0x111;
-	dump_dbg_value(prAdapter, pdma_base_cr,
-		set_debug_flag_value, isMandatoryDump);
-
-	set_debug_flag_value = 0x112;
-	dump_dbg_value(prAdapter, pdma_base_cr,
-		set_debug_flag_value, isMandatoryDump);
-
+	buf = (char *) kalMemAlloc(BUF_SIZE, VIR_MEM_TYPE);
+	if (!buf) {
+		DBGLOG(HAL, ERROR, "Mem allocation failed.\n");
+		return;
+	}
+	set_debug_cr = pdma_base_cr + 0x124;
+	get_debug_cr = pdma_base_cr + 0x128;
+	kalMemZero(buf, BUF_SIZE);
+	pos += kalSnprintf(buf + pos, 50,
+			"set_debug_cr:0x%08x get_debug_cr:0x%08x; ",
+			set_debug_cr, get_debug_cr);
+	for (set_debug_flag_value = 0x100; set_debug_flag_value <= 0x112;
+			set_debug_flag_value++) {
+		HAL_MCR_WR(prAdapter, set_debug_cr, set_debug_flag_value);
+		HAL_MCR_RD(prAdapter, get_debug_cr, &get_debug_value);
+		pos += kalSnprintf(buf + pos, 40, "Set:0x%03x, result=0x%08x%s",
+			set_debug_flag_value,
+			get_debug_value,
+			set_debug_flag_value == 0x112 ? "\n" : "; ");
+	}
+	DBGLOG(HAL, INFO, "%s", buf);
+	kalMemFree(buf, VIR_MEM_TYPE, BUF_SIZE);
 }
 
 void show_wfdma_dbg_flag_log(
 	IN struct ADAPTER *prAdapter,
-	IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type,
-	IN uint32_t isMandatoryDump)
+	IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type)
 {
-	dump_wfdma_dbg_value(prAdapter, enum_wfdma_type, 0, isMandatoryDump);
-	dump_wfdma_dbg_value(prAdapter, enum_wfdma_type, 1, isMandatoryDump);
+	dump_wfdma_dbg_value(prAdapter, enum_wfdma_type, 0);
+	dump_wfdma_dbg_value(prAdapter, enum_wfdma_type, 1);
 }
 
 void show_wfdma_dbg_log(
@@ -1565,8 +1508,8 @@ void soc3_0_show_wfdma_info(IN struct ADAPTER *prAdapter)
 	show_wfdma_dbg_log(prAdapter, WFDMA_TYPE_WM);
 
 	/* dump debug flag CR by host or WM*/
-	show_wfdma_dbg_flag_log(prAdapter, WFDMA_TYPE_HOST, FALSE);
-	show_wfdma_dbg_flag_log(prAdapter, WFDMA_TYPE_WM, FALSE);
+	show_wfdma_dbg_flag_log(prAdapter, WFDMA_TYPE_HOST);
+	show_wfdma_dbg_flag_log(prAdapter, WFDMA_TYPE_WM);
 
 	DumpPPDebugCr(prAdapter);
 }
@@ -1576,10 +1519,10 @@ void soc3_0_show_wfdma_info_by_type(IN struct ADAPTER *prAdapter,
 {
 	if (bShowWFDMA_type) {
 		show_wfdma_dbg_log(prAdapter, WFDMA_TYPE_WM);
-		show_wfdma_dbg_flag_log(prAdapter, WFDMA_TYPE_WM, TRUE);
+		show_wfdma_dbg_flag_log(prAdapter, WFDMA_TYPE_WM);
 	} else {
 		show_wfdma_dbg_log(prAdapter, WFDMA_TYPE_HOST);
-		show_wfdma_dbg_flag_log(prAdapter, WFDMA_TYPE_HOST, TRUE);
+		show_wfdma_dbg_flag_log(prAdapter, WFDMA_TYPE_HOST);
 	}
 }
 
@@ -1671,6 +1614,123 @@ void soc3_0_show_dmashdl_info(IN struct ADAPTER *prAdapter)
 		DBGLOG(HAL, INFO, "DMASHDL: no counter mismatch\n");
 }
 
+void soc3_0_dump_mac_info(IN struct ADAPTER *prAdapter)
+{
+#define BUF_SIZE 1024
+#define CR_COUNT 12
+#define LOOP_COUNT 30
+
+	uint32_t i = 0, j = 0, pos = 0;
+	uint32_t value = 0;
+	uint32_t cr_band0[] = {
+			0x820ED020,
+			0x820E4120,
+			0x820E4128,
+			0x820E22F0,
+			0x820E22F4,
+			0x820E22F8,
+			0x820E22FC,
+			0x820E3190,
+			0x820C0220,
+			0x820C0114,
+			0x820C0154,
+			0x820E0024
+	};
+	uint32_t cr_band1[] = {
+			0x820FD020,
+			0x820F4120,
+			0x820F4128,
+			0x820F22F0,
+			0x820F22F4,
+			0x820F22F8,
+			0x820F22FC,
+			0x820F3190,
+			0x820C0220,
+			0x820C0114,
+			0x820C0154,
+			0x820F0024
+	};
+
+	char *buf = (char *) kalMemAlloc(BUF_SIZE, VIR_MEM_TYPE);
+
+	DBGLOG(HAL, INFO, "Dump for band0\n");
+	HAL_MCR_WR(prAdapter, 0x7C006100, 0x1F);
+	HAL_MCR_WR(prAdapter, 0x7C006104, 0x07070707);
+	HAL_MCR_WR(prAdapter, 0x7C006108, 0x0A0A0909);
+	HAL_MCR_RD(prAdapter, 0x820D0000, &value);
+	DBGLOG(HAL, INFO, "Dump CR: 0x820D0000 = 0x%08x\n", value);
+	HAL_MCR_RD(prAdapter, 0x820E3080, &value);
+	DBGLOG(HAL, INFO, "Dump CR: 0x820E3080 = 0x%08x\n", value);
+	HAL_MCR_RD(prAdapter, 0x820C0028, &value);
+	DBGLOG(HAL, INFO, "Dump CR: 0x820C0028 = 0x%08x\n", value);
+	HAL_MCR_RD(prAdapter, 0x820C8028, &value);
+	DBGLOG(HAL, INFO, "Dump CR: 0x820C8028 = 0x%08x\n", value);
+	HAL_MCR_RD(prAdapter, 0x820C8030, &value);
+	DBGLOG(HAL, INFO, "Dump CR: 0x820C8030 = 0x%08x\n", value);
+	/* Band 0 TXV_C and TXV_P */
+	for (i = 0x820E412C; i < 0x820E4160; i += 4) {
+		HAL_MCR_RD(prAdapter, i, &value);
+		DBGLOG(HAL, INFO, "Dump CR: 0x%08x = 0x%08x\n", i, value);
+		kalMdelay(1);
+	}
+	HAL_MCR_RD(prAdapter, 0x820E206C, &value);
+	DBGLOG(HAL, INFO, "Dump CR: 0x820E206C = 0x%08x\n", value);
+
+	if (buf) {
+		kalMemZero(buf, BUF_SIZE);
+		for (i = 0; i < LOOP_COUNT; i++) {
+			for (j = 0; j < CR_COUNT; j++) {
+				HAL_MCR_RD(prAdapter, cr_band0[j], &value);
+				pos += kalSnprintf(buf + pos, 25,
+					"0x%08x = 0x%08x%s", cr_band0[j], value,
+					j == CR_COUNT - 1 ? ";" : ",");
+			}
+			DBGLOG(HAL, INFO, "Dump CR: %s\n", buf);
+			pos = 0;
+		}
+	}
+
+	DBGLOG(HAL, INFO, "Dump for band1\n");
+	HAL_MCR_WR(prAdapter, 0x7C006400, 0x1F);
+	HAL_MCR_WR(prAdapter, 0x7C006404, 0x07070707);
+	HAL_MCR_WR(prAdapter, 0x7C006408, 0x0A0A0909);
+	HAL_MCR_RD(prAdapter, 0x820D0000, &value);
+	DBGLOG(HAL, INFO, "Dump CR: 0x820D0000 = 0x%08x\n", value);
+	HAL_MCR_RD(prAdapter, 0x820F3080, &value);
+	DBGLOG(HAL, INFO, "Dump CR: 0x820F3080 = 0x%08x\n", value);
+	HAL_MCR_RD(prAdapter, 0x820C0028, &value);
+	DBGLOG(HAL, INFO, "Dump CR: 0x820C0028 = 0x%08x\n", value);
+	HAL_MCR_RD(prAdapter, 0x820C8028, &value);
+	DBGLOG(HAL, INFO, "Dump CR: 0x820C8028 = 0x%08x\n", value);
+	HAL_MCR_RD(prAdapter, 0x820C8030, &value);
+	DBGLOG(HAL, INFO, "Dump CR: 0x820C8030 = 0x%08x\n", value);
+	/* Band 0 TXV_C and TXV_P */
+	for (i = 0x820F412C; i < 0x820F4160; i += 4) {
+		HAL_MCR_RD(prAdapter, i, &value);
+		DBGLOG(HAL, INFO, "Dump CR: 0x%08x = 0x%08x\n", i, value);
+		kalMdelay(1);
+	}
+	HAL_MCR_RD(prAdapter, 0x820F206C, &value);
+	DBGLOG(HAL, INFO, "Dump CR: 0x820F206C = 0x%08x\n", value);
+
+	if (buf) {
+		kalMemZero(buf, BUF_SIZE);
+		for (i = 0; i < LOOP_COUNT; i++) {
+			for (j = 0; j < CR_COUNT; j++) {
+				HAL_MCR_RD(prAdapter, cr_band1[j], &value);
+				pos += kalSnprintf(buf + pos, 25,
+					"0x%08x = 0x%08x%s", cr_band1[j], value,
+					j == CR_COUNT - 1 ? ";" : ",");
+			}
+			DBGLOG(HAL, INFO, "Dump CR: %s\n", buf);
+			pos = 0;
+		}
+	}
+
+	if (buf)
+		kalMemFree(buf, VIR_MEM_TYPE, BUF_SIZE);
+}
+
 #if WFSYS_SUPPORT_BUS_HANG_READ_FROM_DRIVER_BASE
 void show_wfdma_interrupt_info_without_adapter(
 	IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type)
@@ -1679,7 +1739,8 @@ void show_wfdma_interrupt_info_without_adapter(
 	uint32_t u4hostBaseCrAddr = 0;
 	uint32_t u4DmaCfgCrAddr = 0;
 	uint32_t u4DmaCfgCrAddrByWFDMA[CONNAC2X_WFDMA_COUNT];
-	uint32_t u4RegValue, u4RegValueByWFDMA[CONNAC2X_WFDMA_COUNT];
+	uint32_t u4RegValue = 0;
+	uint32_t u4RegValueByWFDMA[CONNAC2X_WFDMA_COUNT] = {0};
 
 	/* Dump Interrupt Status info */
 	if (enum_wfdma_type == WFDMA_TYPE_HOST) {

@@ -712,7 +712,13 @@ struct STA_RECORD {
 #endif
 
 	u_int8_t fgSupportBTM; /* Indicates whether to support BTM */
-
+#if CFG_TC10_FEATURE
+	u_int8_t fgSupportProxyARP;
+	u_int8_t fgSupportTFS;
+	u_int8_t fgSupportWNMSleep;
+	u_int8_t fgSupportTIMBcast;
+	u_int8_t fgSupportDMS;
+#endif
 	/*
 	 * Flag used to record the connected status of upper layer.
 	 * Indicate connected status only when disconnected, and only
@@ -722,6 +728,7 @@ struct STA_RECORD {
 #if CFG_SUPPORT_HE_ER
 	u_int8_t fgIsExtendedRange;
 #endif
+	u_int8_t fgIsEapEncrypt;
 };
 
 #if 0

@@ -196,7 +196,8 @@ enum ENUM_WF_RST_SOURCE {
 #if CFG_WMT_RESET_API_SUPPORT
 extern int wifi_reset_start(void);
 extern int wifi_reset_end(enum ENUM_RESET_STATUS);
-
+extern int mtk_wcn_get_host_assert_info(unsigned int *type,
+	unsigned int *reason, unsigned int *en);
 #if (CFG_SUPPORT_CONNINFRA == 1)
 extern int hifAxiRemove(void);
 extern void kalSetRstEvent(void);

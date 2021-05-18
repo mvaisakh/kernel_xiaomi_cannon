@@ -781,11 +781,11 @@ u_int8_t secPrivacySeekForEntry(
 
 	prWtbl = prAdapter->rWifiVar.arWtbl;
 
-	ucStartIDX = 0;
+	ucStartIDX = 1;
 	ucMaxIDX = prAdapter->ucTxDefaultWlanIndex - 1;
 
 	for (i = ucStartIDX; i <= ucMaxIDX; i++) {
-#if CFG_WIFI_WORKAROUND_HWITS00012836_WTBL_SEARCH_FAIL
+#if CFG_WIFI_SW_WTBL_SEARCH_FAIL
 	if (i % 8 == 0)
 		continue;
 #endif
@@ -803,7 +803,7 @@ u_int8_t secPrivacySeekForEntry(
 
 	if (i == (ucMaxIDX + 1)) {
 		for (i = ucStartIDX; i <= ucMaxIDX; i++) {
-#if CFG_WIFI_WORKAROUND_HWITS00012836_WTBL_SEARCH_FAIL
+#if CFG_WIFI_SW_WTBL_SEARCH_FAIL
 			if (i % 8 == 0)
 				continue;
 #endif
@@ -1063,64 +1063,63 @@ secPrivacySeekForBcEntry(IN struct ADAPTER *prAdapter,
 	if (prBSSInfo->eCurrentOPMode == OP_MODE_ACCESS_POINT)
 		fgCheckKeyId = FALSE;
 
-	ucStartIDX = 0;
-	ucMaxIDX = prAdapter->ucTxDefaultWlanIndex - 1;
-
-	DBGLOG_LIMITED(INIT, TRACE,
-		"OpMode:%d, NetworkType:%d, CheckKeyId:%d\n",
-		prBSSInfo->eCurrentOPMode,
-		prBSSInfo->eNetworkType,
+	DBGLOG_LIMITED(INIT, INFO, "OpMode:%d, NetworkType:%d, CheckKeyId:%d\n",
+		prBSSInfo->eCurrentOPMode, prBSSInfo->eNetworkType,
 		fgCheckKeyId);
 
-	for (i = ucStartIDX; i <= ucMaxIDX; i++) {
+	ucStartIDX = 1;
+	ucMaxIDX = prAdapter->ucTxDefaultWlanIndex - 1;
 
-		if (prWtbl[i].ucUsed && !prWtbl[i].ucPairwise
-		    && prWtbl[i].ucBssIndex == ucBssIndex) {
+	if (ucAlg == CIPHER_SUITE_BIP) {
+		ucEntry = 0;
+	} else {
+		for (i = ucStartIDX; i <= ucMaxIDX; i++) {
 
-			if (!fgCheckKeyId) {
-				ucEntry = i;
-				DBGLOG(RSN, TRACE,
-				       "[Wlan index]: Reuse entry #%d for open/wep/wpi\n",
-				       i);
-				break;
-			}
+			if (prWtbl[i].ucUsed && !prWtbl[i].ucPairwise
+				&& prWtbl[i].ucBssIndex == ucBssIndex) {
+				if (!fgCheckKeyId) {
+					ucEntry = i;
+					DBGLOG(RSN, TRACE,
+					    "[Wlan index]: Reuse entry #%d for open/wep/wpi\n",
+					    i);
+					break;
+				}
 
-			if (fgCheckKeyId && (prWtbl[i].ucKeyId == ucKeyId
-					     || prWtbl[i].ucKeyId == 0xFF)) {
-				ucEntry = i;
-				DBGLOG(RSN, TRACE,
-				       "[Wlan index]: Reuse entry #%d\n", i);
-				break;
+				if (fgCheckKeyId
+					&& (prWtbl[i].ucKeyId == ucKeyId
+						|| prWtbl[i].ucKeyId == 0xFF)) {
+					ucEntry = i;
+					DBGLOG(RSN, TRACE,
+					    "[Wlan index]: Reuse entry #%d\n",
+					    i);
+					break;
+				}
 			}
 		}
-	}
 
-	if (i == (ucMaxIDX + 1)) {
-		for (i = ucStartIDX; i <= ucMaxIDX; i++) {
-			if (prWtbl[i].ucUsed == FALSE) {
-				ucEntry = i;
-				DBGLOG(RSN, TRACE,
-				       "[Wlan index]: Assign entry #%d\n", i);
-				break;
+		if (i == (ucMaxIDX + 1)) {
+			for (i = ucStartIDX; i <= ucMaxIDX; i++) {
+				if (prWtbl[i].ucUsed == FALSE) {
+					ucEntry = i;
+					DBGLOG(RSN, TRACE,
+					    "[Wlan index]: Assign entry #%d\n",
+					    i);
+					break;
+				}
 			}
 		}
 	}
 
 	if (ucEntry < prAdapter->ucTxDefaultWlanIndex) {
-		if (ucAlg != CIPHER_SUITE_BIP) {
-			prWtbl[ucEntry].ucUsed = TRUE;
-			prWtbl[ucEntry].ucKeyId = ucKeyId;
-			prWtbl[ucEntry].ucBssIndex = ucBssIndex;
-			prWtbl[ucEntry].ucPairwise = 0;
-			kalMemCopy(prWtbl[ucEntry].aucMacAddr, pucAddr,
-				   MAC_ADDR_LEN);
-			prWtbl[ucEntry].ucStaIndex = ucStaIdx;
-		} else {
-			/* BIP no need to dump secCheckWTBLAssign */
-			return ucEntry;
-		}
+		prWtbl[ucEntry].ucUsed = TRUE;
+		prWtbl[ucEntry].ucKeyId = ucKeyId;
+		prWtbl[ucEntry].ucBssIndex = ucBssIndex;
+		prWtbl[ucEntry].ucPairwise = 0;
+		kalMemCopy(prWtbl[ucEntry].aucMacAddr, pucAddr,
+				MAC_ADDR_LEN);
+		prWtbl[ucEntry].ucStaIndex = ucStaIdx;
 
-		DBGLOG_LIMITED(RSN, TRACE,
+		DBGLOG_LIMITED(RSN, INFO,
 		       "[Wlan index] BSS#%d keyid#%d P=%d use WlanIndex#%d STAIdx=%d "
 		       MACSTR
 		       "\n", ucBssIndex, ucKeyId, prWtbl[ucEntry].ucPairwise,
@@ -1426,4 +1425,35 @@ void secHandleNoWtbl(IN struct ADAPTER *prAdapter,
 	} else
 		DBGLOG(RX, TRACE,
 			"not find station record base on TA\n");
+}
+
+void secCheckRxEapolPacketEncryption(IN struct ADAPTER *prAdapter,
+	IN struct SW_RFB *prRetSwRfb,
+	IN struct STA_RECORD *prStaRec)
+{
+	uint8_t *pucPkt = NULL;
+	uint16_t u2EtherType;
+
+	if (!prStaRec)
+		return;
+
+	if (prRetSwRfb->u2PacketLen <= ETHER_HEADER_LEN)
+		return;
+
+	pucPkt = prRetSwRfb->pvHeader;
+	if (!pucPkt)
+		return;
+
+	u2EtherType = (pucPkt[ETH_TYPE_LEN_OFFSET] << 8)
+		| (pucPkt[ETH_TYPE_LEN_OFFSET + 1]);
+	if (u2EtherType != ETH_P_1X)
+		return;
+
+	if (HAL_RX_STATUS_GET_FRAME_CTL_FIELD(
+			prRetSwRfb->prRxStatusGroup4) &
+			MASK_FC_PROTECTED_FRAME) {
+		prStaRec->fgIsEapEncrypt = TRUE;
+	} else {
+		prStaRec->fgIsEapEncrypt = FALSE;
+	}
 }

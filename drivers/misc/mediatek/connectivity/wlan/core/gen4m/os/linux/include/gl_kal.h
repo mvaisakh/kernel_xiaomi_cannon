@@ -192,14 +192,15 @@ extern struct delayed_work sched_workq;
 				    RADIOTAP_FIELD_VENDOR)
 #endif
 
-#define PERF_MON_DISABLE_BIT    (0)
-#define PERF_MON_STOP_BIT       (1)
-#define PERF_MON_RUNNING_BIT    (2)
+#define PERF_MON_INIT_BIT       (0)
+#define PERF_MON_DISABLE_BIT    (1)
+#define PERF_MON_STOP_BIT       (2)
+#define PERF_MON_RUNNING_BIT    (3)
 
 #define PERF_MON_UPDATE_INTERVAL (1000)
 #define PERF_MON_TP_MAX_THRESHOLD (10)
 
-#define PERF_MON_TP_CONDITION (0)
+#define PERF_MON_TP_CONDITION (125000)
 
 #if CFG_SUPPORT_DATA_STALL
 #define REPORT_EVENT_INTERVAL		30
@@ -300,7 +301,9 @@ enum ENUM_KAL_MEM_ALLOCATION_TYPE_E {
 };
 
 #ifdef CONFIG_ANDROID		/* Defined in Android kernel source */
-#if (KERNEL_VERSION(4, 9, 0) <= LINUX_VERSION_CODE)
+#if (KERNEL_VERSION(4, 19, 0) <= CFG80211_VERSION_CODE)
+#define KAL_WAKE_LOCK_T struct wakeup_source
+#elif (KERNEL_VERSION(4, 9, 0) <= CFG80211_VERSION_CODE)
 #define KAL_WAKE_LOCK_T struct wakeup_source
 #else
 #define KAL_WAKE_LOCK_T struct wake_lock
@@ -619,42 +622,105 @@ static inline void kalCfg80211ScanDone(struct cfg80211_scan_request *request,
 #if defined(CONFIG_ANDROID) && (CFG_ENABLE_WAKE_LOCK)
 /* CONFIG_ANDROID is defined in Android kernel source */
 #if (KERNEL_VERSION(4, 9, 0) <= LINUX_VERSION_CODE)
+#if (KERNEL_VERSION(4, 14, 149) <= LINUX_VERSION_CODE)
 #define KAL_WAKE_LOCK_INIT(_prAdapter, _prWakeLock, _pcName) \
-	wakeup_source_init(_prWakeLock, _pcName)
+	_prWakeLock = wakeup_source_register(NULL, _pcName);
 
 #define KAL_WAKE_LOCK_DESTROY(_prAdapter, _prWakeLock) \
-	wakeup_source_trash(_prWakeLock)
+{ \
+	wakeup_source_unregister(_prWakeLock); \
+	_prWakeLock = NULL; \
+}
+#else
+#define KAL_WAKE_LOCK_INIT(_prAdapter, _prWakeLock, _pcName) \
+{ \
+	_prWakeLock = kalMemAlloc(sizeof(KAL_WAKE_LOCK_T), \
+		VIR_MEM_TYPE); \
+	if (!_prWakeLock) { \
+		DBGLOG(HAL, ERROR, \
+			"KAL_WAKE_LOCK_INIT init fail!\n"); \
+	} \
+	else { \
+		wakeup_source_init(_prWakeLock, _pcName); \
+	} \
+}
 
+#define KAL_WAKE_LOCK_DESTROY(_prAdapter, _prWakeLock) \
+{ \
+	if (_prWakeLock) { \
+		wakeup_source_trash(_prWakeLock); \
+		_prWakeLock = NULL; \
+	} \
+}
+#endif
 #define KAL_WAKE_LOCK(_prAdapter, _prWakeLock) \
-	__pm_stay_awake(_prWakeLock)
+{ \
+	if (_prWakeLock) { \
+		__pm_stay_awake(_prWakeLock); \
+	} \
+}
 
 #define KAL_WAKE_LOCK_TIMEOUT(_prAdapter, _prWakeLock, _u4Timeout) \
-	__pm_wakeup_event(_prWakeLock, JIFFIES_TO_MSEC(_u4Timeout))
+{ \
+	if (_prWakeLock) { \
+		__pm_wakeup_event(_prWakeLock, JIFFIES_TO_MSEC(_u4Timeout)); \
+	} \
+}
 
 #define KAL_WAKE_UNLOCK(_prAdapter, _prWakeLock) \
-	__pm_relax(_prWakeLock)
+{ \
+	if (_prWakeLock) { \
+		__pm_relax(_prWakeLock); \
+	} \
+}
 
 #define KAL_WAKE_LOCK_ACTIVE(_prAdapter, _prWakeLock) \
-	((_prWakeLock)->active)
+	((_prWakeLock) && ((_prWakeLock)->active))
 
 #else
 #define KAL_WAKE_LOCK_INIT(_prAdapter, _prWakeLock, _pcName) \
-	wake_lock_init(_prWakeLock, WAKE_LOCK_SUSPEND, _pcName)
+{ \
+	_prWakeLock = kalMemAlloc(sizeof(KAL_WAKE_LOCK_T), \
+		VIR_MEM_TYPE); \
+	if (!_prWakeLock) { \
+		DBGLOG(HAL, ERROR, \
+			"KAL_WAKE_LOCK_INIT init fail!\n"); \
+	} \
+	else { \
+		wake_lock_init(_prWakeLock, WAKE_LOCK_SUSPEND, _pcName); \
+	} \
+}
 
 #define KAL_WAKE_LOCK_DESTROY(_prAdapter, _prWakeLock) \
-	wake_lock_destroy(_prWakeLock)
+{ \
+	if (_prWakeLock) { \
+		wake_lock_destroy(_prWakeLock); \
+	} \
+}
 
 #define KAL_WAKE_LOCK(_prAdapter, _prWakeLock) \
-	wake_lock(_prWakeLock)
+{ \
+	if (_prWakeLock) { \
+		wake_lock(_prWakeLock); \
+	} \
+}
 
 #define KAL_WAKE_LOCK_TIMEOUT(_prAdapter, _prWakeLock, _u4Timeout) \
-	wake_lock_timeout(_prWakeLock, _u4Timeout)
+{ \
+	if (_prWakeLock) { \
+		wake_lock_timeout(_prWakeLock, _u4Timeout); \
+	} \
+}
 
 #define KAL_WAKE_UNLOCK(_prAdapter, _prWakeLock) \
-	wake_unlock(_prWakeLock)
+{ \
+	if (_prWakeLock) { \
+		wake_unlock(_prWakeLock); \
+	} \
+}
 
 #define KAL_WAKE_LOCK_ACTIVE(_prAdapter, _prWakeLock) \
-	wake_lock_active(_prWakeLock)
+		((_prWakeLock) && wake_lock_active(_prWakeLock))
 #endif
 
 #else
@@ -687,7 +753,10 @@ static inline void kalCfg80211ScanDone(struct cfg80211_scan_request *request,
 			pvAddr = kmalloc(u4Size, GFP_KERNEL);   \
 	} \
 	else { \
-		pvAddr = vmalloc(u4Size);   \
+		if (u4Size > PAGE_SIZE) \
+			pvAddr = vmalloc(u4Size);   \
+		else \
+			pvAddr = kmalloc(u4Size, GFP_KERNEL);   \
 	} \
 	if (pvAddr) {   \
 		allocatedMemSize += u4Size;   \
@@ -706,7 +775,10 @@ static inline void kalCfg80211ScanDone(struct cfg80211_scan_request *request,
 			pvAddr = kmalloc(u4Size, GFP_KERNEL);   \
 	} \
 	else { \
-		pvAddr = vmalloc(u4Size);   \
+		if (u4Size > PAGE_SIZE) \
+			pvAddr = vmalloc(u4Size);   \
+		else \
+			pvAddr = kmalloc(u4Size, GFP_KERNEL);   \
 	} \
 	if (!pvAddr) \
 		ASSERT_NOMEM(); \
@@ -733,22 +805,12 @@ static inline void kalCfg80211ScanDone(struct cfg80211_scan_request *request,
 		DBGLOG(INIT, INFO, "0x%p(%ld) freed (%s:%s)\n", \
 			pvAddr, (uint32_t)u4Size, __FILE__, __func__);  \
 	}   \
-	if (eMemType == PHY_MEM_TYPE) { \
-		kfree(pvAddr); \
-	} \
-	else { \
-		vfree(pvAddr); \
-	} \
+	kvfree(pvAddr); \
 }
 #else
 #define kalMemFree(pvAddr, eMemType, u4Size)  \
 {   \
-	if (eMemType == PHY_MEM_TYPE) { \
-		kfree(pvAddr); \
-	} \
-	else { \
-		vfree(pvAddr); \
-	} \
+	kvfree(pvAddr); \
 }
 #endif
 
@@ -811,10 +873,12 @@ static inline void kalCfg80211ScanDone(struct cfg80211_scan_request *request,
 #define kalkStrtou32(cp, base, resp)       kstrtou32(cp, base, resp)
 #define kalkStrtos32(cp, base, resp)       kstrtos32(cp, base, resp)
 #define kalSnprintf(buf, size, fmt, ...)   \
-	snprintf(buf, size, fmt, ##__VA_ARGS__)
+	_kalSnprintf((char *)(buf), (size_t)(size), \
+		(const char *)(fmt), ##__VA_ARGS__)
 #define kalScnprintf(buf, size, fmt, ...)  \
 	scnprintf(buf, size, fmt, ##__VA_ARGS__)
-#define kalSprintf(buf, fmt, ...)          sprintf(buf, fmt, __VA_ARGS__)
+#define kalSprintf(buf, fmt, ...)          \
+	_kalSprintf((char *)(buf), (const char *)(fmt), ##__VA_ARGS__)
 /* remove for AOSP */
 /* #define kalSScanf(buf, fmt, ...)        sscanf(buf, fmt, __VA_ARGS__) */
 #define kalStrStr(ct, cs)                  strstr(ct, cs)
@@ -837,6 +901,12 @@ int8_t atoi(uint8_t ch);
 	glSetPowerState(prGlueInfo, ePowerMode)
 #else
 #define kalDevSetPowerState(prGlueInfo, ePowerMode)
+#endif
+
+#if CFG_MTK_ANDROID_WMT
+#define _kalRequestFirmware request_firmware_direct
+#else
+#define _kalRequestFirmware request_firmware
 #endif
 
 /*----------------------------------------------------------------------------*/
@@ -930,6 +1000,14 @@ do { \
 #define MSEC_TO_JIFFIES(_msec)      msecs_to_jiffies(_msec)
 #define JIFFIES_TO_MSEC(_jiffie)    jiffies_to_msecs(_jiffie)
 
+#if KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE
+#define do_gettimeofday(_tv) kal_do_gettimeofday(_tv)
+#define get_ds() KERNEL_DS
+#define kal_access_ok(type, addr, size) access_ok(addr, size)
+#else
+#define kal_access_ok(type, addr, size) access_ok(type, addr, size)
+#endif
+
 #define KAL_TIME_INTERVAL_DECLARATION()     struct timeval __rTs, __rTe
 #define KAL_REC_TIME_START()                do_gettimeofday(&__rTs)
 #define KAL_REC_TIME_END()                  do_gettimeofday(&__rTe)
@@ -971,13 +1049,6 @@ do { \
 	dma_mapping_error(_dev, _addr)
 #endif
 
-#if defined(_HIF_AXI)
-#define KAL_ARCH_SETUP_DMA_OPS(_dev, _base, _size, _iommu, _coherent) \
-	connectivity_arch_setup_dma_ops(_dev, _base, _size, _iommu, _coherent)
-#else
-#define KAL_ARCH_SETUP_DMA_OPS(_dev, _base, _size, _iommu, _coherent)
-#endif
-
 #if CFG_SUPPORT_DATA_STALL
 #define KAL_REPORT_ERROR_EVENT			kalIndicateDriverEvent
 #endif
@@ -989,17 +1060,67 @@ do { \
 /*----------------------------------------------------------------------------*/
 /* Macros of show stack operations for using in Driver Layer                  */
 /*----------------------------------------------------------------------------*/
-#ifdef CONFIG_X86
-#define kal_show_stack(_adapter, _task, _sp)
-#else
+#if CFG_MTK_ANDROID_WMT
 #define kal_show_stack(_adapter, _task, _sp) \
-{ \
-	if (_adapter->chip_info->showTaskStack) { \
-		_adapter->chip_info->showTaskStack(_task, _sp); \
-	} \
-}
+	connectivity_export_show_stack(_task, _sp)
+#else
+#define kal_show_stack(_adapter, _task, _sp)
 #endif
 
+/*----------------------------------------------------------------------------*/
+/* Macros of systrace operations for using in Driver Layer                    */
+/*----------------------------------------------------------------------------*/
+#if !CONFIG_WLAN_DRV_BUILD_IN
+
+#define kalTraceBegin(_fmt, ...) \
+	tracing_mark_write("B|%d|" _fmt "\n", current->tgid, ##__VA_ARGS__)
+
+#define kalTraceEnd() \
+	tracing_mark_write("E|%d\n", current->tgid)
+
+#define kalTraceInt(_value, _fmt, ...) \
+	tracing_mark_write("C|%d|" _fmt "|%d\n", \
+		current->tgid, ##__VA_ARGS__, _value)
+
+#define kalTraceCall() \
+	{ kalTraceBegin("%s", __func__); kalTraceEnd(); }
+
+#define kalTraceEvent(_fmt, ...) \
+	{ kalTraceBegin(_fmt, ##__VA_ARGS__); kalTraceEnd(); }
+
+#define __type_is_void(expr) __builtin_types_compatible_p(typeof(expr), void)
+#define __expr_zero(expr) __builtin_choose_expr(__type_is_void(expr), 0, (expr))
+
+#define TRACE(_expr, _fmt, ...) \
+	__builtin_choose_expr(__type_is_void(_expr), \
+	__TRACE_VOID(_expr, _fmt, ##__VA_ARGS__), \
+	__TRACE(__expr_zero(_expr), _fmt, ##__VA_ARGS__))
+
+#define __TRACE(_expr, _fmt, ...) \
+	({ \
+		typeof(_expr) __ret; \
+		kalTraceBegin(_fmt, ##__VA_ARGS__); \
+		__ret = (_expr); \
+		kalTraceEnd(); \
+		__ret; \
+	})
+
+#define __TRACE_VOID(_expr, _fmt, ...) \
+	({ \
+		kalTraceBegin(_fmt, ##__VA_ARGS__); \
+		(void) (_expr); \
+		kalTraceEnd(); \
+	})
+#else
+
+#define kalTraceBegin(_fmt, ...)
+#define kalTraceEnd()
+#define kalTraceInt(_value, _fmt, ...)
+#define kalTraceCall()
+#define kalTraceEvent(_fmt, ...)
+#define TRACE(_expr, _fmt, ...) _expr
+
+#endif
 /*******************************************************************************
  *                  F U N C T I O N   D E C L A R A T I O N S
  *******************************************************************************
@@ -1067,6 +1188,14 @@ kalUpdateReAssocReqInfo(IN struct GLUE_INFO *prGlueInfo,
 			IN uint8_t *pucFrameBody, IN uint32_t u4FrameBodyLen,
 			IN u_int8_t fgReassocRequest,
 			IN uint8_t ucBssIndex);
+
+#if CFG_SUPPORT_ASSURANCE
+void kalUpdateDeauthInfo(IN struct GLUE_INFO
+			 *prGlueInfo,
+			 IN uint8_t *pucFrameBody,
+			 IN uint32_t u4FrameBodyLen,
+			 IN uint8_t ucBssIndex);
+#endif
 
 void kalUpdateReAssocRspInfo(IN struct GLUE_INFO
 			     *prGlueInfo,
@@ -1359,7 +1488,11 @@ uint8_t kalUpdateBssTimestamp(IN struct GLUE_INFO *prGlueInfo);
 
 uint32_t kalRandomNumber(void);
 
+#if KERNEL_VERSION(4, 15, 0) <= LINUX_VERSION_CODE
+void kalTimeoutHandler(struct timer_list *timer);
+#else
 void kalTimeoutHandler(unsigned long arg);
+#endif
 
 void kalSetEvent(struct GLUE_INFO *pr);
 
@@ -1623,6 +1756,7 @@ void kalSetDrvEmiMpuProtection(phys_addr_t emiPhyBase, uint32_t offset,
 int32_t kalSetCpuNumFreq(uint32_t u4CoreNum,
 			 uint32_t u4Freq);
 int32_t kalGetFwFlavor(uint8_t *flavor);
+int32_t kalGetConnsysVerId(void);
 int32_t kalPerMonSetForceEnableFlag(uint8_t uFlag);
 int32_t kalFbNotifierReg(IN struct GLUE_INFO *prGlueInfo);
 void kalFbNotifierUnReg(void);
@@ -1684,61 +1818,21 @@ int kalExternalAuthRequest(IN struct ADAPTER *prAdapter,
 			   IN uint8_t uBssIndex);
 #endif
 
-#if !CONFIG_WLAN_DRV_BUILD_IN
+int kalWlanUeventInit(void);
+void kalWlanUeventDeinit(void);
+
+int _kalSnprintf(char *buf, size_t size, const char *fmt, ...);
+int _kalSprintf(char *buf, const char *fmt, ...);
 
 /* systrace utilities */
+#if !CONFIG_WLAN_DRV_BUILD_IN
 void tracing_mark_write(const char *fmt, ...);
-
-#define kalTraceBegin(_fmt, ...) \
-	tracing_mark_write("B|%d|" _fmt "\n", current->tgid, ##__VA_ARGS__)
-
-#define kalTraceEnd() \
-	tracing_mark_write("E|%d\n", current->tgid)
-
-#define kalTraceInt(_value, _fmt, ...) \
-	tracing_mark_write("C|%d|" _fmt "|%d\n", \
-		current->tgid, ##__VA_ARGS__, _value)
-
-#define kalTraceCall() \
-	{ kalTraceBegin("%s", __func__); kalTraceEnd(); }
-
-#define kalTraceEvent(_fmt, ...) \
-	{ kalTraceBegin(_fmt, ##__VA_ARGS__); kalTraceEnd(); }
-
-#define __type_is_void(expr) __builtin_types_compatible_p(typeof(expr), void)
-#define __expr_zero(expr) __builtin_choose_expr(__type_is_void(expr), 0, (expr))
-
-#define TRACE(_expr, _fmt, ...) \
-	__builtin_choose_expr(__type_is_void(_expr), \
-	__TRACE_VOID(_expr, _fmt, ##__VA_ARGS__), \
-	__TRACE(__expr_zero(_expr), _fmt, ##__VA_ARGS__))
-
-#define __TRACE(_expr, _fmt, ...) \
-	({ \
-		typeof(_expr) __ret; \
-		kalTraceBegin(_fmt, ##__VA_ARGS__); \
-		__ret = (_expr); \
-		kalTraceEnd(); \
-		__ret; \
-	})
-
-#define __TRACE_VOID(_expr, _fmt, ...) \
-	({ \
-		kalTraceBegin(_fmt, ##__VA_ARGS__); \
-		(void) (_expr); \
-		kalTraceEnd(); \
-	})
-
-#else
-
-#define kalTraceBegin(_fmt, ...)
-#define kalTraceEnd()
-#define kalTraceInt(_value, _fmt, ...)
-#define kalTraceCall()
-#define kalTraceEvent(_fmt, ...)
-#define TRACE(_expr, _fmt, ...) _expr
-
 #endif
+
+#if KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE
+void kal_do_gettimeofday(struct timeval *tv);
+#endif
+
 
 #endif /* _GL_KAL_H */
 

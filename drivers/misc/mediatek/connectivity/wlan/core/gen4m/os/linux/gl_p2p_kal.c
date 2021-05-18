@@ -898,12 +898,20 @@ void kalP2PIndicateSDRequest(IN struct GLUE_INFO *prGlueInfo,
 {
 	union iwreq_data evt;
 	uint8_t aucBuffer[IW_CUSTOM_MAX];
+	int32_t i4Ret = 0;
 
 	ASSERT(prGlueInfo);
 
 	memset(&evt, 0, sizeof(evt));
 
-	snprintf(aucBuffer, IW_CUSTOM_MAX - 1, "P2P_SD_REQ %d", ucSeqNum);
+	i4Ret =
+		snprintf(aucBuffer, IW_CUSTOM_MAX - 1,
+		"P2P_SD_REQ %d", ucSeqNum);
+	if (i4Ret < 0) {
+		DBGLOG(INIT, WARN, "sprintf failed:%d\n", i4Ret);
+		return;
+	}
+
 	evt.data.length = strlen(aucBuffer);
 
 	/* indicate IWEVP2PSDREQ event */
@@ -926,12 +934,19 @@ void kalP2PIndicateSDResponse(IN struct GLUE_INFO *prGlueInfo,
 {
 	union iwreq_data evt;
 	uint8_t aucBuffer[IW_CUSTOM_MAX];
+	int32_t i4Ret = 0;
 
 	ASSERT(prGlueInfo);
 
 	memset(&evt, 0, sizeof(evt));
 
-	snprintf(aucBuffer, IW_CUSTOM_MAX - 1, "P2P_SD_RESP %d", ucSeqNum);
+	i4Ret =
+		snprintf(aucBuffer, IW_CUSTOM_MAX - 1,
+		"P2P_SD_RESP %d", ucSeqNum);
+	if (i4Ret < 0) {
+		DBGLOG(INIT, WARN, "sprintf failed:%d\n", i4Ret);
+		return;
+	}
 	evt.data.length = strlen(aucBuffer);
 
 	/* indicate IWEVP2PSDREQ event */
@@ -956,13 +971,19 @@ void kalP2PIndicateTXDone(IN struct GLUE_INFO *prGlueInfo,
 {
 	union iwreq_data evt;
 	uint8_t aucBuffer[IW_CUSTOM_MAX];
+	int32_t i4Ret = 0;
 
 	ASSERT(prGlueInfo);
 
 	memset(&evt, 0, sizeof(evt));
 
-	snprintf(aucBuffer, IW_CUSTOM_MAX - 1,
+	i4Ret =
+		snprintf(aucBuffer, IW_CUSTOM_MAX - 1,
 		"P2P_SD_XMITTED: %d %d", ucSeqNum, ucStatus);
+	if (i4Ret < 0) {
+		DBGLOG(INIT, WARN, "sprintf failed:%d\n", i4Ret);
+		return;
+	}
 	evt.data.length = strlen(aucBuffer);
 
 	/* indicate IWEVP2PSDREQ event */
@@ -1464,6 +1485,8 @@ kalP2PGCIndicateConnectionStatus(IN struct GLUE_INFO *prGlueInfo,
 		/* FIXME: This exception occurs at wlanRemove. */
 		if ((prGlueP2pInfo == NULL) ||
 		    (prGlueP2pInfo->aprRoleHandler == NULL) ||
+		    (prGlueP2pInfo->aprRoleHandler->reg_state !=
+				NETREG_REGISTERED) ||
 		    (prAdapter->rP2PNetRegState !=
 				ENUM_NET_REG_STATE_REGISTERED) ||
 		    ((prGlueInfo->ulFlag & GLUE_FLAG_HALT) == 1)) {
@@ -1615,6 +1638,9 @@ kalP2PGOStationUpdate(IN struct GLUE_INFO *prGlueInfo,
 					/* struct net_device * dev, */
 					prCliStaRec->aucMacAddr, GFP_KERNEL);
 			}
+			kalMemCopy(&prGlueInfo->prAdapter->rSapLastStaRec,
+					prCliStaRec, sizeof(struct STA_RECORD));
+			prGlueInfo->prAdapter->fgSapLastStaRecSet = 1;
 		}
 
 	} while (FALSE);
@@ -2215,6 +2241,11 @@ void kalP2pIndicateChnlSwitch(IN struct ADAPTER *prAdapter,
 		prP2PInfo->chandef = (struct cfg80211_chan_def *)
 				cnmMemAlloc(prAdapter, RAM_TYPE_BUF,
 				sizeof(struct cfg80211_chan_def));
+		if (!prP2PInfo->chandef) {
+			DBGLOG(P2P, WARN, "cfg80211_chan_def alloc fail\n");
+			return;
+		}
+
 		prP2PInfo->chandef->chan = (struct ieee80211_channel *)
 				cnmMemAlloc(prAdapter, RAM_TYPE_BUF,
 				sizeof(struct ieee80211_channel));

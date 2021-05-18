@@ -612,6 +612,7 @@ void cnmInit(struct ADAPTER *prAdapter)
 			"HwBssNum(%d)WmmNum(%d) > BSS_DEFAULT_NUM !!!\n",
 			prAdapter->ucHwBssIdNum,
 			prAdapter->ucWmmSetNum);
+		ASSERT(0);
 	}
 
 	for (ucWmmIndex = 0; ucWmmIndex < prAdapter->ucWmmSetNum;
@@ -2021,6 +2022,11 @@ struct BSS_INFO *cnmGetBssInfoAndInit(struct ADAPTER *prAdapter,
 			prBssInfo->wepkeyUsed[i] = FALSE;
 		}
 	}
+
+#if CFG_SUPPORT_DFS
+	rlmResetCSAParams(prBssInfo);
+#endif
+
 	return prBssInfo;
 }
 
@@ -3679,8 +3685,17 @@ void cnmOpModeCallbackDispatcher(
 	if (!prBssOpCtrl->rRunning.fgIsRunning) {
 		/* GO/AP run cb immediately. */
 		DBGLOG(CNM, INFO,
-			"CbOpMode, BSS[%d] none running\n",
-			ucBssIndex);
+			"CbOpMode, BSS[%d] none running, OpModeState[%d]\n",
+			ucBssIndex,
+			g_rDbdcInfo.eBssOpModeState[ucBssIndex]);
+		/* We have to callback op mode change done.
+		 * Otherwise, DBDC state machine won't continue.
+		 */
+		if (g_rDbdcInfo.eBssOpModeState[ucBssIndex] ==
+			ENUM_OPMODE_STATE_WAIT) {
+			cnmDbdcOpModeChangeDoneCallback(
+				prAdapter, ucBssIndex, fgSuccess);
+		}
 	} else {
 		switch (prBssOpCtrl->rRunning.eReqIdx) {
 		case CNM_OPMODE_REQ_DBDC:
@@ -3976,9 +3991,8 @@ void cnmEventSGStatus(
 	IN struct ADAPTER *prAdapter,
 	IN struct WIFI_EVENT *prEvent)
 {
+#if CFG_SUPPORT_DATA_STALL
 	struct EVENT_SMART_GEAT_STATE *prSGState;
-
-	#if CFG_SUPPORT_DATA_STALL
 	enum ENUM_VENDOR_DRIVER_EVENT eEvent;
 
 	ASSERT(prAdapter);
@@ -4003,7 +4017,7 @@ void cnmEventSGStatus(
 			eEvent, (uint16_t)sizeof(u_int8_t),
 			0,
 			TRUE);
-	#endif /* CFG_SUPPORT_DATA_STALL */
+#endif /* CFG_SUPPORT_DATA_STALL */
 }
 #endif
 
@@ -4187,3 +4201,54 @@ void cnmWmmQuotaSetMaxQuota(
 
 	cnmWmmQuotaCallback(prAdapter, ucWmmIndex);
 }
+
+/*----------------------------------------------------------------------------*/
+/*!
+ * @brief check if p2p is active
+ *
+ * @param prAdapter
+ *
+ * @return
+ */
+/*----------------------------------------------------------------------------*/
+u_int8_t cnmP2pIsActive(IN struct ADAPTER *prAdapter)
+{
+	uint8_t ret;
+
+	ret = (cnmGetP2pBssInfo(prAdapter) != NULL);
+	DBGLOG(CNM, TRACE, "P2p is %s\n", ret ? "ACTIVE" : "INACTIVE");
+	return ret;
+}
+
+/*----------------------------------------------------------------------------*/
+/*!
+ * @brief get p2p bss info
+ *
+ * @param prAdapter
+ *
+ * @return
+ */
+/*----------------------------------------------------------------------------*/
+struct BSS_INFO *cnmGetP2pBssInfo(IN struct ADAPTER *prAdapter)
+{
+	struct BSS_INFO *prBssInfo;
+	uint8_t i;
+
+	if (!prAdapter)
+		return NULL;
+
+	for (i = 0; i < prAdapter->ucHwBssIdNum; i++) {
+		prBssInfo = prAdapter->aprBssInfo[i];
+
+		if (prBssInfo &&
+		    IS_BSS_P2P(prBssInfo) &&
+		    !p2pFuncIsAPMode(
+		    prAdapter->rWifiVar.prP2PConnSettings
+		    [prBssInfo->u4PrivateData]) &&
+		    IS_BSS_ALIVE(prAdapter, prBssInfo))
+			return prBssInfo;
+	}
+
+	return NULL;
+}
+

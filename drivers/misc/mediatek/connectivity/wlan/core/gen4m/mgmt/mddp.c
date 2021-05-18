@@ -70,8 +70,11 @@ struct mddp_drv_handle_t gMddpFunc = {
 #define MD_STATUS_OFF_SYNC_BIT BIT(1)
 #define MD_STATUS_ON_SYNC_BIT BIT(2)
 
+#if (CFG_SUPPORT_CONNAC2X == 0)
+/* Use SER dummy register for mddp support flag */
 #define MDDP_SUPPORT_CR 0x820600d0
 #define MDDP_SUPPORT_CR_BIT BIT(23)
+#endif
 
 /*******************************************************************************
 *                           P R I V A T E   D A T A
@@ -102,18 +105,23 @@ static void clear_md_wifi_on_bit(void);
 static bool wait_for_md_off_complete(void);
 static bool wait_for_md_on_complete(void);
 
-int32_t mddpRegisterCb(IN struct ADAPTER *prAdapter)
+static int32_t mddpRegisterCb(void)
 {
 	int32_t ret = 0;
 
 	gMddpFunc.wifi_handle = &gMddpWFunc;
 
 	ret = mddp_drv_attach(&gMddpDrvConf, &gMddpFunc);
-	DBGLOG(INIT, INFO, "MDDP Wlan callback reqister result: %d\n", ret);
-
-	prAdapter->fgMddpActivated = true;
+	DBGLOG(INIT, INFO, "mddp_drv_attach ret: %d\n", ret);
 
 	return ret;
+}
+
+static void mddpUnregisterCb(void)
+{
+	DBGLOG(INIT, INFO, "mddp_drv_detach\n");
+	mddp_drv_detach(&gMddpDrvConf, &gMddpFunc);
+	gMddpFunc.wifi_handle = NULL;
 }
 
 int32_t mddpGetMdStats(IN struct net_device *prDev)
@@ -124,10 +132,8 @@ int32_t mddpGetMdStats(IN struct net_device *prDev)
 	struct mddpw_net_stat_t mddpNetStats;
 	int32_t ret;
 
-	if (!gMddpWFunc.get_net_stat) {
-		DBGLOG(INIT, ERROR, "get_net_stat is NULL.\n");
+	if (!gMddpWFunc.get_net_stat)
 		return 0;
-	}
 
 	prNetDevPrivate = (struct NETDEV_PRIVATE_GLUE_INFO *)
 			netdev_priv(prDev);
@@ -342,8 +348,9 @@ int32_t mddpNotifyDrvTxd(IN struct ADAPTER *prAdapter,
 	}
 	prNotifyInfo = (struct mddpw_drv_notify_info_t *) buff;
 	prNotifyInfo->version = 0;
-	/* (3 = version+buf_len+info_num) */
-	prNotifyInfo->buf_len = (u32BufSize - 3);
+	prNotifyInfo->buf_len = sizeof(struct mddpw_drv_info_t) +
+			sizeof(struct mddp_txd_t) +
+			NIC_TX_DESC_LONG_FORMAT_LENGTH;
 	prNotifyInfo->info_num = 1;
 	prDrvInfo = (struct mddpw_drv_info_t *) &(prNotifyInfo->buf[0]);
 	prDrvInfo->info_id = 3; /* MDDPW_DRV_INFO_TXD; */
@@ -410,8 +417,8 @@ int32_t mddpNotifyDrvMac(IN struct ADAPTER *prAdapter)
 		}
 		prNotifyInfo = (struct mddpw_drv_notify_info_t *) buff;
 		prNotifyInfo->version = 0;
-		/* (3= version+buf_len+info_num) */
-		prNotifyInfo->buf_len = (u32BufSize - 3);
+		prNotifyInfo->buf_len = sizeof(struct mddpw_drv_info_t) +
+				MAC_ADDR_LEN;
 		prNotifyInfo->info_num = 1;
 		prDrvInfo = (struct mddpw_drv_info_t *) &(prNotifyInfo->buf[0]);
 		prDrvInfo->info_id = MDDPW_DRV_INFO_DEVICE_MAC;
@@ -451,18 +458,17 @@ int32_t mddpNotifyWifiStatus(IN enum mddp_drv_onoff_status wifiOnOffStatus)
 		}
 		prNotifyInfo = (struct mddpw_drv_notify_info_t *) buff;
 		prNotifyInfo->version = 0;
-		prNotifyInfo->buf_len = u32BufSize;
+		prNotifyInfo->buf_len = sizeof(struct mddpw_drv_info_t) +
+				sizeof(bool);
 		prNotifyInfo->info_num = 1;
 		prDrvInfo = (struct mddpw_drv_info_t *) &(prNotifyInfo->buf[0]);
 		prDrvInfo->info_id = MDDPW_DRV_INFO_NOTIFY_WIFI_ONOFF;
 		prDrvInfo->info_len = WIFI_ONOFF_NOTIFICATION_LEN;
 		prDrvInfo->info[0] = wifiOnOffStatus;
 
-		DBGLOG(INIT, INFO, "notify_drv_info start.\n");
 		ret = gMddpWFunc.notify_drv_info(prNotifyInfo);
 		DBGLOG(INIT, INFO, "power: %d, ret: %d.\n",
 			wifiOnOffStatus, ret);
-		DBGLOG(INIT, INFO, "notify_drv_info end.\n");
 		kalMemFree(buff, VIR_MEM_TYPE, u32BufSize);
 	} else {
 		DBGLOG(INIT, ERROR, "notify_drv_info is NULL.\n");
@@ -474,6 +480,7 @@ int32_t mddpNotifyWifiStatus(IN enum mddp_drv_onoff_status wifiOnOffStatus)
 
 void mddpNotifyWifiOnStart(void)
 {
+	mddpRegisterCb();
 	mddpNotifyWifiStatus(MDDPW_DRV_INFO_WLAN_ON_START);
 }
 
@@ -487,13 +494,24 @@ int32_t mddpNotifyWifiOnEnd(void)
 		ret = wait_for_md_on_complete() ?
 				WLAN_STATUS_SUCCESS :
 				WLAN_STATUS_FAILURE;
+	if (ret == WLAN_STATUS_SUCCESS) {
+		struct GLUE_INFO *prGlueInfo = wlanGetGlueInfo();
+
+		if (prGlueInfo && prGlueInfo->u4ReadyFlag &&
+				prGlueInfo->prAdapter)
+			prGlueInfo->prAdapter->fgMddpActivated = true;
+	}
 	return ret;
 }
 
 void mddpNotifyWifiOffStart(void)
 {
 	int32_t ret;
+	struct GLUE_INFO *prGlueInfo = wlanGetGlueInfo();
 
+	if (prGlueInfo && prGlueInfo->u4ReadyFlag &&
+			prGlueInfo->prAdapter)
+		prGlueInfo->prAdapter->fgMddpActivated = false;
 	clear_md_wifi_off_bit();
 	ret = mddpNotifyWifiStatus(MDDPW_DRV_INFO_WLAN_OFF_START);
 	if (ret == 0)
@@ -503,6 +521,7 @@ void mddpNotifyWifiOffStart(void)
 void mddpNotifyWifiOffEnd(void)
 {
 	mddpNotifyWifiStatus(MDDPW_DRV_INFO_WLAN_OFF_END);
+	mddpUnregisterCb();
 }
 
 int32_t mddpMdNotifyInfo(struct mddpw_md_notify_info_t *prMdInfo)
@@ -570,6 +589,8 @@ int32_t mddpMdNotifyInfo(struct mddpw_md_notify_info_t *prMdInfo)
 			prClientList = &prP2pBssInfo->rStaRecOfClientList;
 			LINK_FOR_EACH_ENTRY(prCurrStaRec, prClientList,
 					rLinkEntry, struct STA_RECORD) {
+				if (!prCurrStaRec)
+					break;
 				mddpNotifyDrvTxd(prAdapter,
 						prCurrStaRec,
 						TRUE);
@@ -706,9 +727,6 @@ static bool wait_for_md_on_complete(void)
 			DBGLOG(INIT, WARN, "Skip waiting due to ready flag.\n");
 			fgCompletion = false;
 			break;
-		} else if (!prGlueInfo->u4ReadyFlag) {
-			DBGLOG(INIT, WARN, "Skip waiting due to ready flag.\n");
-			break;
 		}
 
 		u4CurTime = kalGetTimeTick();
@@ -727,11 +745,13 @@ static bool wait_for_md_on_complete(void)
 
 void setMddpSupportRegister(IN struct ADAPTER *prAdapter)
 {
+#if (CFG_SUPPORT_CONNAC2X == 0)
 	uint32_t u4Val = 0;
 
 	HAL_MCR_RD(prAdapter, MDDP_SUPPORT_CR, &u4Val);
 	u4Val |= MDDP_SUPPORT_CR_BIT;
 	HAL_MCR_WR(prAdapter, MDDP_SUPPORT_CR, u4Val);
+#endif
 }
 
 #endif

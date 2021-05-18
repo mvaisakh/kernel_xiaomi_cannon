@@ -946,8 +946,6 @@ authSendDeauthFrame(IN struct ADAPTER *prAdapter,
 	uint8_t ucBssIndex = prAdapter->ucHwBssIdNum;
 	uint8_t aucBMC[] = BC_MAC_ADDR;
 
-	DBGLOG(RSN, INFO, "authSendDeauthFrame\n");
-
 	/* NOTE(Kevin): The best way to reply the Deauth is according to
 	 * the incoming data frame
 	 */
@@ -1072,6 +1070,12 @@ authSendDeauthFrame(IN struct ADAPTER *prAdapter,
 	    (MAC_TX_RESERVED_FIELD + WLAN_MAC_MGMT_HEADER_LEN +
 	     REASON_CODE_FIELD_LEN);
 
+#if CFG_SUPPORT_ASSURANCE
+	/* Assurance */
+	if (prAdapter->u4DeauthIeFromUpperLength)
+		u2EstimatedFrameLen += prAdapter->u4DeauthIeFromUpperLength;
+#endif
+
 	/* Allocate a MSDU_INFO_T */
 	prMsduInfo = cnmMgtPktAlloc(prAdapter, u2EstimatedFrameLen);
 	if (prMsduInfo == NULL) {
@@ -1111,6 +1115,14 @@ authSendDeauthFrame(IN struct ADAPTER *prAdapter,
 			     + MAC_TX_RESERVED_FIELD);
 
 			prDeauthFrame->u2FrameCtrl |= MASK_FC_PROTECTED_FRAME;
+			if (GET_BSS_INFO_BY_INDEX(prAdapter,
+				prStaRec->ucBssIndex)->eNetworkType ==
+				(uint8_t) NETWORK_TYPE_AIS) {
+				GET_BSS_INFO_BY_INDEX(prAdapter,
+					prStaRec->ucBssIndex)
+					->encryptedDeauthIsInProcess
+						= TRUE;
+			}
 			DBGLOG(SAA, INFO,
 			       "Reason=%d, DestAddr=" MACSTR
 			       " srcAddr=" MACSTR " BSSID=" MACSTR "\n",
@@ -1133,6 +1145,10 @@ authSendDeauthFrame(IN struct ADAPTER *prAdapter,
 		     WLAN_MAC_MGMT_HEADER_LEN,
 		     WLAN_MAC_MGMT_HEADER_LEN + REASON_CODE_FIELD_LEN,
 		     pfTxDoneHandler, MSDU_RATE_MODE_AUTO);
+
+#if CFG_SUPPORT_ASSURANCE
+	deauth_build_nonwfa_vend_ie(prAdapter, prMsduInfo);
+#endif
 
 #if CFG_SUPPORT_802_11W
 	/* AP PMF */
@@ -1157,6 +1173,38 @@ authSendDeauthFrame(IN struct ADAPTER *prAdapter,
 
 	return WLAN_STATUS_SUCCESS;
 }				/* end of authSendDeauthFrame() */
+
+#if CFG_SUPPORT_ASSURANCE
+/*-----------------------------------------------------------------------*/
+/*!
+ * @brief Builds the non-wfa vendor specific ies into deauth frame.
+ *
+ * @param prAdapter    pointer to driver adapter
+ *        prMsduInfo   pointer to the msdu frame body
+ *
+ * @retval void
+ */
+/*-----------------------------------------------------------------------*/
+void deauth_build_nonwfa_vend_ie(struct ADAPTER *prAdapter,
+	struct MSDU_INFO *prMsduInfo)
+{
+	uint8_t *ptr = NULL;
+	uint16_t len = 0;
+
+	if (!prAdapter || !prMsduInfo)
+		return;
+
+	len = prAdapter->u4DeauthIeFromUpperLength;
+	if (!len)
+		return;
+
+	DBGLOG(SAA, INFO, "send nonwfa vendor IE, IeLen=%d\n", len);
+	ptr = (uint8_t *)prMsduInfo->prPacket +
+		(uint16_t)prMsduInfo->u2FrameLength;
+	kalMemCopy(ptr, prAdapter->aucDeauthIeFromUpper, len);
+	prMsduInfo->u2FrameLength += len;
+}
+#endif
 
 /*----------------------------------------------------------------------------*/
 /*!
@@ -1331,9 +1379,8 @@ void authAddMDIE(IN struct ADAPTER *prAdapter,
 	uint8_t ucBssIdx = prMsduInfo->ucBssIndex;
 	struct FT_IES *prFtIEs = aisGetFtIe(prAdapter, ucBssIdx);
 
-	if (!IS_BSS_INDEX_VALID(ucBssIdx) ||
-	    !IS_BSS_AIS(GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIdx)) ||
-	    !prFtIEs->prMDIE)
+	if (!prFtIEs->prMDIE ||
+	    !rsnIsFtOverTheAir(prAdapter, ucBssIdx, prMsduInfo->ucStaRecIndex))
 		return;
 	prMsduInfo->u2FrameLength +=
 		5; /* IE size for MD IE is fixed, it is 5 */
@@ -1343,14 +1390,10 @@ void authAddMDIE(IN struct ADAPTER *prAdapter,
 uint32_t authCalculateRSNIELen(struct ADAPTER *prAdapter, uint8_t ucBssIdx,
 			       struct STA_RECORD *prStaRec)
 {
-	enum ENUM_PARAM_AUTH_MODE eAuthMode =
-	    aisGetAuthMode(prAdapter, ucBssIdx);
 	struct FT_IES *prFtIEs = aisGetFtIe(prAdapter, ucBssIdx);
 
-	if (!IS_BSS_INDEX_VALID(ucBssIdx) ||
-	    !IS_BSS_AIS(GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIdx)) ||
-	    !prFtIEs->prRsnIE || (eAuthMode != AUTH_MODE_WPA2_FT &&
-				  eAuthMode != AUTH_MODE_WPA2_FT_PSK))
+	if (!prFtIEs->prRsnIE ||
+	    !rsnIsFtOverTheAir(prAdapter, ucBssIdx, prStaRec->ucIndex))
 		return 0;
 	return IE_SIZE(prFtIEs->prRsnIE);
 }
@@ -1368,14 +1411,10 @@ uint32_t authAddRSNIE_impl(IN struct ADAPTER *prAdapter,
 		(uint8_t *)prMsduInfo->prPacket + prMsduInfo->u2FrameLength;
 	uint32_t ucRSNIeSize = 0;
 	uint8_t ucBssIdx = prMsduInfo->ucBssIndex;
-	enum ENUM_PARAM_AUTH_MODE eAuthMode =
-	    aisGetAuthMode(prAdapter, ucBssIdx);
 	struct FT_IES *prFtIEs = aisGetFtIe(prAdapter, ucBssIdx);
 
-	if (!IS_BSS_INDEX_VALID(ucBssIdx) ||
-	    !IS_BSS_AIS(GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIdx)) ||
-	    !prFtIEs->prRsnIE || (eAuthMode != AUTH_MODE_WPA2_FT &&
-				  eAuthMode != AUTH_MODE_WPA2_FT_PSK))
+	if (!prFtIEs->prRsnIE ||
+	    !rsnIsFtOverTheAir(prAdapter, ucBssIdx, prMsduInfo->ucStaRecIndex))
 		return FALSE;
 
 	ucRSNIeSize = IE_SIZE(prFtIEs->prRsnIE);

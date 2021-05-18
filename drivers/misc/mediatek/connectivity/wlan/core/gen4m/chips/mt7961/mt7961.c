@@ -596,6 +596,7 @@ struct CHIP_DBG_OPS mt7961DebugOps = {
 	.showUmacFwtblInfo = connac2x_show_umac_wtbl_info,
 	.showCsrInfo = NULL,
 	.showDmaschInfo = NULL,
+	.dumpMacInfo = NULL,
 	.showHifInfo = NULL,
 	.printHifDbgInfo = NULL,
 	.show_rx_rate_info = connac2x_show_rx_rate_info,
@@ -622,6 +623,7 @@ struct mt66xx_chip_info mt66xx_chip_info_mt7961 = {
 	.is_support_wacpu = FALSE,
 	.txd_append_size = MT7961_TX_DESC_APPEND_LENGTH,
 	.rxd_size = MT7961_RX_DESC_LENGTH,
+	.init_evt_rxd_size = MT7961_RX_DESC_LENGTH,
 	.pse_header_length = CONNAC2X_NIC_TX_PSE_HEADER_LENGTH,
 	.init_event_size = CONNAC2X_RX_INIT_EVENT_LENGTH,
 	.eco_info = mt7961_eco_table,
@@ -650,6 +652,7 @@ struct mt66xx_chip_info mt66xx_chip_info_mt7961 = {
 	.group5_size = sizeof(struct HW_MAC_RX_STS_GROUP_5),
 	.u4LmacWtblDUAddr = MT7961_WIFI_LWTBL_BASE,
 	.u4UmacWtblDUAddr = MT7961_WIFI_UWTBL_BASE,
+	.cmd_max_pkt_size = CFG_TX_MAX_PKT_SIZE, /* size 1600 */
 };
 
 struct mt66xx_hif_driver_data mt66xx_driver_data_mt7961 = {

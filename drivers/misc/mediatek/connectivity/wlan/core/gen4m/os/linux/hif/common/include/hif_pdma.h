@@ -141,7 +141,7 @@
 
 #define HIF_TX_INIT_CMD_PORT				TX_RING_FWDL_IDX_3
 
-#if CFG_SUPPORT_DBDC
+#ifdef CONNAC2X2
 #define HIF_TX_MSDU_TOKEN_NUM				(TX_RING_SIZE * 3)
 #else
 #define HIF_TX_MSDU_TOKEN_NUM				(TX_RING_SIZE * 2)
@@ -354,6 +354,7 @@ struct RTMP_RX_RING {
 	uint32_t hw_didx_addr;
 	uint32_t hw_cnt_addr;
 	bool fgIsDumpLog;
+	uint32_t u4PendingCnt;
 };
 
 struct PCIE_CHIP_CR_MAPPING {
@@ -374,10 +375,11 @@ struct MSDU_TOKEN_ENTRY {
 	phys_addr_t rPktDmaAddr;
 	uint32_t u4PktDmaLength;
 	uint16_t u2Port; /* tx ring number */
+	uint8_t ucWlanIndex;
 };
 
 struct MSDU_TOKEN_INFO {
-	int32_t i4UsedCnt;
+	uint32_t u4UsedCnt;
 	struct MSDU_TOKEN_ENTRY *aprTokenStack[HIF_TX_MSDU_TOKEN_NUM];
 	spinlock_t rTokenLock;
 	struct MSDU_TOKEN_ENTRY arToken[HIF_TX_MSDU_TOKEN_NUM];
@@ -477,7 +479,11 @@ bool kalDevKickCmd(struct GLUE_INFO *prGlueInfo);
 
 /* SER functions */
 void halSetDrvSer(struct ADAPTER *prAdapter);
+#if KERNEL_VERSION(4, 15, 0) <= LINUX_VERSION_CODE
+void halHwRecoveryTimeout(struct timer_list *timer);
+#else
 void halHwRecoveryTimeout(unsigned long arg);
+#endif
 void halHwRecoveryFromError(IN struct ADAPTER *prAdapter);
 
 /* Debug functions */

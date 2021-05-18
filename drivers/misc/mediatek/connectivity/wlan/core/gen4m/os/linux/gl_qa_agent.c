@@ -793,7 +793,7 @@ static int32_t HQA_SetRxPath(struct net_device *prNetDev,
 {
 	int32_t i4Ret = 0, value = 0;
 	uint8_t	band_idx = 0;
-	uint16_t rx_ant = 0;
+	uint32_t rx_ant = 0;
 	struct GLUE_INFO *prGlueInfo = NULL;
 	struct PARAM_MTK_WIFI_TEST_STRUCT rRfATInfo;
 	uint32_t u4BufLen = 0;
@@ -2413,7 +2413,7 @@ static int32_t HQA_WriteEEPROM(struct net_device *prNetDev,
 	u4Index = Offset % EFUSE_BLOCK_SIZE;
 
 	if (prGlueInfo->prAdapter->rWifiVar.ucEfuseBufferModeCal ==
-	    TRUE) {
+	    TRUE && Offset >= 0 && Offset < MAX_EEPROM_BUFFER_SIZE - 1) {
 		uacEEPROMImage[Offset] = u4WriteData & 0xff;
 		uacEEPROMImage[Offset + 1] = u4WriteData >> 8 & 0xff;
 	} else if (u4Index >= EFUSE_BLOCK_SIZE - 1) {
@@ -2682,7 +2682,8 @@ static int32_t HQA_WriteBulkEEPROM(struct net_device
 		}
 
 		if (prGlueInfo->prAdapter->rWifiVar.ucEfuseBufferModeCal ==
-		    TRUE) {
+		    TRUE &&
+		    Offset >= 0 && Offset < MAX_EEPROM_BUFFER_SIZE - 1) {
 			/* EEPROM */
 			DBGLOG(INIT, INFO, "Direct EEPROM buffer, offset=%x\n",
 			       Offset);
@@ -7536,6 +7537,8 @@ static int32_t HQA_MUSetMUTable(struct net_device *prNetDev,
 	i4Ret = Set_MUSetMUTable(prNetDev, prTable);
 
 	ResponseToQA(HqaCmdFrame, prIwReqData, 2, i4Ret);
+
+	kfree(prTable);
 
 	return i4Ret;
 }

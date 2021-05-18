@@ -1004,6 +1004,9 @@ static inline INT32 _stp_psm_notify_stp(MTKSTP_PSM_T *stp_psm, const MTKSTP_PSM_
 
 	INT32 retval = STP_PSM_OPERATION_SUCCESS;
 
+	if (action < 0 || action >= STP_PSM_MAX_ACTION)
+		return STP_PSM_OPERATION_FAIL;
+
 	if (action == EIRQ) {
 		STP_PSM_PR_DBG("Call _stp_psm_notify_wmt_host_awake_wq\n\r");
 		_stp_psm_notify_wmt_host_awake_wq(stp_psm);
@@ -1131,7 +1134,7 @@ static inline INT32 _stp_psm_notify_wmt(MTKSTP_PSM_T *stp_psm, const MTKSTP_PSM_
 {
 	INT32 ret = STP_PSM_OPERATION_SUCCESS;
 
-	if (stp_psm == NULL)
+	if (stp_psm == NULL || action < 0 || action >= STP_PSM_MAX_ACTION)
 		return STP_PSM_OPERATION_FAIL;
 
 	switch (_stp_psm_get_state(stp_psm)) {
@@ -1274,10 +1277,13 @@ static inline INT32 _stp_psm_notify_wmt(MTKSTP_PSM_T *stp_psm, const MTKSTP_PSM_
 	return ret;
 }
 
-static inline VOID _stp_psm_stp_is_idle(ULONG data)
+static inline VOID _stp_psm_stp_is_idle(timer_handler_arg arg)
 {
-	MTKSTP_PSM_T *stp_psm = (MTKSTP_PSM_T *) data;
+	ULONG data;
+	MTKSTP_PSM_T *stp_psm;
 
+	GET_HANDLER_DATA(arg, data);
+	stp_psm = (MTKSTP_PSM_T *) data;
 	osal_clear_bit(STP_PSM_WMT_EVENT_DISABLE_MONITOR_RX_HIGH_DENSITY, &stp_psm->flag);
 	_stp_psm_dbg_dmp_in(g_stp_psm_dbg, stp_psm->flag.data, __LINE__);
 	osal_clear_bit(STP_PSM_WMT_EVENT_DISABLE_MONITOR_TX_HIGH_DENSITY, &stp_psm->flag);
@@ -1346,6 +1352,9 @@ static inline INT32 _stp_psm_do_wait(MTKSTP_PSM_T *stp_psm, MTKSTP_PSM_STATE_T s
 	INT32 limit = POLL_WAIT_TIME / POLL_WAIT;
 	UINT64 sec = 0;
 	ULONG usec = 0;
+
+	if (state < 0 || state >= STP_PSM_MAX_STATE)
+		return STP_PSM_OPERATION_FAIL;
 
 	osal_get_local_time(&sec, &usec);
 	while (_stp_psm_get_state(stp_psm) != state && i < limit && mtk_wcn_stp_is_enable()) {
@@ -1595,7 +1604,7 @@ INT32 stp_psm_disable_by_tx_rx_density(MTKSTP_PSM_T *stp_psm, INT32 dir, INT32 l
 		else
 			tx_sum_len += length;
 
-		do_gettimeofday(&tv_now);
+		osal_do_gettimeofday(&tv_now);
 		/* STP_PSM_PR_INFO("tv_now:%d.%d tv_end:%d.%d\n", tv_now.tv_sec, tv_now.tv_usec,
 		 * tv_end.tv_sec,tv_end.tv_usec);
 		 */
@@ -1619,7 +1628,7 @@ INT32 stp_psm_disable_by_tx_rx_density(MTKSTP_PSM_T *stp_psm, INT32 dir, INT32 l
 		}
 	} else {
 		sample_start = 1;
-		do_gettimeofday(&tv_now);
+		osal_do_gettimeofday(&tv_now);
 		tv_end = tv_now;
 		tv_end.tv_sec += SAMPLE_DURATION;
 	}
@@ -1785,7 +1794,7 @@ static INT32 _stp_psm_dbg_dmp_in(STP_PSM_RECORD_T *stp_psm_dbg, UINT32 flag, UIN
 
 	if (stp_psm_dbg) {
 		osal_lock_unsleepable_lock(&stp_psm_dbg->lock);
-		do_gettimeofday(&now);
+		osal_do_gettimeofday(&now);
 		index = stp_psm_dbg->in - 1;
 		index = (index + STP_PSM_DBG_SIZE) % STP_PSM_DBG_SIZE;
 		STP_PSM_PR_DBG("index(%d)\n", index);
@@ -1857,7 +1866,7 @@ static INT32 _stp_psm_opid_dbg_dmp_in(P_STP_PSM_OPID_RECORD p_opid_dbg, UINT32 o
 	osal_get_local_time(&ts, &nsec);
 	if (p_opid_dbg) {
 		osal_lock_unsleepable_lock(&p_opid_dbg->lock);
-		do_gettimeofday(&now);
+		osal_do_gettimeofday(&now);
 		index = p_opid_dbg->in - 1;
 		index = (index + STP_PSM_DBG_SIZE) % STP_PSM_DBG_SIZE;
 		STP_PSM_PR_DBG("index(%d)\n", index);

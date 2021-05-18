@@ -343,7 +343,7 @@ u_int8_t hs20IsGratuitousArp(IN struct ADAPTER *prAdapter,
 		prCurrSwRfb->pvHeader + ETHER_HEADER_LEN + ARP_TARGET_IP_OFFSET;
 	uint8_t *pucSenderMac = ((uint8_t *)
 		prCurrSwRfb->pvHeader +
-		ETHER_HEADER_LEN + ARP_SNEDER_MAC_OFFSET);
+		ETHER_HEADER_LEN + ARP_SENDER_MAC_OFFSET);
 
 #if CFG_HS20_DEBUG && 0
 /* UINT_8  aucIpAllZero[4] = {0,0,0,0}; */

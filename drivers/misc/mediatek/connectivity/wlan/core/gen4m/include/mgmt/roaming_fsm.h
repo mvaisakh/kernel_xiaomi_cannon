@@ -78,10 +78,17 @@
  *******************************************************************************
  */
 /* Roaming Discovery interval, SCAN result need to be updated */
-#define ROAMING_DISCOVERY_TIMEOUT_SEC               5	/* Seconds. */
+#if CFG_TC10_FEATURE
+#define ROAMING_DISCOVER_TIMEOUT_SEC                0   /* Seconds. */
+#else
+#define ROAMING_DISCOVER_TIMEOUT_SEC                10  /* Seconds. */
+#endif
+#define ROAMING_INACTIVE_TIMEOUT_SEC                10	/* Seconds. */
 #if CFG_SUPPORT_ROAMING_SKIP_ONE_AP
 #define ROAMING_ONE_AP_SKIP_TIMES		3
 #endif
+
+#define ROAMING_BTM_DELTA			    0   /* % */
 
 /* #define ROAMING_NO_SWING_RCPI_STEP                  5 //rcpi */
 /*******************************************************************************
@@ -101,25 +108,36 @@ enum ENUM_ROAMING_EVENT {
 	ROAMING_EVENT_ROAM,
 	ROAMING_EVENT_FAIL,
 	ROAMING_EVENT_ABORT,
+	ROAMING_EVENT_THRESHOLD_UPDATE,
 	ROAMING_EVENT_NUM
 };
 
 enum ENUM_ROAMING_REASON {
+	/* FW defined */
 	ROAMING_REASON_POOR_RCPI = 0,
 	ROAMING_REASON_TX_ERR, /*Lowest rate, high PER*/
 	ROAMING_REASON_RETRY,
+	ROAMING_REASON_IDLE,
+
+	/* driver defined */
+	ROAMING_REASON_BEACON_TIMEOUT,
+	ROAMING_REASON_BEACON_TIMEOUT_TX_ERR,
+	ROAMING_REASON_INACTIVE,
+	ROAMING_REASON_SAA_FAIL,
+	ROAMING_REASON_BTM,
 	ROAMING_REASON_NUM
 };
 
 struct CMD_ROAMING_TRANSIT {
-	uint16_t	u2Event;
-	uint16_t	u2Data;
-	uint16_t	u2RcpiLowThreshold;
-	uint8_t	ucIsSupport11B;
-	uint8_t	ucBssidx;
-	enum ENUM_ROAMING_REASON	eReason;
-	uint32_t	u4RoamingTriggerTime; /*sec in mcu*/
-	uint8_t aucReserved2[8];
+	uint16_t u2Event;
+	uint16_t u2Data;
+	uint16_t u2RcpiLowThreshold;
+	uint8_t ucIsSupport11B;
+	uint8_t ucBssidx;
+	enum ENUM_ROAMING_REASON eReason;
+	uint32_t u4RoamingTriggerTime; /*sec in mcu*/
+	uint16_t u2RcpiHighThreshold;
+	uint8_t aucReserved2[6];
 };
 
 
@@ -144,7 +162,6 @@ enum ENUM_ROAMING_STATE {
 	ROAMING_STATE_IDLE = 0,
 	ROAMING_STATE_DECISION,
 	ROAMING_STATE_DISCOVERY,
-	ROAMING_STATE_REQ_CAND_LIST,
 	ROAMING_STATE_ROAM,
 	ROAMING_STATE_NUM
 };
@@ -160,16 +177,10 @@ struct ROAMING_INFO {
 #endif
 
 	u_int8_t fgDrvRoamingAllow;
-	struct TIMER rWaitCandidateTimer;
 	enum ENUM_ROAMING_REASON eReason;
 	uint8_t ucPER;
-};
-
-enum ROAM_TYPE {
-	ROAM_TYPE_RCPI,
-	ROAM_TYPE_PER,
-
-	ROAM_TYPE_NUM
+	uint8_t ucRcpi;
+	uint8_t ucThreshold;
 };
 
 /*******************************************************************************
@@ -226,5 +237,7 @@ void roamingFsmRunEventAbort(IN struct ADAPTER *prAdapter,
 
 uint32_t roamingFsmProcessEvent(IN struct ADAPTER *prAdapter,
 	IN struct CMD_ROAMING_TRANSIT *prTransit);
+
+uint8_t roamingFsmInDecision(struct ADAPTER *prAdapter, uint8_t ucBssIndex);
 
 #endif /* _ROAMING_FSM_H */

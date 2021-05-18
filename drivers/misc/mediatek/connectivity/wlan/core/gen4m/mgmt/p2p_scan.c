@@ -314,8 +314,8 @@ struct BSS_DESC *scanP2pSearchDesc(IN struct ADAPTER *prAdapter,
 					MAC2STR(prConnReqInfo->aucBssid));
 				DBGLOG(P2P, TRACE,
 					"Connecting to SSID:%s, length:%d\n",
-					HIDE(prConnReqInfo->
-					rSsidStruct.aucSsid),
+					HIDE(
+					  prConnReqInfo->rSsidStruct.aucSsid),
 					prConnReqInfo->rSsidStruct.ucSsidLen);
 				DBGLOG(P2P, TRACE,
 					"Checking SSID:%s, length:%d\n",

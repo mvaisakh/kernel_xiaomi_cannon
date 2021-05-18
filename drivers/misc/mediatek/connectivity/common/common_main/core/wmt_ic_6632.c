@@ -758,7 +758,7 @@ static INT32 mt6632_sw_init(P_WMT_HIF_CONF pWmtHifConf)
 	ctrlPa1 = 0;
 	ctrlPa2 = 0;
 	wmt_core_ctrl(WMT_CTRL_GET_PATCH_NUM, &ctrlPa1, &ctrlPa2);
-	patch_num = ctrlPa1;
+	patch_num = (UINT32)ctrlPa1;
 	WMT_DBG_FUNC("patch total num = [%d]\n", patch_num);
 
 	/* improve patch down load speed */
@@ -1807,7 +1807,7 @@ static INT32 mt6632_patch_dwn(UINT32 index)
 		iRet = -1;
 		goto done;
 	}
-	patchSize -= sizeof(WMT_PATCH);
+	patchSize -= (UINT32)sizeof(WMT_PATCH);
 	pPatchBuf += sizeof(WMT_PATCH);
 	patchSizePerFrag = DEFAULT_PATCH_FRAG_SIZE;
 

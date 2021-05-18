@@ -346,28 +346,44 @@ static struct MSG_HNDL_ENTRY arMsgMapTable[] = {
 
 #if DBG
 #define MBOX_HNDL_MSG(prAdapter, prMsg) do { \
-	ASSERT(arMsgMapTable[prMsg->eMsgId].pfMsgHndl); \
-	if (arMsgMapTable[prMsg->eMsgId].pfMsgHndl) { \
-		DBGLOG(CNM, LOUD, \
-		"DO MSG [%d: %s]\n", \
-		prMsg->eMsgId, apucDebugMsg[prMsg->eMsgId]); \
-		arMsgMapTable[prMsg->eMsgId].pfMsgHndl(prAdapter, prMsg); \
+	if (prMsg->eMsgId >= 0 && prMsg->eMsgId < MID_TOTAL_NUM) { \
+		ASSERT(arMsgMapTable[prMsg->eMsgId].pfMsgHndl); \
+		if (arMsgMapTable[prMsg->eMsgId].pfMsgHndl) { \
+			DBGLOG(CNM, LOUD, \
+			"DO MSG [%d: %s]\n", \
+			prMsg->eMsgId, apucDebugMsg[prMsg->eMsgId]); \
+			arMsgMapTable[prMsg->eMsgId].pfMsgHndl( \
+				prAdapter, prMsg); \
+		} \
+		else { \
+		    DBGLOG(CNM, ERROR, "NULL fptr for MSG [%d]\n", \
+			prMsg->eMsgId); \
+		    cnmMemFree(prAdapter, prMsg); \
+		} \
 	} \
 	else { \
-	    DBGLOG(CNM, ERROR, "NULL fptr for MSG [%d]\n", prMsg->eMsgId); \
-	    cnmMemFree(prAdapter, prMsg); \
+		DBGLOG(CNM, ERROR, "Invalid MSG ID [%d]\n", prMsg->eMsgId); \
+		cnmMemFree(prAdapter, prMsg); \
 	} \
 } while (0)
 #else
 #define MBOX_HNDL_MSG(prAdapter, prMsg) do { \
-	ASSERT(arMsgMapTable[prMsg->eMsgId].pfMsgHndl); \
-	if (arMsgMapTable[prMsg->eMsgId].pfMsgHndl) { \
-		DBGLOG(CNM, LOUD, "DO MSG [%d]\n", prMsg->eMsgId); \
-		arMsgMapTable[prMsg->eMsgId].pfMsgHndl(prAdapter, prMsg); \
+	if (prMsg->eMsgId >= 0 && prMsg->eMsgId < MID_TOTAL_NUM) { \
+		ASSERT(arMsgMapTable[prMsg->eMsgId].pfMsgHndl); \
+		if (arMsgMapTable[prMsg->eMsgId].pfMsgHndl) { \
+			DBGLOG(CNM, LOUD, "DO MSG [%d]\n", prMsg->eMsgId); \
+			arMsgMapTable[prMsg->eMsgId].pfMsgHndl( \
+				prAdapter, prMsg); \
+		} \
+		else { \
+		    DBGLOG(CNM, ERROR, "NULL fptr for MSG [%d]\n", \
+			prMsg->eMsgId); \
+		    cnmMemFree(prAdapter, prMsg); \
+		} \
 	} \
 	else { \
-	    DBGLOG(CNM, ERROR, "NULL fptr for MSG [%d]\n", prMsg->eMsgId); \
-	    cnmMemFree(prAdapter, prMsg); \
+		DBGLOG(CNM, ERROR, "Invalid MSG ID [%d]\n", prMsg->eMsgId); \
+		cnmMemFree(prAdapter, prMsg); \
 	} \
 } while (0)
 #endif

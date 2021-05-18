@@ -187,7 +187,7 @@ typedef void(*remove_card) (void);
  *   _field - field name of the structure
  */
 #ifndef OFFSET_OF
-#define OFFSET_OF(_type, _field)    ((unsigned long)&(((_type *)0)->_field))
+#define OFFSET_OF(_type, _field)         offsetof(_type, _field)
 #endif /* OFFSET_OF */
 
 /* This macro returns the base address of an instance of a structure

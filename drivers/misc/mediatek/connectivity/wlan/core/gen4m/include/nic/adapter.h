@@ -183,10 +183,6 @@ struct CONNECTION_SETTINGS {
 	uint8_t aucBSSID[MAC_ADDR_LEN];
 	uint8_t aucBSSIDHint[MAC_ADDR_LEN];
 
-	u_int8_t fgIsConnReqIssued;
-	u_int8_t fgIsDisconnectedByNonRequest;
-	enum ENUM_RECONNECT_LEVEL_T eReConnectLevel;
-
 	uint8_t ucSSIDLen;
 	uint8_t aucSSID[ELEM_MAX_LEN_SSID];
 
@@ -269,7 +265,9 @@ struct CONNECTION_SETTINGS {
 	/* for RSN info store, when upper layer set rsn info */
 	struct RSN_INFO rRsnInfo;
 
+#if CFG_SUPPORT_DETECT_SECURITY_MODE_CHANGE
 	u_int8_t fgSecModeChangeStartTimer;
+#endif
 
 	uint8_t *pucAssocIEs;
 	size_t assocIeLen;
@@ -585,6 +583,12 @@ struct BSS_INFO {
 #endif
 	uint16_t u2DeauthReason;
 
+#if CFG_SUPPORT_ASSURANCE
+	uint32_t u4DeauthIeLength;
+	/* Assurance: Deauth IE from AP */
+	uint8_t aucDeauthIe[CFG_CFG80211_IE_BUF_LEN];
+#endif
+
 #if CFG_SUPPORT_TDLS
 	u_int8_t fgTdlsIsProhibited;
 	u_int8_t fgTdlsIsChSwProhibited;
@@ -603,6 +607,9 @@ struct BSS_INFO {
 #if CFG_SUPPORT_802_11W
 	/* AP PMF */
 	struct AP_PMF_CFG rApPmfCfg;
+	/* STA PMF: for encrypted deauth frame */
+	struct completion rDeauthComp;
+	u_int8_t encryptedDeauthIsInProcess;
 #endif
 
 #if (CFG_SUPPORT_HE_ER == 1)
@@ -613,6 +620,14 @@ struct BSS_INFO {
 	uint8_t aucCountryStr[3];
 	uint8_t aucSubbandTriplet[253];
 	enum ENUM_IFTYPE eIftype;
+
+#if CFG_SUPPORT_DFS
+	struct SWITCH_CH_AND_BAND_PARAMS CSAParams;
+#endif
+
+#if CFG_TC10_FEATURE
+	u_int8_t aisConnectedBandwidth;
+#endif
 };
 
 /* Support AP Selection */
@@ -623,7 +638,7 @@ struct ESS_CHNL_INFO {
 };
 /* end Support AP Selection */
 
-struct NEIGHBOR_AP_T {
+struct NEIGHBOR_AP {
 	struct LINK_ENTRY rLinkEntry;
 	uint8_t aucBssid[MAC_ADDR_LEN];
 	u_int8_t fgHT:1;
@@ -705,10 +720,23 @@ struct AIS_SPECIFIC_BSS_INFO {
 	struct LINK rCurEssLink;
 	/* end Support AP Selection */
 
-	struct BSS_TRANSITION_MGT_PARAM_T rBTMParam;
+	struct BSS_TRANSITION_MGT_PARAM rBTMParam;
 	struct LINK_MGMT  rNeighborApList;
 	OS_SYSTIME rNeiApRcvTime;
 	uint32_t u4NeiApValidInterval;
+
+#if CFG_SUPPORT_ASSURANCE
+	u_int8_t fgRoamingReasonEnable;
+	u_int8_t fgBcnReptErrReasonEnable;
+#endif
+
+	/* scan parameters */
+	uint16_t u2OpChStayTimeMs;
+	uint16_t u2OpChAwayTimeMs;
+	uint8_t ucNonDfsChDwellTimeMs;
+	uint8_t	ucDfsChDwellTimeMs;
+	uint8_t	ucPerScanChannelCnt;
+
 };
 
 struct BOW_SPECIFIC_BSS_INFO {
@@ -851,6 +879,9 @@ struct WIFI_VAR {
 	uint8_t ucStaVht;
 #if (CFG_SUPPORT_802_11AX == 1)
 	uint8_t ucStaHe;
+	uint8_t ucApHe;
+	uint8_t ucP2pGoHe;
+	uint8_t ucP2pGcHe;
 	uint8_t ucApSelAxWeight;
 	uint8_t ucApSelAxScoreDiv;
 #endif
@@ -949,6 +980,7 @@ struct WIFI_VAR {
 	uint8_t ucApAllowHtVhtTkip;
 
 	uint8_t ucNSS;
+	uint8_t fgSta1NSS; /* Less or euqal than ucNss */
 	uint8_t ucAp5gNSS; /* Less or euqal than ucNss */
 	uint8_t ucAp2gNSS; /* Less or euqal than ucNss */
 	uint8_t ucGo5gNSS; /* Less or euqal than ucNss */
@@ -1012,7 +1044,7 @@ struct WIFI_VAR {
 	uint8_t ucArpTxDone;
 
 	uint8_t ucMacAddrOverride;
-	uint8_t aucMacAddrStr[32];
+	uint8_t aucMacAddrStr[WLAN_CFG_VALUE_LEN_MAX];
 
 	uint8_t ucCtiaMode;
 	uint8_t ucTpTestMode;
@@ -1138,18 +1170,23 @@ struct WIFI_VAR {
 #if (CFG_SUPPORT_P2PGO_ACS == 1)
 	uint8_t ucP2pGoACS;
 #endif
+	uint8_t fgReuseRSNIE;
+
+	uint32_t u4DiscoverTimeout;
+	uint32_t u4InactiveTimeout;
+	uint32_t u4BtmDelta;
+	uint32_t u4BtmDisTimerThreshold;
 #if ARP_MONITER_ENABLE
 	uint32_t uArpMonitorNumber;
 	uint32_t uArpMonitorRxPktNum;
 #endif /* ARP_MONITER_ENABLE */
-
 };
 
 /* cnm_timer module */
 struct ROOT_TIMER {
 	struct LINK rLinkHead;
 	OS_SYSTIME rNextExpiredSysTime;
-	KAL_WAKE_LOCK_T rWakeLock;
+	KAL_WAKE_LOCK_T *rWakeLock;
 	u_int8_t fgWakeLocked;
 };
 
@@ -1214,27 +1251,32 @@ struct P2P_FUNCTION_LINKER {
 
 #endif
 
+struct CFG_SCAN_CHNL {
+	uint8_t ucChannelListNum;
+	struct RF_CHANNEL_INFO arChnlInfoList[MAXIMUM_OPERATION_CHANNEL_LIST];
+};
+
 #if CFG_SUPPORT_NCHO
-enum _ENUM_NCHO_ITEM_SET_TYPE_T {
+enum ENUM_NCHO_ITEM_SET_TYPE {
 	ITEM_SET_TYPE_NUM,
 	ITEM_SET_TYPE_STR
 };
 
-enum _ENUM_NCHO_BAND_T {
+enum ENUM_NCHO_BAND {
 	NCHO_BAND_AUTO = 0,
 	NCHO_BAND_5G,
 	NCHO_BAND_2G4,
 	NCHO_BAND_NUM
 };
 
-enum _ENUM_NCHO_DFS_SCN_MODE_T {
+enum ENUM_NCHO_DFS_SCN_MODE {
 	NCHO_DFS_SCN_DISABLE = 0,
 	NCHO_DFS_SCN_ENABLE1,
 	NCHO_DFS_SCN_ENABLE2,
 	NCHO_DFS_SCN_NUM
 };
 
-struct _CFG_NCHO_RE_ASSOC_T {
+struct CFG_NCHO_RE_ASSOC {
 	/*!< SSID length in bytes. Zero length is broadcast(any) SSID */
 	uint32_t u4SsidLen;
 	uint8_t aucSsid[ELEM_MAX_LEN_SSID];
@@ -1242,12 +1284,9 @@ struct _CFG_NCHO_RE_ASSOC_T {
 	uint32_t u4CenterFreq;
 };
 
-struct _CFG_NCHO_SCAN_CHNL_T {
-	uint8_t ucChannelListNum;
-	struct RF_CHANNEL_INFO arChnlInfoList[MAXIMUM_OPERATION_CHANNEL_LIST];
-};
+#define CFG_NCHO_SCAN_CHNL CFG_SCAN_CHNL
 
-struct _NCHO_ACTION_FRAME_PARAMS_T {
+struct NCHO_ACTION_FRAME_PARAMS {
 	uint8_t aucBssid[MAC_ADDR_LEN];
 	int32_t i4channel;
 	int32_t i4DwellTime;
@@ -1255,7 +1294,7 @@ struct _NCHO_ACTION_FRAME_PARAMS_T {
 	uint8_t aucData[520];
 };
 
-struct _NCHO_AF_INFO_T {
+struct NCHO_AF_INFO {
 	uint8_t *aucBssid;
 	int32_t i4channel;
 	int32_t i4DwellTime;
@@ -1263,8 +1302,8 @@ struct _NCHO_AF_INFO_T {
 	uint8_t *pucData;
 };
 
-struct _NCHO_INFO_T {
-	u_int8_t fgECHOEnabled;
+struct NCHO_INFO {
+	u_int8_t fgNCHOEnabled;
 	u_int8_t fgChGranted;
 	u_int8_t fgIsSendingAF;
 	int32_t i4RoamTrigger;		/* db */
@@ -1275,11 +1314,19 @@ struct _NCHO_INFO_T {
 	uint32_t u4ScanHomeawayTime;	/* ms */
 	uint32_t u4ScanNProbes;
 	uint32_t u4WesMode;
-	enum _ENUM_NCHO_BAND_T eBand;
-	enum _ENUM_NCHO_DFS_SCN_MODE_T eDFSScnMode;
+	enum ENUM_NCHO_BAND eBand;
+	enum ENUM_NCHO_DFS_SCN_MODE eDFSScnMode;
 	uint32_t u4RoamScanControl;
-	struct _CFG_NCHO_SCAN_CHNL_T rRoamScnChnl;
-	struct _NCHO_ACTION_FRAME_PARAMS_T rParamActionFrame;
+	struct CFG_NCHO_SCAN_CHNL rRoamScnChnl;
+	struct CFG_NCHO_SCAN_CHNL rAddRoamScnChnl;
+	struct NCHO_ACTION_FRAME_PARAMS rParamActionFrame;
+};
+#endif
+
+#if CFG_SUPPORT_MANIPULATE_TID
+struct MANIPULATE_TID_INFO {
+	uint8_t fgManipulateTidEnabled;
+	uint8_t ucUserPriority;
 };
 #endif
 
@@ -1296,11 +1343,14 @@ struct WIFI_FEM_CFG {
  * -->DISABLE: Screen is off
  * -->RUNNING: Screen is on && Tx/Rx traffic is active
  */
-struct PERF_MONITOR_T {
+struct PERF_MONITOR {
 	struct TIMER rPerfMonTimer;
+	OS_SYSTIME rLastUpdateTime;
 	unsigned long ulPerfMonFlag;
 	unsigned long ulLastTxBytes[BSS_DEFAULT_NUM];
 	unsigned long ulLastRxBytes[BSS_DEFAULT_NUM];
+	unsigned long ulLastTxPackets[BSS_DEFAULT_NUM];
+	unsigned long ulLastRxPackets[BSS_DEFAULT_NUM];
 	uint64_t ulThroughput; /* in bps */
 	unsigned long ulTxTp[BSS_DEFAULT_NUM]; /* in Bps */
 	unsigned long ulRxTp[BSS_DEFAULT_NUM]; /* in Bps */
@@ -1310,6 +1360,21 @@ struct PERF_MONITOR_T {
 	uint32_t u4UsedCnt;
 	unsigned long ulTotalTxSuccessCount;
 	unsigned long ulTotalTxFailCount;
+};
+
+struct HIF_STATS {
+	unsigned long ulUpdatePeriod; /* in ms */
+	uint32_t u4HwIsrCount;
+	uint32_t u4SwIsrCount;
+	uint32_t u4CmdInCount; /* cmd from main_thread to hif_thread */
+	uint32_t u4CmdTxCount; /* cmd from hif_thread to DMA */
+	uint32_t u4CmdTxdoneCount; /* cmd from DMA to consys */
+	uint32_t u4DataInCount; /* data from main_thread to hif_thread */
+	uint32_t u4DataTxCount; /* data from hif_thread to DMA */
+	uint32_t u4DataTxdoneCount; /* data from DMA to consys */
+	uint32_t u4DataMsduRptCount; /* data from consys to air */
+	uint32_t u4EventRxCount; /* event from DMA to hif_thread */
+	uint32_t u4DataRxCount; /* data from DMA to hif_thread */
 };
 
 /*
@@ -1521,6 +1586,7 @@ struct ADAPTER {
 	enum ENUM_SYS_PCO_PHASE eSysPcoPhase;
 
 	struct DOMAIN_INFO_ENTRY *prDomainInfo;
+	struct DOMAIN_INFO_ENTRY rBlockedDomainInfo;
 
 	/* QM */
 	struct QUE_MGT rQM;
@@ -1611,8 +1677,9 @@ struct ADAPTER {
 #endif
 
 #if CFG_SUPPORT_NCHO			/*  NCHO information */
-	struct _NCHO_INFO_T rNchoInfo;
+	struct NCHO_INFO rNchoInfo;
 #endif
+	struct CFG_SCAN_CHNL rAddRoamScnChnl;
 
 /*#if (CFG_EEPROM_PAGE_ACCESS == 1)*/
 	uint8_t aucEepromVaule[16]; /* HQA CMD for Efuse Block size contents */
@@ -1642,7 +1709,7 @@ struct ADAPTER {
 	uint8_t ucSmarGearSupportSisoOnly;
 	uint8_t ucSmartGearWfPathSupport;
 
-	struct PERF_MONITOR_T rPerMonitor;
+	struct PERF_MONITOR rPerMonitor;
 	struct ICAP_INFO_T rIcapInfo;
 	struct RECAL_INFO_T rReCalInfo;
 
@@ -1678,10 +1745,8 @@ struct ADAPTER {
 	uint8_t  ucTxTestUP;
 #endif /* CFG_SUPPORT_WIFI_SYSDVT */
 
-	bool fgEnHifDbgInfo;
 	uint32_t u4HifDbgFlag;
 	uint32_t u4HifChkFlag;
-	uint32_t u4TxHangFlag;
 	uint32_t u4NoMoreRfb;
 
 	/* Only for PCIE DmaSchdl usage so far. */
@@ -1734,8 +1799,27 @@ struct ADAPTER {
 #if CFG_SUPPORT_BIGDATA_PIP
 	OS_SYSTIME tmDataPipReportinterval;
 #endif
+#if CFG_SUPPORT_ASSURANCE
+	/* Deauth IE from wpa_supplicant */
+	uint8_t aucDeauthIeFromUpper[NON_WFA_VENDOR_IE_MAX_LEN];
+	uint16_t u4DeauthIeFromUpperLength;
+
+	u_int8_t fgRoamReasonEnabled;
+	u_int8_t fgBrErrReasonEnabled;
+#endif
 
 	int8_t cArpNoResponseIdx;
+
+	u_int8_t fgEnDbgPowerMode;
+#if CFG_SUPPORT_MANIPULATE_TID
+	struct MANIPULATE_TID_INFO rManipulateTidInfo;
+#endif
+	struct HIF_STATS rHifStats;
+
+#if CFG_TC10_FEATURE
+	struct STA_RECORD rSapLastStaRec;
+	u_int8_t fgSapLastStaRecSet;
+#endif
 
 };				/* end of _ADAPTER_T */
 

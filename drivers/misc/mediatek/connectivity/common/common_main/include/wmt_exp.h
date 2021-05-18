@@ -437,6 +437,9 @@ extern MTK_WCN_BOOL mtk_wmt_gps_suspend_ctrl(MTK_WCN_BOOL suspend);
 extern INT32 mtk_wcn_wmt_mpu_lock_aquire(VOID);
 extern VOID mtk_wcn_wmt_mpu_lock_release(VOID);
 
+extern INT32 mtk_wcn_get_reset_info(PUINT8 pBuff, INT32 buffLen);
+extern INT32 mtk_wcn_get_host_assert_info(PUINT32 type, PUINT32 reason, PUINT32 en);
+
 /*******************************************************************************
 *                              F U N C T I O N S
 ********************************************************************************

@@ -328,6 +328,8 @@ uint32_t wlanImageSectionDownloadStage(IN struct ADAPTER *prAdapter,
 	IN uint32_t u4FwImageFileLength, IN uint8_t ucSectionNumber,
 	IN enum ENUM_IMG_DL_IDX_T eDlIdx);
 
+uint32_t wlanPatchSendComplete(IN struct ADAPTER *prAdapter);
+
 #if (CFG_DOWNLOAD_DYN_MEMORY_MAP == 1)
 uint32_t wlanPatchDynMemMapSendComplete(IN struct ADAPTER *prAdapter);
 

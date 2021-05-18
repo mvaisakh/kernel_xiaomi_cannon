@@ -42,7 +42,9 @@
 #include <linux/jiffies.h>
 #include <linux/slab.h>
 #if defined(WMT_PLAT_ALPS) && WMT_PLAT_ALPS
+#if IS_ENABLED(CONFIG_MTK_AEE_AED)
 #include <aee.h>
+#endif
 #endif
 #include <linux/kfifo.h>
 #include <linux/device.h>

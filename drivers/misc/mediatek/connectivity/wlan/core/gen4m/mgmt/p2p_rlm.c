@@ -176,6 +176,25 @@ void rlmBssInitForAP(struct ADAPTER *prAdapter, struct BSS_INFO *prBssInfo)
 		prBssInfo->ucVhtChannelFrequencyS2 = 0;
 	}
 
+#if (CFG_SUPPORT_802_11AX == 1)
+	/* Filled the HE Operation IE */
+	if (prBssInfo->ucPhyTypeSet & PHY_TYPE_BIT_HE) {
+		memset(prBssInfo->ucHeOpParams, 0, HE_OP_BYTE_NUM);
+
+		/* Disable BSS color support*/
+		prBssInfo->ucBssColorInfo |=
+			BIT(HE_OP_BSSCOLOR_BSS_COLOR_DISABLE_SHFT);
+
+		prBssInfo->u2HeBasicMcsSet |= (HE_CAP_INFO_MCS_MAP_MCS11 << 0);
+		for (i = 1; i < 8; i++)
+			prBssInfo->u2HeBasicMcsSet |=
+				(HE_CAP_INFO_MCS_NOT_SUPPORTED << 2 * i);
+	} else {
+		memset(prBssInfo->ucHeOpParams, 0, HE_OP_BYTE_NUM);
+		prBssInfo->ucBssColorInfo = 0;
+		prBssInfo->u2HeBasicMcsSet = 0;
+	}
+#endif
 
 	/*ERROR HANDLE*/
 	if ((prBssInfo->ucVhtChannelWidth == VHT_OP_CHANNEL_WIDTH_80)

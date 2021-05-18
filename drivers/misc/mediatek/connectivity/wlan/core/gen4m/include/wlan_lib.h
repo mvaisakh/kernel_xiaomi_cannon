@@ -197,19 +197,16 @@
 #endif
 
 #define NUM_TC_RESOURCE_TO_STATISTICS       4
-#if CFG_SUPPORT_NCHO
+
 #define WLAN_CFG_ARGV_MAX 64
-#else
-#define WLAN_CFG_ARGV_MAX 20
-#endif
 #define WLAN_CFG_ARGV_MAX_LONG	22	/* for WOW, 2+20 */
-#define WLAN_CFG_ENTRY_NUM_MAX	200	/* 128 */
+#define WLAN_CFG_ENTRY_NUM_MAX	400	/* 128 */
 #define WLAN_CFG_KEY_LEN_MAX	32	/* include \x00  EOL */
 #define WLAN_CFG_VALUE_LEN_MAX	128	/* include \x00 EOL */
 #define WLAN_CFG_FLAG_SKIP_CB	BIT(0)
-#define WLAN_CFG_FILE_BUF_SIZE	2560
+#define WLAN_CFG_FILE_BUF_SIZE	2048
 
-#define WLAN_CFG_REC_ENTRY_NUM_MAX 200
+#define WLAN_CFG_REC_ENTRY_NUM_MAX 400
 
 
 
@@ -419,6 +416,18 @@ struct CFG_SETTING {
 
 #endif
 
+#if CFG_SUPPORT_NCHO
+#define FW_CFG_KEY_NCHO_ENABLE			"NCHOEnable"
+#define FW_CFG_KEY_NCHO_ROAM_RCPI		"RoamingRCPIValue"
+#define FW_CFG_KEY_NCHO_SCN_CHANNEL_TIME	"NCHOScnChannelTime"
+#define FW_CFG_KEY_NCHO_SCN_HOME_TIME		"NCHOScnHomeTime"
+#define FW_CFG_KEY_NCHO_SCN_HOME_AWAY_TIME	"NCHOScnHomeAwayTime"
+#define FW_CFG_KEY_NCHO_SCN_NPROBES		"NCHOScnNumProbs"
+#define FW_CFG_KEY_NCHO_WES_MODE		"NCHOWesMode"
+#define FW_CFG_KEY_NCHO_SCAN_DFS_MODE		"NCHOScnDfsMode"
+#define FW_CFG_KEY_NCHO_SCAN_PERIOD		"NCHOScnPeriod"
+#endif
+
 /*******************************************************************************
  *                             D A T A   T Y P E S
  *******************************************************************************
@@ -513,6 +522,7 @@ enum ENUM_REG_CH_MAP {
 	REG_CH_MAP_COUNTRY_CODE,
 	REG_CH_MAP_TBL_IDX,
 	REG_CH_MAP_CUSTOMIZED,
+	REG_CH_MAP_BLOCK_INDOOR,
 	REG_CH_MAP_NUM
 };
 
@@ -1191,6 +1201,7 @@ enum ENUM_WLAN_IOT_AP_HANDLE_ACTION {
 	WLAN_IOT_AP_COEX_CTS2SELF,
 	WLAN_IOT_AP_FIX_MODE,
 	WLAN_IOT_AP_DIS_2GHT40,
+	WLAN_IOT_AP_KEEP_EDCA_PARAM = 6,
 	WLAN_IOT_AP_ACT_MAX
 };
 
@@ -1814,9 +1825,6 @@ void wlanCustomMonitorFunction(struct ADAPTER *prAdapter,
 uint32_t wlanSetForceRTS(IN struct ADAPTER *prAdapter,
 	IN u_int8_t fgEnForceRTS);
 
-
-u_int8_t wlanWfdEnabled(struct ADAPTER *prAdapter);
-
 void
 wlanBackupEmCfgSetting(IN struct ADAPTER *prAdapter);
 
@@ -1825,3 +1833,21 @@ wlanResoreEmCfgSetting(IN struct ADAPTER *prAdapter);
 
 void
 wlanCleanAllEmCfgSetting(IN struct ADAPTER *prAdapter);
+
+#if CFG_SUPPORT_NCHO
+void wlanNchoInit(IN struct ADAPTER *prAdapter, IN uint8_t fgFwSync);
+uint32_t wlanNchoSetFWEnable(IN struct ADAPTER *prAdapter, IN uint8_t fgEnable);
+uint32_t wlanNchoSetFWRssiTrigger(IN struct ADAPTER *prAdapter,
+	IN int32_t i4RoamTriggerRssi);
+uint32_t wlanNchoSetFWScanPeriod(IN struct ADAPTER *prAdapter,
+	IN uint32_t u4RoamScanPeriod);
+#endif
+
+u_int8_t wlanWfdEnabled(struct ADAPTER *prAdapter);
+
+int wlanChipConfig(struct ADAPTER *prAdapter,
+	char *pcCommand, int i4TotalLen);
+
+int wlanChipConfigWithType(struct ADAPTER *prAdapter,
+	char *pcCommand, int i4TotalLen, uint8_t type);
+

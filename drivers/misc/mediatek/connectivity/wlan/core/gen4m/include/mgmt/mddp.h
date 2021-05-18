@@ -61,7 +61,6 @@
  */
 int32_t mddpMdNotifyInfo(struct mddpw_md_notify_info_t *prMdInfo);
 int32_t mddpChangeState(enum mddp_state_e event, void *buf, uint32_t *buf_len);
-int32_t mddpRegisterCb(IN struct ADAPTER *prAdapter);
 int32_t mddpGetMdStats(IN struct net_device *prDev);
 int32_t mddpSetTxDescTemplate(IN struct ADAPTER *prAdapter,
 	IN struct STA_RECORD *prStaRec,

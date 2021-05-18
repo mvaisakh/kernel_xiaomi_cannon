@@ -608,7 +608,7 @@ static int compat_priv(IN struct net_device *prNetDev,
 	int ret = 0;
 #ifdef CONFIG_COMPAT
 	struct compat_iw_point *iwp_compat = NULL;
-	struct iw_point iwp;
+	struct iw_point iwp = {0};
 #endif
 
 	if (!prIwReqData)
@@ -706,6 +706,8 @@ int priv_support_ioctl(IN struct net_device *prNetDev,
 	case IOC_AP_SET_CFG:
 	/* This case need to fall through */
 	case IOC_AP_STA_DISASSOC:
+	/* This case need to fall through */
+	case IOC_AP_SET_NSS:
 		return priv_set_ap(prNetDev, &rIwReqInfo, &(prIwReq->u),
 				     (char *) &(prIwReq->u));
 
@@ -1835,7 +1837,7 @@ __priv_set_struct(IN struct net_device *prNetDev,
 			char *pCommand = NULL;
 
 			u4CmdLen = prIwReqData->data.length;
-			if (u4CmdLen > CMD_OID_BUF_LENGTH)
+			if (u4CmdLen >= CMD_OID_BUF_LENGTH)
 				return -EINVAL;
 			if (copy_from_user(&aucOidBuf[0],
 					   prIwReqData->data.pointer,
@@ -1843,6 +1845,7 @@ __priv_set_struct(IN struct net_device *prNetDev,
 				status = -EFAULT;
 				break;
 			}
+			aucOidBuf[u4CmdLen] = 0;
 			if (strlen(aucOidBuf) <= 0) {
 				status = -EFAULT;
 				break;
@@ -2423,7 +2426,7 @@ static u_int8_t reqSearchSupportedOidEntry(IN uint32_t rOid,
 	j = NUM_SUPPORTED_OIDS - 1;
 
 	while (i <= j) {
-		k = (i + j) / 2;
+		k = i + (j - i) / 2;
 
 		if (rOid == arWlanOidReqTable[k].rOid) {
 			*ppWlanReqEntry = &arWlanOidReqTable[k];
@@ -2498,7 +2501,7 @@ priv_set_driver(IN struct net_device *prNetDev,
 
 	ASSERT(IW_IS_GET(u2Cmd));
 	if (prIwReqData->data.length != 0) {
-		if (!access_ok(VERIFY_READ, prIwReqData->data.pointer,
+		if (!kal_access_ok(VERIFY_READ, prIwReqData->data.pointer,
 			       prIwReqData->data.length)) {
 			DBGLOG(REQ, INFO,
 			       "%s access_ok Read fail written = %d\n",
@@ -2972,6 +2975,7 @@ reqExtSetAcpiDevicePowerState(IN struct GLUE_INFO
 #define CMD_SET_MDTIM		"SET_MDTIM"
 
 #define CMD_SET_DBDC		"SET_DBDC"
+#define CMD_SET_STA1NSS		"SET_STA1NSS"
 
 #define CMD_SET_AMPDU_TX        "SET_AMPDU_TX"
 #define CMD_SET_AMPDU_RX        "SET_AMPDU_RX"
@@ -3122,7 +3126,7 @@ int priv_driver_get_dbg_level(IN struct net_device
 		    WLAN_STATUS_SUCCESS) {
 			fgIsCmdAccept = TRUE;
 			i4BytesWritten =
-				snprintf(pcCommand, i4TotalLen,
+				kalSnprintf(pcCommand, i4TotalLen,
 					 "Get DBG module[%u] log level => [0x%02x]!",
 					 u4DbgIdx,
 					 (uint8_t) u4DbgMask);
@@ -3130,7 +3134,7 @@ int priv_driver_get_dbg_level(IN struct net_device
 	}
 
 	if (!fgIsCmdAccept)
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen,
+		i4BytesWritten = kalSnprintf(pcCommand, i4TotalLen,
 					  "Get DBG module log level failed!");
 
 	return i4BytesWritten;
@@ -3233,7 +3237,7 @@ static int priv_driver_set_efuse_buffer_mode(
 			   FALSE, FALSE, TRUE, &u4BufLen);
 
 	i4BytesWritten =
-		snprintf(pcCommand, i4TotalLen, "set buffer mode %s",
+		kalSnprintf(pcCommand, i4TotalLen, "set buffer mode %s",
 			 (rStatus == WLAN_STATUS_SUCCESS) ? "success" : "fail");
 
 out:
@@ -4696,7 +4700,7 @@ static int priv_driver_get_mcr(IN struct net_device *prNetDev,
 		if (rStatus != WLAN_STATUS_SUCCESS)
 			return -1;
 
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen, "0x%08x",
+		i4BytesWritten = kalSnprintf(pcCommand, i4TotalLen, "0x%08x",
 					  (unsigned int)rCmdAccessReg.u4Data);
 		DBGLOG(REQ, INFO, "%s: command result is %s\n", __func__,
 		       pcCommand);
@@ -4909,8 +4913,8 @@ static int priv_driver_get_test_result(IN struct net_device *prNetDev,
 		if (rStatus != WLAN_STATUS_SUCCESS)
 			return -1;
 		u4Data = (unsigned int)rRfATInfo.u4FuncData;
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen, "%d[0x%08x]",
-					  u4Data, u4Data);
+		i4BytesWritten = kalSnprintf(pcCommand, i4TotalLen,
+						"%d[0x%08x]", u4Data, u4Data);
 		DBGLOG(REQ, INFO, "%s: command result is %s\n", __func__,
 		       pcCommand);
 	}
@@ -4953,6 +4957,8 @@ static int32_t priv_driver_set_ra_debug_proc(IN struct net_device *prNetDev,
 	DBGLOG(REQ, LOUD, "string = %s\n", this_char);
 
 	i4Recv = sscanf(this_char, "%d:%d", &(u4WCID), &(u4DebugType));
+	if (i4Recv < 0)
+		return -1;
 
 	prSwCtrlInfo =
 		(struct PARAM_CUSTOM_SW_CTRL_STRUCT *)kalMemAlloc(
@@ -5069,7 +5075,7 @@ int priv_driver_set_fixed_fallback(IN struct net_device *prNetDev,
 		if (rStatus != WLAN_STATUS_SUCCESS)
 			return -1;
 	} else if (i4Recv == 2 || i4Recv == 3) {
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen,
+		i4BytesWritten = kalSnprintf(pcCommand, i4TotalLen,
 			"Update fgIsUseWCID %d\n", fgIsUseWCID);
 	} else if (i4Recv == 11) {
 		rSwCtrlInfo.u4Id = u4Id;
@@ -5078,11 +5084,11 @@ int priv_driver_set_fixed_fallback(IN struct net_device *prNetDev,
 			prAdapter->rWifiVar.arWtbl[u4WCID].ucUsed) {
 			rSwCtrlInfo.u4Id |= u4WCID;
 			rSwCtrlInfo.u4Id |= BIT(8);
-			i4BytesWritten = snprintf(
+			i4BytesWritten = kalSnprintf(
 				pcCommand, i4TotalLen,
 				"Apply WCID %d\n", u4WCID);
 		} else {
-			i4BytesWritten = snprintf(
+			i4BytesWritten = kalSnprintf(
 				pcCommand, i4TotalLen, "Apply All\n");
 		}
 
@@ -5409,6 +5415,8 @@ static int32_t priv_driver_get_txpower_info(IN struct net_device *prNetDev,
 	DBGLOG(REQ, INFO, "string = %s\n", this_char);
 
 	u4ParamNum = sscanf(this_char, "%d:%d", &ucParam, &ucBandIdx);
+	if (u4ParamNum < 0)
+		return -1;
 	DBGLOG(REQ, INFO, "ParamNum=%d,Param=%d,Band=%d\n",
 		u4ParamNum, ucParam, ucBandIdx);
 
@@ -5485,6 +5493,11 @@ static int32_t priv_driver_txpower_man_set(IN struct net_device *prNetDev,
 
 	u4ParamNum = sscanf(this_char, "%d:%d:%d:%d", &ucPhyMode, &ucTxRate,
 		&ucBw, &iTargetPwr);
+
+	if (u4ParamNum < 0) {
+		DBGLOG(REQ, WARN, "sscanf input fail\n");
+		return -1;
+	}
 
 	DBGLOG(REQ, INFO, "ParamNum=%d,PhyMod=%d,Rate=%d,Bw=%d,Pwr=%d\n",
 		u4ParamNum, ucPhyMode, ucTxRate, ucBw, iTargetPwr);
@@ -5576,8 +5589,8 @@ static int priv_driver_get_sta_stat(IN struct net_device *prNetDev,
 			if (!wlanGetWlanIdxByAddress(prGlueInfo->prAdapter,
 			    &aucMacAddr[0], &ucWlanIndex)) {
 				DBGLOG(REQ, INFO,
-					"wlan index of %pM is not found!\n",
-					aucMacAddr);
+				      "wlan index of "MACSTR" is not found!\n",
+				      MAC2STR(aucMacAddr));
 				goto out;
 			}
 		} else {
@@ -5602,8 +5615,8 @@ static int priv_driver_get_sta_stat(IN struct net_device *prNetDev,
 				prGlueInfo->prAdapter, NULL,
 				&ucWlanIndex)) {
 				DBGLOG(REQ, INFO,
-					"wlan index of %pM is not found!\n",
-					aucMacAddr);
+				      "wlan index of "MACSTR" is not found!\n",
+				      MAC2STR(aucMacAddr));
 				goto out;
 			}
 		} else {
@@ -5623,8 +5636,8 @@ static int priv_driver_get_sta_stat(IN struct net_device *prNetDev,
 			if (!wlanGetWlanIdxByAddress(prGlueInfo->prAdapter,
 			    &aucMacAddr[0], &ucWlanIndex)) {
 				DBGLOG(REQ, INFO,
-					"wlan index of %pM is not found!\n",
-					aucMacAddr);
+				      "wlan index of "MACSTR" is not found!\n",
+				      MAC2STR(aucMacAddr));
 				goto out;
 			}
 		}
@@ -7102,7 +7115,7 @@ static int priv_driver_get_drv_mcr(IN struct net_device *prNetDev,
 		if (rStatus != WLAN_STATUS_SUCCESS)
 			return -1;
 
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen, "0x%08x",
+		i4BytesWritten = kalSnprintf(pcCommand, i4TotalLen, "0x%08x",
 					  (unsigned int)rCmdAccessReg.u4Data);
 		DBGLOG(REQ, INFO, "%s: command result is %s\n", __func__,
 		       pcCommand);
@@ -7205,7 +7218,7 @@ static int priv_driver_get_sw_ctrl(IN struct net_device *prNetDev,
 		if (rStatus != WLAN_STATUS_SUCCESS)
 			return -1;
 
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen, "0x%08x",
+		i4BytesWritten = kalSnprintf(pcCommand, i4TotalLen, "0x%08x",
 					  (unsigned int)rSwCtrlInfo.u4Data);
 		DBGLOG(REQ, INFO, "%s: command result is %s\n", __func__,
 		       pcCommand);
@@ -7357,7 +7370,7 @@ int priv_driver_set_fixed_rate(IN struct net_device *prNetDev,
 		if (rStatus != WLAN_STATUS_SUCCESS)
 			return -1;
 	} else if (i4Recv == 2 || i4Recv == 3) {
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen,
+		i4BytesWritten = kalSnprintf(pcCommand, i4TotalLen,
 			"Update fgIsUseWCID %d\n", fgIsUseWCID);
 	} else if (i4Recv == 10 || i4Recv == 13) {
 		rSwCtrlInfo.u4Id = u4Id;
@@ -7365,18 +7378,18 @@ int priv_driver_set_fixed_rate(IN struct net_device *prNetDev,
 			prAdapter->rWifiVar.arWtbl[u4WCID].ucUsed) {
 			rSwCtrlInfo.u4Id |= u4WCID;
 			rSwCtrlInfo.u4Id |= BIT(8);
-			i4BytesWritten = snprintf(
+			i4BytesWritten = kalSnprintf(
 				pcCommand, i4TotalLen,
 				"Apply WCID %d\n", u4WCID);
 		} else {
-			i4BytesWritten = snprintf(
+			i4BytesWritten = kalSnprintf(
 				pcCommand, i4TotalLen, "Apply All\n");
 		}
 
 		if (rFixedRate.u4Mode >= TX_RATE_MODE_HE_SU) {
 			if (i4Recv == 10) {
 				/* Give default value */
-				rFixedRate.u4HeLTF = HE_LTF_2X;
+				rFixedRate.u4HeLTF = HE_LTF_4X;
 				rFixedRate.u4HeErDCM = 0;
 				rFixedRate.u4HeEr106t = 0;
 			}
@@ -7803,7 +7816,7 @@ priv_driver_get_chip_config_16(uint8_t *pucStartAddr, uint32_t u4Length,
 	while (u4Length >= 16) {
 		if (i4TotalLen > i4BytesWritten) {
 			i4BytesWritten +=
-			    snprintf(pcCommand + i4BytesWritten,
+			    kalSnprintf(pcCommand + i4BytesWritten,
 					i4TotalLen - i4BytesWritten,
 					"%04x %02x %02x %02x %02x  %02x %02x %02x %02x - %02x %02x %02x %02x  %02x %02x %02x %02x\n",
 					u4Line, pucStartAddr[0],
@@ -7832,7 +7845,7 @@ priv_driver_get_chip_config_4(uint32_t *pu4StartAddr, uint32_t u4Length,
 	while (u4Length >= 16) {
 		if (i4TotalLen > i4BytesWritten) {
 			i4BytesWritten +=
-			    snprintf(pcCommand + i4BytesWritten,
+			    kalSnprintf(pcCommand + i4BytesWritten,
 				     i4TotalLen - i4BytesWritten,
 				     "%04x %08x %08x %08x %08x\n", u4Line,
 				     pu4StartAddr[0], pu4StartAddr[1],
@@ -7916,7 +7929,7 @@ int priv_driver_get_chip_config(IN struct net_device *prNetDev,
 			if (rChipConfigInfo.ucRespType ==
 			    CHIP_CONFIG_TYPE_ASCII) {
 				i4BytesWritten =
-				    snprintf(pcCommand + i4BytesWritten,
+				    kalSnprintf(pcCommand + i4BytesWritten,
 					     i4TotalLen, "%s",
 					     rChipConfigInfo.aucCmd);
 			} else {
@@ -8048,7 +8061,7 @@ int priv_driver_get_linkspeed(IN struct net_device *prNetDev,
 	if (rStatus != WLAN_STATUS_SUCCESS)
 		return -1;
 	u4Rate = rLinkSpeed.rLq[ucBssIndex].u2LinkSpeed;
-	i4BytesWritten = snprintf(pcCommand, i4TotalLen, "LinkSpeed %u",
+	i4BytesWritten = kalSnprintf(pcCommand, i4TotalLen, "LinkSpeed %u",
 				  (unsigned int)(u4Rate * 100));
 	DBGLOG(REQ, INFO, "%s: command result is %s\n", __func__, pcCommand);
 	return i4BytesWritten;
@@ -8577,19 +8590,19 @@ int priv_driver_set_miracast(IN struct net_device *prNetDev,
 
 			if (ucMode == MIRACAST_MODE_OFF) {
 				prWfdCfgSettings->ucWfdEnable = 0;
-				snprintf(pcCommand, i4TotalLen,
+				kalSnprintf(pcCommand, i4TotalLen,
 					 CMD_SET_CHIP " mira 0");
 			} else if (ucMode == MIRACAST_MODE_SOURCE) {
 				prWfdCfgSettings->ucWfdEnable = 1;
-				snprintf(pcCommand, i4TotalLen,
+				kalSnprintf(pcCommand, i4TotalLen,
 					 CMD_SET_CHIP " mira 1");
 			} else if (ucMode == MIRACAST_MODE_SINK) {
 				prWfdCfgSettings->ucWfdEnable = 2;
-				snprintf(pcCommand, i4TotalLen,
+				kalSnprintf(pcCommand, i4TotalLen,
 					 CMD_SET_CHIP " mira 2");
 			} else {
 				prWfdCfgSettings->ucWfdEnable = 0;
-				snprintf(pcCommand, i4TotalLen,
+				kalSnprintf(pcCommand, i4TotalLen,
 					 CMD_SET_CHIP " mira 0");
 			}
 
@@ -8899,8 +8912,8 @@ int priv_driver_set_ap_get_sta_list(IN struct net_device *prNetDev,
 		i4BytesWritten += kalSnprintf(
 			pcCommand + i4BytesWritten,
 			i4TotalLen - i4BytesWritten,
-			"%pM\n",
-			prCurrStaRec->aucMacAddr);
+			""MACSTR"\n",
+			MAC2STR(prCurrStaRec->aucMacAddr));
 	}
 
 	return i4BytesWritten;
@@ -8967,6 +8980,56 @@ error:
 	return -1;
 }
 
+int priv_driver_set_ap_nss(IN struct net_device *prNetDev,
+				  IN char *pcCommand, IN int i4TotalLen)
+{
+	struct GLUE_INFO *prGlueInfo = NULL;
+	int32_t i4BytesWritten = 0;
+	int32_t i4Argc = 0;
+	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = {0};
+	uint32_t u4Ret, u4Parse = 0;
+	uint8_t ucNSS;
+
+	ASSERT(prNetDev);
+
+	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
+		return -1;
+
+	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
+
+	DBGLOG(REQ, LOUD, "command is %s\n", pcCommand);
+	wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
+
+	if (i4Argc == 2) {
+		u4Ret = kalkStrtou32(apcArgv[1], 0, &u4Parse);
+		if (u4Ret) {
+			DBGLOG(REQ, WARN, "parse apcArgv error u4Ret=%d\n",
+			       u4Ret);
+			goto error;
+		}
+		ucNSS = (uint8_t) u4Parse;
+
+		if ((ucNSS == 1) || (ucNSS == 2)) {
+			prGlueInfo->prAdapter->rWifiVar.ucAp5gNSS = ucNSS;
+			prGlueInfo->prAdapter->rWifiVar.ucAp2gNSS = ucNSS;
+
+			DBGLOG(REQ, STATE,
+				"Ap2gNSS = %d\n",
+				prGlueInfo->prAdapter->rWifiVar.ucAp2gNSS);
+		} else
+			DBGLOG(REQ, WARN, "Invalid nss=%d\n",
+				ucNSS);
+	} else {
+		DBGLOG(INIT, ERROR,
+			"iwpriv wlanXX SET_AP_NSS <value>\n");
+	}
+
+	return i4BytesWritten;
+
+error:
+	return -1;
+}
+
 int
 __priv_set_ap(IN struct net_device *prNetDev,
 	IN struct iw_request_info *prIwReqInfo,
@@ -9007,7 +9070,7 @@ __priv_set_ap(IN struct net_device *prNetDev,
 
 	ASSERT(IW_IS_GET(u2Cmd));
 	if (prIwReqData->data.length != 0) {
-		if (!access_ok(VERIFY_READ, prIwReqData->data.pointer,
+		if (!kal_access_ok(VERIFY_READ, prIwReqData->data.pointer,
 			prIwReqData->data.length)) {
 			DBGLOG(REQ, INFO,
 				"%s access_ok Read fail written = %d\n",
@@ -9062,6 +9125,13 @@ __priv_set_ap(IN struct net_device *prNetDev,
 		aucOidBuf,
 		i4TotalFixLen);
 	  break;
+	case IOC_AP_SET_NSS:
+	i4BytesWritten =
+		priv_driver_set_ap_nss(
+		prNetDev,
+		aucOidBuf,
+		i4TotalFixLen);
+	  break;
 	default:
 		i4CmdFound = 0;
 		break;
@@ -9104,7 +9174,6 @@ priv_set_ap(IN struct net_device *prNetDev,
 	IN struct iw_request_info *prIwReqInfo,
 	IN union iwreq_data *prIwReqData, IN OUT char *pcExtra)
 {
-	/* kal_show_stack(NULL, NULL); */
 #if 0
 	return compat_priv(prNetDev, prIwReqInfo,
 		prIwReqData, pcExtra, __priv_set_ap);
@@ -9955,7 +10024,7 @@ int priv_driver_set_monitor(IN struct net_device *prNetDev, IN char *pcCommand,
 							   ucPriChannel);
 
 		if (fgIsLegalChannel == FALSE) {
-			i4BytesWritten = snprintf(pcCommand, i4TotalLen,
+			i4BytesWritten = kalSnprintf(pcCommand, i4TotalLen,
 						  "Illegal primary channel %d",
 						  ucPriChannel);
 			return i4BytesWritten;
@@ -10012,7 +10081,7 @@ int priv_driver_set_monitor(IN struct net_device *prNetDev, IN char *pcCommand,
 
 		if (fgError) {
 			i4BytesWritten =
-			    snprintf(pcCommand, i4TotalLen,
+			    kalSnprintf(pcCommand, i4TotalLen,
 				     "Invalid primary channel %d with bandwidth %d",
 				     ucPriChannel, ucChannelWidth);
 			return i4BytesWritten;
@@ -10039,14 +10108,14 @@ int priv_driver_set_monitor(IN struct net_device *prNetDev, IN char *pcCommand,
 				   FALSE, FALSE, TRUE, &u4BufLen);
 
 		i4BytesWritten =
-		    snprintf(pcCommand, i4TotalLen, "set monitor config %s",
+		    kalSnprintf(pcCommand, i4TotalLen, "set monitor config %s",
 			     (rStatus == WLAN_STATUS_SUCCESS) ?
 			     "success" : "fail");
 
 		return i4BytesWritten;
 	}
 
-	i4BytesWritten = snprintf(pcCommand, i4TotalLen,
+	i4BytesWritten = kalSnprintf(pcCommand, i4TotalLen,
 				  "monitor [Enable][PriChannel][ChannelWidth][Sco]");
 
 	return i4BytesWritten;
@@ -11027,7 +11096,7 @@ static int priv_driver_get_version(IN struct net_device *prNetDev,
 
 	u4Offset += fwDlGetFwdlInfo(prAdapter, pcCommand, i4TotalLen);
 	u4Offset += snprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
-		"WiFi Driver Version %u.%u.%u\n",
+		"WiFi Driver Version MTK_%u.%u.%u\n",
 		NIC_DRIVER_MAJOR_VERSION,
 		NIC_DRIVER_MINOR_VERSION,
 		NIC_DRIVER_SERIAL_VERSION);
@@ -11168,6 +11237,45 @@ int priv_driver_set_dbdc(IN struct net_device *prNetDev, IN char *pcCommand,
 
 	return i4BytesWritten;
 }
+
+int priv_driver_set_sta1ss(IN struct net_device *prNetDev, IN char *pcCommand,
+			 IN int i4TotalLen)
+{
+	struct GLUE_INFO *prGlueInfo = NULL;
+	int32_t i4BytesWritten = 0;
+	int32_t i4Argc = 0;
+	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = {0};
+	uint32_t u4Ret, u4Parse = 0;
+
+	ASSERT(prNetDev);
+
+	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
+		return -1;
+
+	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
+
+	DBGLOG(REQ, LOUD, "command is %s\n", pcCommand);
+	wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
+
+	if (i4Argc == 2) {
+		u4Ret = kalkStrtou32(apcArgv[1], 0, &u4Parse);
+		if (u4Ret)
+			DBGLOG(REQ, LOUD, "parse apcArgv error u4Ret=%d\n",
+			       u4Ret);
+
+		prGlueInfo->prAdapter->rWifiVar.fgSta1NSS =
+			(uint8_t) u4Parse;
+
+	} else {
+		DBGLOG(INIT, ERROR,
+			"iwpriv wlanXX driver SET_STA1NSS <enable>\n");
+		DBGLOG(INIT, ERROR,
+			"<enable> 1: enable. 0: disable.\n");
+	}
+
+	return i4BytesWritten;
+}
+
 #endif /*CFG_SUPPORT_DBDC*/
 
 #if CFG_SUPPORT_BATCH_SCAN
@@ -11232,7 +11340,7 @@ static int priv_driver_get_capab_rsdb(IN struct net_device *prNetDev,
 
 	if (prGlueInfo->prAdapter->rWifiFemCfg.u2WifiPath ==
 	    (WLAN_FLAG_2G4_WF0 | WLAN_FLAG_5G_WF1))
-		fgDbDcModeEn = TRUE;
+		fgDbDcModeEn = FALSE;
 #endif
 
 	DBGLOG(REQ, INFO, "RSDB:%d\n", fgDbDcModeEn);
@@ -11292,10 +11400,10 @@ static int priv_driver_get_cnm(IN struct net_device *prNetDev,
 		return -1;
 	}
 
-	i4BytesWritten += snprintf(pcCommand + i4BytesWritten,
+	i4BytesWritten += kalSnprintf(pcCommand + i4BytesWritten,
 				   i4TotalLen - i4BytesWritten,
 				   "\n[CNM Info]\n");
-	i4BytesWritten += snprintf(pcCommand + i4BytesWritten,
+	i4BytesWritten += kalSnprintf(pcCommand + i4BytesWritten,
 				   i4TotalLen - i4BytesWritten,
 				   "DBDC Mode : %s\n\n",
 				   (prCnmInfo->fgIsDbdcEnable) ?
@@ -11313,7 +11421,7 @@ static int priv_driver_get_cnm(IN struct net_device *prNetDev,
 			if (prCnmInfo->ucOpChNum[eDbdcIdx] < 1)
 				prCnmInfo->ucChList[eDbdcIdx][0] = 0;
 		}
-		i4BytesWritten += snprintf(pcCommand + i4BytesWritten,
+		i4BytesWritten += kalSnprintf(pcCommand + i4BytesWritten,
 					   i4TotalLen - i4BytesWritten,
 					   "Band %u OPCH %d [%u, %u, %u]\n",
 					   eDbdcIdx,
@@ -11322,7 +11430,7 @@ static int priv_driver_get_cnm(IN struct net_device *prNetDev,
 					   prCnmInfo->ucChList[eDbdcIdx][1],
 					   prCnmInfo->ucChList[eDbdcIdx][2]);
 	}
-	i4BytesWritten += snprintf(pcCommand + i4BytesWritten,
+	i4BytesWritten += kalSnprintf(pcCommand + i4BytesWritten,
 				   i4TotalLen - i4BytesWritten, "\n");
 
 	for (ucBssIdx = BSSID_0; ucBssIdx < (BSSID_NUM+1); ucBssIdx++) {
@@ -11372,7 +11480,7 @@ static int priv_driver_get_cnm(IN struct net_device *prNetDev,
 				continue;
 		}
 
-		i4BytesWritten += snprintf(pcCommand + i4BytesWritten,
+		i4BytesWritten += kalSnprintf(pcCommand + i4BytesWritten,
 			i4TotalLen - i4BytesWritten,
 			"BSS%u Inuse%u Act%u ConnStat%u [NetType%u][CH%3u][DBDC b%u][WMM%u b%u][OMAC%u b%u][BW%3u][TxNSS%u][RxNss%u]\n",
 			ucBssIdx,
@@ -11390,12 +11498,12 @@ static int priv_driver_get_cnm(IN struct net_device *prNetDev,
 			ucOpTxNss,
 			ucOpRxNss);
 #ifdef CONFIG_SUPPORT_OPENWRT
-		i4BytesWritten += snprintf(pcCommand + i4BytesWritten,
+		i4BytesWritten += kalSnprintf(pcCommand + i4BytesWritten,
 			i4TotalLen - i4BytesWritten, "BW=BW%u\n",
 			20 * (0x01 << rlmGetBssOpBwByVhtAndHtOpInfo(prBssInfo))
 			);
 
-		i4BytesWritten += snprintf(pcCommand + i4BytesWritten,
+		i4BytesWritten += kalSnprintf(pcCommand + i4BytesWritten,
 			i4TotalLen - i4BytesWritten, "[TxNSS%u][RxNss%u]\n",
 			ucOpTxNss, ucOpRxNss);
 
@@ -11407,11 +11515,11 @@ static int priv_driver_get_cnm(IN struct net_device *prNetDev,
 		prStaRec = cnmGetStaRecByAddress(prGlueInfo->prAdapter,
 			ucBssIdx, prBssInfo->aucBSSID);
 
-		i4BytesWritten += snprintf(pcCommand + i4BytesWritten,
+		i4BytesWritten += kalSnprintf(pcCommand + i4BytesWritten,
 			i4TotalLen - i4BytesWritten, "Mcs1=%u\n",
 			(prStaRec->u2HeRxMcsMapBW80) & 0x3);
 
-		i4BytesWritten += snprintf(pcCommand + i4BytesWritten,
+		i4BytesWritten += kalSnprintf(pcCommand + i4BytesWritten,
 			i4TotalLen - i4BytesWritten, "Mcs2=%u\n",
 			((prStaRec->u2HeRxMcsMapBW80) >> 2) & 0x3);
 	}
@@ -11602,7 +11710,7 @@ static int priv_driver_efuse_ops(IN struct net_device *prNetDev,
 	    prGlueInfo->prAdapter &&
 	    prGlueInfo->prAdapter->chip_info &&
 	    !prGlueInfo->prAdapter->chip_info->is_support_efuse) {
-		u4Offset += snprintf(pcCommand + u4Offset,
+		u4Offset += kalSnprintf(pcCommand + u4Offset,
 				     i4TotalLen - u4Offset,
 				     "efuse ops is invalid\n");
 		return (int32_t)u4Offset;
@@ -11623,7 +11731,7 @@ static int priv_driver_efuse_ops(IN struct net_device *prNetDev,
 				   TRUE, TRUE, TRUE, &u4BufLen);
 
 		if (rStatus == WLAN_STATUS_SUCCESS) {
-			u4Offset += snprintf(pcCommand + u4Offset,
+			u4Offset += kalSnprintf(pcCommand + u4Offset,
 			     i4TotalLen - u4Offset,
 			     "Read success 0x%X = 0x%X\n", u4Efuse_addr,
 			     prGlueInfo->prAdapter->aucEepromVaule[u4Index]);
@@ -11641,7 +11749,7 @@ static int priv_driver_efuse_ops(IN struct net_device *prNetDev,
 				   sizeof(struct PARAM_CUSTOM_ACCESS_EFUSE),
 				   FALSE, FALSE, TRUE, &u4BufLen);
 		if (rStatus == WLAN_STATUS_SUCCESS) {
-			u4Offset += snprintf(pcCommand + u4Offset,
+			u4Offset += kalSnprintf(pcCommand + u4Offset,
 					     i4TotalLen - u4Offset,
 					     "Write success 0x%X = 0x%X\n",
 					     u4Efuse_addr, ucEfuse_value);
@@ -11651,7 +11759,7 @@ static int priv_driver_efuse_ops(IN struct net_device *prNetDev,
 
 		if (prGlueInfo->prAdapter->fgIsSupportGetFreeEfuseBlockCount
 		    == FALSE) {
-			u4Offset += snprintf(pcCommand + u4Offset,
+			u4Offset += kalSnprintf(pcCommand + u4Offset,
 					     i4TotalLen - u4Offset,
 					     "Cannot read free block size\n");
 			return (int32_t)u4Offset;
@@ -11661,14 +11769,14 @@ static int priv_driver_efuse_ops(IN struct net_device *prNetDev,
 				   sizeof(struct PARAM_CUSTOM_EFUSE_FREE_BLOCK),
 				   TRUE, TRUE, TRUE, &u4BufLen);
 		if (rStatus == WLAN_STATUS_SUCCESS) {
-			u4Offset += snprintf(pcCommand + u4Offset,
+			u4Offset += kalSnprintf(pcCommand + u4Offset,
 				     i4TotalLen - u4Offset,
 				     "Free block size 0x%X\n",
 				     prGlueInfo->prAdapter->u4FreeBlockNum);
 		}
 	}
 #else
-	u4Offset += snprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
+	u4Offset += kalSnprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
 					"efuse ops is invalid\n");
 #endif
 
@@ -11676,13 +11784,13 @@ static int priv_driver_efuse_ops(IN struct net_device *prNetDev,
 
 efuse_op_invalid:
 
-	u4Offset += snprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
+	u4Offset += kalSnprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
 				"\nHelp menu\n");
-	u4Offset += snprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
+	u4Offset += kalSnprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
 				"\tRead:\t\"efuse read addr_hex\"\n");
-	u4Offset += snprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
+	u4Offset += kalSnprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
 				"\tWrite:\t\"efuse write addr_hex val_hex\"\n");
-	u4Offset += snprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
+	u4Offset += kalSnprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
 				"\tFree Blocks:\t\"efuse free\"\n");
 	return (int32_t)u4Offset;
 }
@@ -11716,7 +11824,7 @@ static int priv_driver_cccr_ops(IN struct net_device *prNetDev,
 	ASSERT(prGlueInfo);
 
 	if(!IS_SDIO_INF(prGlueInfo)){
-		u4Offset += snprintf(pcCommand + u4Offset,
+		u4Offset += kalSnprintf(pcCommand + u4Offset,
 				     i4TotalLen - u4Offset,
 				     "Not SDIO bus(%d)\n",
 				     prGlueInfo->u4InfType);
@@ -11762,12 +11870,12 @@ static int priv_driver_cccr_ops(IN struct net_device *prNetDev,
 		sdio_release_host(func);
 
 		if (rStatus) /* Fail case */
-			u4Offset += snprintf(pcCommand + u4Offset,
+			u4Offset += kalSnprintf(pcCommand + u4Offset,
 					     i4TotalLen - u4Offset,
 					     "Read Fail 0x%X (ret=%d)\n",
 					     u4CCCR_addr, rStatus);
 		else
-			u4Offset += snprintf(pcCommand + u4Offset,
+			u4Offset += kalSnprintf(pcCommand + u4Offset,
 					     i4TotalLen - u4Offset,
 					     "Read success 0x%X = 0x%X\n",
 					     u4CCCR_addr, ucCCCR_value);
@@ -11783,12 +11891,12 @@ static int priv_driver_cccr_ops(IN struct net_device *prNetDev,
 		sdio_release_host(func);
 
 		if (rStatus) /* Fail case */
-			u4Offset += snprintf(pcCommand + u4Offset,
+			u4Offset += kalSnprintf(pcCommand + u4Offset,
 					     i4TotalLen - u4Offset,
 					     "Write Fail 0x%X (ret=%d)\n",
 					     u4CCCR_addr, rStatus);
 		else
-			u4Offset += snprintf(pcCommand + u4Offset,
+			u4Offset += kalSnprintf(pcCommand + u4Offset,
 					     i4TotalLen - u4Offset,
 					     "Write success 0x%X = 0x%X\n",
 					     u4CCCR_addr, ucCCCR_value);
@@ -11798,11 +11906,11 @@ static int priv_driver_cccr_ops(IN struct net_device *prNetDev,
 
 cccr_op_invalid:
 
-	u4Offset += snprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
+	u4Offset += kalSnprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
 				"\nHelp menu\n");
-	u4Offset += snprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
+	u4Offset += kalSnprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
 				"\tRead:\t\"cccr read addr_hex\"\n");
-	u4Offset += snprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
+	u4Offset += kalSnprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
 				"\tWrite:\t\"cccr write addr_hex val_hex\"\n");
 	return (int32_t)u4Offset;
 }
@@ -11896,7 +12004,7 @@ static int priv_driver_get_noise(IN struct net_device *prNetDev,
 	u2Wf0AvgPwr = rSwCtrlInfo.u4Data & 0xFFFF;
 	u2Wf1AvgPwr = (rSwCtrlInfo.u4Data >> 16) & 0xFFFF;
 
-	u4Offset += snprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
+	u4Offset += kalSnprintf(pcCommand + u4Offset, i4TotalLen - u4Offset,
 			     "Noise Idle Avg. Power: WF0:%ddB WF1:%ddB\n",
 			     u2Wf0AvgPwr, u2Wf1AvgPwr);
 
@@ -12582,7 +12690,7 @@ static int priv_driver_set_drv_ser(struct net_device *prNetDev,
 			   (void *)&u4Num, sizeof(uint32_t),
 			   FALSE, FALSE, FALSE, &u4BufLen);
 
-	i4BytesWritten += snprintf(pcCommand, i4TotalLen,
+	i4BytesWritten += kalSnprintf(pcCommand, i4TotalLen,
 				   "trigger driver SER\n");
 	if (rStatus != WLAN_STATUS_SUCCESS) {
 		DBGLOG(REQ, ERROR, "ERR: kalIoctl fail (%d)\n", rStatus);
@@ -12699,7 +12807,7 @@ static int priv_driver_set_amsdu_num(IN struct net_device *prNetDev,
 			   (void *)&u4Num, sizeof(uint32_t),
 			   FALSE, FALSE, FALSE, &u4BufLen);
 
-	i4BytesWritten += snprintf(pcCommand, i4TotalLen,
+	i4BytesWritten += kalSnprintf(pcCommand, i4TotalLen,
 				   "Set Sw Amsdu Num:%u\n", u4Num);
 
 	if (rStatus != WLAN_STATUS_SUCCESS) {
@@ -12746,7 +12854,7 @@ static int priv_driver_set_amsdu_size(IN struct net_device *prNetDev,
 			   (void *)&u4Size, sizeof(uint32_t),
 			   FALSE, FALSE, FALSE, &u4BufLen);
 
-	i4BytesWritten += snprintf(pcCommand, i4TotalLen,
+	i4BytesWritten += kalSnprintf(pcCommand, i4TotalLen,
 				   "Set Sw Amsdu Max Size:%u\n", u4Size);
 
 	if (rStatus != WLAN_STATUS_SUCCESS) {
@@ -13011,21 +13119,26 @@ int32_t priv_driver_rx_stat_parser(
 				"i4tmpContent is %x\n", i4tmpContent);
 
 				if (i4Type == 0) {
-					i4BytesWritten += snprintf(pcCommand +
-					i4BytesWritten, i4TotalLen,
-					RxStatPerBand[i/4], i4tmpContent);
+					i4BytesWritten += kalSnprintf(
+						pcCommand + i4BytesWritten,
+						i4TotalLen, RxStatPerBand[i/4],
+						i4tmpContent);
 				} else if (i4Type == 1) {
-					i4BytesWritten += snprintf(pcCommand +
-					i4BytesWritten, i4TotalLen,
-					RxStatPerAnt[i/4], i4tmpContent);
+					i4BytesWritten += kalSnprintf(
+						pcCommand + i4BytesWritten,
+						i4TotalLen, RxStatPerAnt[i/4],
+						i4tmpContent);
 				} else if (i4Type == 2) {
-					i4BytesWritten += snprintf(pcCommand +
-					i4BytesWritten, i4TotalLen,
-					RxStatPerUser[i/4], i4tmpContent);
+					i4BytesWritten += kalSnprintf(
+						pcCommand + i4BytesWritten,
+						i4TotalLen, RxStatPerUser[i/4],
+						i4tmpContent);
 				} else {
-					i4BytesWritten += snprintf(pcCommand +
-					i4BytesWritten, i4TotalLen,
-					RxStatCommonUser[i/4], i4tmpContent);
+					i4BytesWritten += kalSnprintf(
+						pcCommand + i4BytesWritten,
+						i4TotalLen,
+						RxStatCommonUser[i/4],
+						i4tmpContent);
 				}
 				i += 4;
 				dataptr += 4;
@@ -13112,7 +13225,7 @@ static int priv_driver_run_hqa(
 	/*parsing ret 2 bytes*/
 	if ((dataptr) && (datalen)) {
 		i2tmpVal = dataptr[1] << 8 | dataptr[0];
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen,
+		i4BytesWritten = kalSnprintf(pcCommand, i4TotalLen,
 		"Return : 0x%04x\n", i2tmpVal);
 
 		datalen -= 2;
@@ -13131,12 +13244,13 @@ static int priv_driver_run_hqa(
 			dataptr[1] << 8 | dataptr[0];
 			if (datalen == 4) {
 				i4BytesWritten +=
-				snprintf(pcCommand + i4BytesWritten, i4TotalLen,
-				"ExtId : 0x%08x\n", i4tmpVal);
+				kalSnprintf(pcCommand + i4BytesWritten,
+				i4TotalLen, "ExtId : 0x%08x\n", i4tmpVal);
 			} else if (datalen == 8) {
 				i4BytesWritten +=
-				snprintf(pcCommand + i4BytesWritten, i4TotalLen,
-				"Band%d TX : 0x%08x\n", i/4, NTOHL(i4tmpVal));
+				kalSnprintf(pcCommand + i4BytesWritten,
+				i4TotalLen, "Band%d TX : 0x%08x\n", i/4,
+				NTOHL(i4tmpVal));
 			} else {
 				if (IsShowRxStat) {
 				i += datalen;
@@ -13145,8 +13259,9 @@ static int priv_driver_run_hqa(
 				i4TotalLen, pcCommand + i4BytesWritten);
 				} else {
 				i4BytesWritten +=
-				snprintf(pcCommand + i4BytesWritten, i4TotalLen,
-				"id%d : 0x%08x\n", i/4, NTOHL(i4tmpVal));
+				kalSnprintf(pcCommand + i4BytesWritten,
+				i4TotalLen, "id%d : 0x%08x\n", i/4,
+				NTOHL(i4tmpVal));
 				}
 			}
 		}
@@ -13191,7 +13306,7 @@ static int priv_driver_calibration(
 				   "%s: Parsing Fail\n", __func__);
 		} else if (u4GetInput == 0) {
 
-			i4BytesWritten = snprintf(pcCommand,
+			i4BytesWritten = kalSnprintf(pcCommand,
 				i4TotalLen,
 				"reset driver calibration result\n");
 
@@ -13205,11 +13320,11 @@ static int priv_driver_calibration(
 				DBGLOG(RFTEST, INFO,
 					   "%s: Parsing 2 Fail\n", __func__);
 			} else if (u4GetInput2 == 0) {
-				i4BytesWritten = snprintf(pcCommand,
+				i4BytesWritten = kalSnprintf(pcCommand,
 					i4TotalLen,
 					"driver result write back EMI\n");
 			} else {
-				i4BytesWritten = snprintf(pcCommand,
+				i4BytesWritten = kalSnprintf(pcCommand,
 					i4TotalLen,
 					"FW use EMI original data\n");
 			}
@@ -13219,21 +13334,21 @@ static int priv_driver_calibration(
 					u4GetInput2);
 		}
 	} else {
-		i4BytesWritten = snprintf(pcCommand,
+		i4BytesWritten = kalSnprintf(pcCommand,
 			i4TotalLen,
 			"support parameter as below:\n");
 
-		i4BytesWritten += snprintf(
+		i4BytesWritten += kalSnprintf(
 			pcCommand + i4BytesWritten,
 			i4TotalLen - i4BytesWritten,
 			"0: reset driver calibration result\n");
 
-		i4BytesWritten += snprintf(
+		i4BytesWritten += kalSnprintf(
 			pcCommand + i4BytesWritten,
 			i4TotalLen - i4BytesWritten,
 			"1,0: driver result write back EMI\n");
 
-		i4BytesWritten += snprintf(
+		i4BytesWritten += kalSnprintf(
 			pcCommand + i4BytesWritten,
 			i4TotalLen - i4BytesWritten,
 			"1,1: FW use EMI original data\n");
@@ -13532,6 +13647,7 @@ struct PRIV_CMD_HANDLER priv_cmd_handlers[] = {
 	{CMD_GET_MU_RX_PKTCNT, priv_driver_show_rx_stat},
 	{CMD_RUN_HQA, priv_driver_run_hqa},
 	{CMD_CALIBRATION, priv_driver_calibration},
+	{CMD_SET_STA1NSS, priv_driver_set_sta1ss},
 	{CMD_SET_NVRAM, priv_driver_set_nvram},
 	{CMD_GET_NVRAM, priv_driver_get_nvram},
 };
@@ -13554,7 +13670,7 @@ int32_t priv_driver_cmds(IN struct net_device *prNetDev, IN int8_t *pcCommand,
 
 	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
 
-	for (i = 0; i < sizeof(priv_cmd_handlers) / sizeof(struct
+	for (i = 0; i < (int)sizeof(priv_cmd_handlers) / sizeof(struct
 			PRIV_CMD_HANDLER); i++) {
 		if (strnicmp(pcCommand,
 				priv_cmd_handlers[i].pcCmdStr,
@@ -13566,8 +13682,8 @@ int32_t priv_driver_cmds(IN struct net_device *prNetDev, IN int8_t *pcCommand,
 					prNetDev,
 					pcCommand,
 					i4TotalLen);
+				i4CmdFound = 1;
 			}
-			i4CmdFound = 1;
 		}
 	}
 
@@ -13729,6 +13845,14 @@ int32_t priv_driver_cmds(IN struct net_device *prNetDev, IN int8_t *pcCommand,
 				 wlanoidShowDmaschInfo,
 				 (void *) pcCommand, i4TotalLen,
 				 FALSE, FALSE, TRUE, &i4BytesWritten);
+#if CFG_SUPPORT_EASY_DEBUG
+		} else if (strnicmp(pcCommand, CMD_FW_PARAM,
+				strlen(CMD_FW_PARAM)) == 0) {
+			kalIoctl(prGlueInfo, wlanoidSetFwParam,
+				 (void *)(pcCommand + 13),
+				 i4TotalLen - 13, FALSE, FALSE, FALSE,
+				 &i4BytesWritten);
+#endif /* CFG_SUPPORT_EASY_DEBUG */
 			} else if (strnicmp(pcCommand, CMD_GET_WFDMA_INFO,
 					strlen(CMD_GET_WFDMA_INFO)) == 0) {
 				kalIoctl(prGlueInfo,
@@ -13762,7 +13886,7 @@ int32_t priv_driver_cmds(IN struct net_device *prNetDev, IN int8_t *pcCommand,
 			kalIoctl(prGlueInfo, wlanoidTspecOperation,
 				 (void *)pcCommand, i4TotalLen, FALSE, FALSE,
 				 FALSE, &i4BytesWritten);
-		} else if (kalStrStr(pcCommand, "-IT ")) {
+		} else if (kalStrStr(pcCommand, "-IT")) {
 			kalIoctl(prGlueInfo, wlanoidPktProcessIT,
 				 (void *)pcCommand, i4TotalLen, FALSE, FALSE,
 				 FALSE, &i4BytesWritten);
@@ -13896,11 +14020,11 @@ int32_t priv_driver_cmds(IN struct net_device *prNetDev, IN int8_t *pcCommand,
 			DBGLOG(REQ, INFO,
 			       "%s: i4BytesWritten %d > i4TotalLen < %d\n",
 			       __func__, i4BytesWritten, i4TotalLen);
-			i4BytesWritten = i4TotalLen;
-		} else {
-			pcCommand[i4BytesWritten] = '\0';
-			i4BytesWritten++;
+			i4BytesWritten = i4TotalLen - 1;
 		}
+		pcCommand[i4BytesWritten] = '\0';
+		i4BytesWritten++;
+
 	}
 
 	return i4BytesWritten;
@@ -14021,15 +14145,14 @@ int priv_support_driver_cmd(IN struct net_device *prNetDev,
 
 	i4BytesWritten = priv_driver_cmds(prNetDev, pcCommand, i4TotalLen);
 
-	if (i4BytesWritten < 0) {
-		DBGLOG(REQ, INFO, "%s: command %s Written is %d\n", __func__,
-		       pcCommand, i4BytesWritten);
-		if (i4TotalLen >= 3) {
-			snprintf(pcCommand, 3, "OK");
-			i4BytesWritten = strlen("OK");
-		}
-#if CFG_TC3_FEATURE
-	} else {
+	if (i4BytesWritten == -EOPNOTSUPP) {
+		/* Report positive status */
+		i4BytesWritten = kalSnprintf(pcCommand, i4TotalLen,
+					    "%s", "UNSUPPORTED");
+		i4BytesWritten++;
+	}
+
+	if (i4BytesWritten >= 0) {
 		priv_cmd->used_len = i4BytesWritten;
 		if ((i4BytesWritten == 0) && (priv_cmd->total_len > 0))
 			pcCommand[0] = '\0';
@@ -14039,1624 +14162,18 @@ int priv_support_driver_cmd(IN struct net_device *prNetDev,
 			i4BytesWritten++;
 		priv_cmd->used_len = i4BytesWritten;
 		if (copy_to_user(prReq->ifr_data, priv_cmd,
-				sizeof(struct priv_driver_cmd_s))) {
+				i4BytesWritten)) {
 			ret = -EFAULT;
 			DBGLOG(REQ, INFO, "copy fail");
 		}
-#endif
-	}
+	} else
+		ret = i4BytesWritten;
 
 exit:
 	kfree(priv_cmd);
 
 	return ret;
 }				/* priv_support_driver_cmd */
-
-#if CFG_SUPPORT_NCHO
-/* NCHO related command definition. Setting by supplicant */
-#define CMD_NCHO_ROAM_TRIGGER_GET		"GETROAMTRIGGER"
-#define CMD_NCHO_ROAM_TRIGGER_SET		"SETROAMTRIGGER"
-#define CMD_NCHO_ROAM_DELTA_GET			"GETROAMDELTA"
-#define CMD_NCHO_ROAM_DELTA_SET			"SETROAMDELTA"
-#define CMD_NCHO_ROAM_SCAN_PERIOD_GET		"GETROAMSCANPERIOD"
-#define CMD_NCHO_ROAM_SCAN_PERIOD_SET		"SETROAMSCANPERIOD"
-#define CMD_NCHO_ROAM_SCAN_CHANNELS_GET		"GETROAMSCANCHANNELS"
-#define CMD_NCHO_ROAM_SCAN_CHANNELS_SET		"SETROAMSCANCHANNELS"
-#define CMD_NCHO_ROAM_SCAN_CONTROL_GET		"GETROAMSCANCONTROL"
-#define CMD_NCHO_ROAM_SCAN_CONTROL_SET		"SETROAMSCANCONTROL"
-#define CMD_NCHO_SCAN_CHANNEL_TIME_GET		"GETSCANCHANNELTIME"
-#define CMD_NCHO_SCAN_CHANNEL_TIME_SET		"SETSCANCHANNELTIME"
-#define CMD_NCHO_SCAN_HOME_TIME_GET		"GETSCANHOMETIME"
-#define CMD_NCHO_SCAN_HOME_TIME_SET		"SETSCANHOMETIME"
-#define CMD_NCHO_SCAN_HOME_AWAY_TIME_GET	"GETSCANHOMEAWAYTIME"
-#define CMD_NCHO_SCAN_HOME_AWAY_TIME_SET	"SETSCANHOMEAWAYTIME"
-#define CMD_NCHO_SCAN_NPROBES_GET		"GETSCANNPROBES"
-#define CMD_NCHO_SCAN_NPROBES_SET		"SETSCANNPROBES"
-#define CMD_NCHO_REASSOC_SEND			"REASSOC"
-#define CMD_NCHO_ACTION_FRAME_SEND		"SENDACTIONFRAME"
-#define CMD_NCHO_WES_MODE_GET			"GETWESMODE"
-#define CMD_NCHO_WES_MODE_SET			"SETWESMODE"
-#define CMD_NCHO_BAND_GET			"GETBAND"
-#define CMD_NCHO_BAND_SET			"SETBAND"
-#define CMD_NCHO_DFS_SCAN_MODE_GET		"GETDFSSCANMODE"
-#define CMD_NCHO_DFS_SCAN_MODE_SET		"SETDFSSCANMODE"
-#define CMD_NCHO_DFS_SCAN_MODE_GET		"GETDFSSCANMODE"
-#define CMD_NCHO_DFS_SCAN_MODE_SET		"SETDFSSCANMODE"
-#define CMD_NCHO_ENABLE				"NCHOENABLE"
-#define CMD_NCHO_DISABLE			"NCHODISABLE"
-static int
-priv_driver_enable_ncho(IN struct net_device *prNetDev, IN char *pcCommand,
-			IN int i4TotalLen);
-static int
-priv_driver_disable_ncho(IN struct net_device *prNetDev, IN char *pcCommand,
-			 IN int i4TotalLen);
-
-int
-priv_driver_set_ncho_roam_trigger(IN struct net_device *prNetDev,
-				  IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	int32_t i4Param = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = {0};
-	int32_t i4Ret = -1;
-	uint32_t u4SetInfoLen = 0;
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4Ret;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-
-	if (rStatus == WLAN_STATUS_SUCCESS && i4Argc >= 2) {
-		DBGLOG(REQ, TRACE, "NCHO argc is %i, %s\n", i4Argc, apcArgv[1]);
-		i4Ret = kalkStrtos32(apcArgv[1], 0, &i4Param);
-		if (i4Ret) {
-			DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d\n",
-			       i4Ret);
-			return -1;
-		}
-
-		DBGLOG(INIT, TRACE, "NCHO set roam trigger cmd %d\n", i4Param);
-		rStatus = kalIoctl(prGlueInfo, wlanoidSetNchoRoamTrigger,
-				   &i4Param, sizeof(int32_t),
-				   FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen);
-
-		if (rStatus != WLAN_STATUS_SUCCESS) {
-			DBGLOG(INIT, ERROR, "NCHO set roam trigger fail 0x%x\n",
-			       rStatus);
-			i4Ret = -1;
-		} else {
-			DBGLOG(INIT, TRACE,
-			       "NCHO set roam trigger successed\n");
-			i4Ret = 0;
-		}
-
-	} else {
-		DBGLOG(REQ, ERROR, "NCHO set failed\n");
-	}
-	return i4Ret;
-}
-
-int
-priv_driver_get_ncho_roam_trigger(IN struct net_device *prNetDev,
-				  IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	int32_t i4BytesWritten = -1;
-	int32_t i4Param = 0;
-	uint32_t u4BufLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = { 0 };
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-	struct CMD_HEADER cmdV1Header;
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4BytesWritten;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-	if (rStatus != WLAN_STATUS_SUCCESS || i4Argc >= 2) {
-		DBGLOG(REQ, ERROR, "NCHO error input parameter %d\n", i4Argc);
-		return i4BytesWritten;
-	}
-
-	rStatus = kalIoctl(prGlueInfo, wlanoidQueryNchoRoamTrigger,
-			   &cmdV1Header, sizeof(cmdV1Header),
-			   TRUE, TRUE, TRUE, FALSE, &u4BufLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, ERROR,
-		       "NCHO wlanoidQueryNchoRoamTrigger fail 0x%x\n", rStatus);
-		return i4BytesWritten;
-	}
-
-	DBGLOG(REQ, TRACE, "NCHO query ok and ret is %s\n", cmdV1Header.buffer);
-	i4BytesWritten = kalkStrtou32(cmdV1Header.buffer, 0, &i4Param);
-	if (i4BytesWritten) {
-		DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d!\n",
-		       i4BytesWritten);
-		i4BytesWritten = -1;
-	} else {
-		i4Param = RCPI_TO_dBm(i4Param);		/* RCPI to DB */
-		DBGLOG(INIT, TRACE, "NCHO query RoamTrigger is %d\n", i4Param);
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen, "%d", i4Param);
-	}
-
-	return i4BytesWritten;
-}
-
-int priv_driver_set_ncho_roam_delta(IN struct net_device *prNetDev,
-				    IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	int32_t i4Param = 0;
-	uint32_t u4SetInfoLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = {0};
-	int32_t i4Ret = -1;
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4Ret;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-
-	if (rStatus == WLAN_STATUS_SUCCESS && i4Argc >= 2) {
-		DBGLOG(REQ, TRACE, "NCHO argc is %i, %s\n", i4Argc, apcArgv[1]);
-		i4Ret = kalkStrtos32(apcArgv[1], 0, &i4Param);
-		if (i4Ret) {
-			DBGLOG(REQ, ERROR,
-			       "NCHO parse u4Param error %d\n", i4Ret);
-			return -1;
-		}
-
-		DBGLOG(INIT, TRACE, "NCHO set roam delta cmd %d\n", i4Param);
-		rStatus = kalIoctl(prGlueInfo, wlanoidSetNchoRoamDelta,
-				   &i4Param, sizeof(int32_t),
-				   FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen);
-
-		if (rStatus != WLAN_STATUS_SUCCESS) {
-			DBGLOG(INIT, ERROR,
-			       "NCHO set roam delta fail 0x%x\n", rStatus);
-			i4Ret = -1;
-		} else {
-			DBGLOG(INIT, TRACE, "NCHO set roam delta successed\n");
-			i4Ret = 0;
-		}
-
-	} else {
-		DBGLOG(REQ, ERROR, "NCHO set failed\n");
-	}
-	return i4Ret;
-}
-int priv_driver_get_ncho_roam_delta(IN struct net_device *prNetDev,
-				    IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	int32_t i4BytesWritten = -1;
-	int32_t i4Param = 0;
-	uint32_t u4BufLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = { 0 };
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4BytesWritten;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-	if (rStatus != WLAN_STATUS_SUCCESS || i4Argc >= 2) {
-		DBGLOG(REQ, ERROR, "NCHO error input parameter %d\n", i4Argc);
-		return i4BytesWritten;
-	}
-
-	rStatus = kalIoctl(prGlueInfo, wlanoidQueryNchoRoamDelta,
-			   &i4Param, sizeof(int32_t),
-			   TRUE, TRUE, TRUE, FALSE, &u4BufLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, ERROR,
-		       "NCHO wlanoidQueryNchoRoamDelta fail 0x%x\n", rStatus);
-	} else {
-		DBGLOG(REQ, TRACE, "NCHO query ok and ret is %d\n", i4Param);
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen, "%d", i4Param);
-	}
-	return i4BytesWritten;
-}
-
-int priv_driver_set_ncho_roam_scn_period(IN struct net_device *prNetDev,
-					 IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	uint32_t u4Param = 0;
-	uint32_t u4SetInfoLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = {0};
-	int32_t i4Ret = -1;
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4Ret;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-
-	if (rStatus == WLAN_STATUS_SUCCESS && i4Argc >= 2) {
-		DBGLOG(REQ, TRACE, "NCHO argc is %i, %s\n", i4Argc, apcArgv[1]);
-		i4Ret = kalkStrtou32(apcArgv[1], 0, &u4Param);
-		if (i4Ret) {
-			DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d\n",
-			       i4Ret);
-			return -1;
-		}
-
-		DBGLOG(INIT, TRACE, "NCHO set roam period cmd %d\n", u4Param);
-		rStatus = kalIoctl(prGlueInfo, wlanoidSetNchoRoamScnPeriod,
-				   &u4Param, sizeof(uint32_t),
-				   FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen);
-
-		if (rStatus != WLAN_STATUS_SUCCESS) {
-			DBGLOG(INIT, ERROR, "NCHO set roam period fail 0x%x\n",
-			       rStatus);
-			i4Ret = -1;
-		} else {
-			DBGLOG(INIT, TRACE, "NCHO set roam period successed\n");
-			i4Ret = 0;
-		}
-
-	} else {
-		DBGLOG(REQ, ERROR, "NCHO set failed\n");
-	}
-	return i4Ret;
-}
-
-int priv_driver_get_ncho_roam_scn_period(IN struct net_device *prNetDev,
-					 IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	int32_t i4BytesWritten = -1;
-	uint32_t u4Param = 0;
-	uint32_t u4BufLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = { 0 };
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4BytesWritten;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-	if (rStatus != WLAN_STATUS_SUCCESS || i4Argc >= 2) {
-		DBGLOG(REQ, ERROR, "NCHO error input parameter %d\n", i4Argc);
-		return i4BytesWritten;
-	}
-	rStatus = kalIoctl(prGlueInfo, wlanoidQueryNchoRoamScnPeriod,
-			   &u4Param, sizeof(uint32_t),
-			   TRUE, TRUE, TRUE, FALSE, &u4BufLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, ERROR,
-		       "NCHO wlanoidQueryNchoRoamScnPeriod fail 0x%x\n",
-		       rStatus);
-	} else {
-		DBGLOG(REQ, TRACE, "NCHO query ok and ret is %d\n", u4Param);
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen, "%u", u4Param);
-	}
-	return i4BytesWritten;
-}
-
-int priv_driver_set_ncho_roam_scn_chnl(IN struct net_device *prNetDev,
-				       IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	uint32_t u4ChnlInfo = 0;
-	uint8_t i = 1;
-	uint8_t t = 0;
-	uint32_t u4SetInfoLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = {0};
-	int32_t i4Ret = -1;
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-	struct _CFG_NCHO_SCAN_CHNL_T rRoamScnChnl;
-
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4Ret;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-
-	if (rStatus == WLAN_STATUS_SUCCESS && i4Argc >= 2) {
-		DBGLOG(REQ, TRACE, "NCHO argc is %i, cmd is %s\n", i4Argc,
-		       apcArgv[1]);
-		i4Ret = kalkStrtou32(apcArgv[1], 0, &u4ChnlInfo);
-		if (i4Ret) {
-			DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d\n",
-			       i4Ret);
-			return -1;
-		}
-
-		rRoamScnChnl.ucChannelListNum = u4ChnlInfo;
-		DBGLOG(REQ, ERROR, "NCHO ChannelListNum is %d\n", u4ChnlInfo);
-		if (i4Argc != u4ChnlInfo + 2) {
-			DBGLOG(REQ, ERROR, "NCHO param mismatch %d\n",
-			       u4ChnlInfo);
-			return -1;
-		}
-		for (i = 2; i < i4Argc; i++) {
-			i4Ret = kalkStrtou32(apcArgv[i], 0, &u4ChnlInfo);
-			if (i4Ret) {
-				while (i != 2) {
-					rRoamScnChnl.arChnlInfoList[i]
-					.ucChannelNum = 0;
-					i--;
-				}
-				DBGLOG(REQ, ERROR,
-				       "NCHO parse chnl num error %d\n", i4Ret);
-				return -1;
-			}
-			if (u4ChnlInfo != 0) {
-				DBGLOG(INIT, TRACE,
-				       "NCHO t = %d, channel value=%d\n",
-				       t, u4ChnlInfo);
-				if ((u4ChnlInfo >= 1) && (u4ChnlInfo <= 14))
-					rRoamScnChnl.arChnlInfoList[t].eBand =
-								BAND_2G4;
-				else
-					rRoamScnChnl.arChnlInfoList[t].eBand =
-								BAND_5G;
-
-				rRoamScnChnl.arChnlInfoList[t].ucChannelNum =
-								u4ChnlInfo;
-				t++;
-			}
-
-		}
-
-		DBGLOG(INIT, TRACE, "NCHO set roam scan channel cmd\n");
-		rStatus = kalIoctl(prGlueInfo, wlanoidSetNchoRoamScnChnl,
-				   &rRoamScnChnl,
-				   sizeof(struct _CFG_NCHO_SCAN_CHNL_T),
-				   FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen);
-
-		if (rStatus != WLAN_STATUS_SUCCESS) {
-			DBGLOG(INIT, ERROR,
-			       "NCHO set roam scan channel fail 0x%x\n",
-			       rStatus);
-			i4Ret = -1;
-		} else {
-			DBGLOG(INIT, TRACE,
-			       "NCHO set roam scan channel successed\n");
-			i4Ret = 0;
-		}
-
-	} else {
-		DBGLOG(REQ, ERROR, "NCHO set failed\n");
-	}
-	return i4Ret;
-}
-
-int priv_driver_get_ncho_roam_scn_chnl(IN struct net_device *prNetDev,
-				       IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	uint8_t i = 0;
-	uint32_t u4BufLen = 0;
-	int32_t i4BytesWritten = -1;
-	int32_t i4Argc = 0;
-	uint32_t u4ChnlInfo = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = { 0 };
-	struct _CFG_NCHO_SCAN_CHNL_T rRoamScnChnl;
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4BytesWritten;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-	if (rStatus != WLAN_STATUS_SUCCESS || i4Argc >= 2) {
-		DBGLOG(REQ, ERROR, "NCHO error input parameter %d\n", i4Argc);
-		return i4BytesWritten;
-	}
-
-	rStatus = kalIoctl(prGlueInfo, wlanoidQueryNchoRoamScnChnl,
-			   &rRoamScnChnl, sizeof(struct _CFG_NCHO_SCAN_CHNL_T),
-			   TRUE, TRUE, TRUE, FALSE, &u4BufLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, ERROR,
-		       "NCHO wlanoidQueryNchoRoamScnChnl fail 0x%x\n", rStatus);
-	} else {
-		DBGLOG(REQ, TRACE, "NCHO query ok and ret is %d\n",
-		       rRoamScnChnl.ucChannelListNum);
-		u4ChnlInfo = rRoamScnChnl.ucChannelListNum;
-		i4BytesWritten = 0;
-		i4BytesWritten += snprintf(pcCommand + i4BytesWritten,
-					   i4TotalLen - i4BytesWritten, "%u",
-					   u4ChnlInfo);
-		for (i = 0; i < rRoamScnChnl.ucChannelListNum; i++) {
-			u4ChnlInfo =
-				rRoamScnChnl.arChnlInfoList[i].ucChannelNum;
-			i4BytesWritten += snprintf(pcCommand + i4BytesWritten,
-					       i4TotalLen - i4BytesWritten,
-					       " %u", u4ChnlInfo);
-		}
-	}
-
-	DBGLOG(REQ, TRACE, "NCHO i4BytesWritten is %d and channel list is %s\n",
-	       i4BytesWritten, pcCommand);
-	return i4BytesWritten;
-}
-
-int priv_driver_set_ncho_roam_scn_ctrl(IN struct net_device *prNetDev,
-				       IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	uint32_t u4Param = 0;
-	uint32_t u4SetInfoLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = {0};
-	int32_t i4Ret = -1;
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4Ret;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-
-	if (rStatus == WLAN_STATUS_SUCCESS && i4Argc >= 2) {
-		DBGLOG(REQ, TRACE, "NCHO argc is %i, %s\n", i4Argc, apcArgv[1]);
-		i4Ret = kalkStrtou32(apcArgv[1], 0, &u4Param);
-		if (i4Ret) {
-			DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d\n",
-			       i4Ret);
-			return -1;
-		}
-
-		DBGLOG(INIT, TRACE, "NCHO set roam scan control cmd %d\n",
-		       u4Param);
-		rStatus = kalIoctl(prGlueInfo, wlanoidSetNchoRoamScnCtrl,
-				   &u4Param, sizeof(uint32_t),
-				   FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen);
-
-		if (rStatus != WLAN_STATUS_SUCCESS) {
-			DBGLOG(INIT, ERROR,
-			       "NCHO set roam scan control fail 0x%x\n",
-			       rStatus);
-			i4Ret = -1;
-		} else {
-			DBGLOG(INIT, TRACE,
-			       "NCHO set roam scan control successed\n");
-			i4Ret = 0;
-		}
-	} else {
-		DBGLOG(REQ, ERROR, "NCHO set failed\n");
-	}
-	return i4Ret;
-}
-int priv_driver_get_ncho_roam_scn_ctrl(IN struct net_device *prNetDev,
-				       IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	int32_t i4BytesWritten = -1;
-	uint32_t u4Param = 0;
-	uint32_t u4BufLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = { 0 };
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4BytesWritten;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-	if (rStatus != WLAN_STATUS_SUCCESS || i4Argc >= 2) {
-		DBGLOG(REQ, ERROR, "NCHO error input parameter %d\n", i4Argc);
-		return i4BytesWritten;
-	}
-
-	rStatus = kalIoctl(prGlueInfo, wlanoidQueryNchoRoamScnCtrl,
-			   &u4Param, sizeof(uint32_t),
-			   TRUE, TRUE, TRUE, FALSE, &u4BufLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, ERROR,
-		       "NCHO wlanoidQueryNchoRoamScnCtrl fail 0x%x\n", rStatus);
-	} else {
-		DBGLOG(REQ, TRACE, "NCHO query ok and ret is %d\n", u4Param);
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen, "%u", u4Param);
-	}
-	return i4BytesWritten;
-}
-
-int priv_driver_set_ncho_scn_chnl_time(IN struct net_device *prNetDev,
-				       IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	uint32_t u4Param = 0;
-	uint32_t u4SetInfoLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = {0};
-	int32_t i4Ret = -1;
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4Ret;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-
-	if (rStatus == WLAN_STATUS_SUCCESS && i4Argc >= 2) {
-		DBGLOG(REQ, TRACE, "NCHO argc is %i, %s\n", i4Argc, apcArgv[1]);
-		i4Ret = kalkStrtou32(apcArgv[1], 0, &u4Param);
-		if (i4Ret) {
-			DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d\n",
-			       i4Ret);
-			return -1;
-		}
-
-		DBGLOG(INIT, TRACE, "NCHO set scan channel time cmd %d\n",
-		       u4Param);
-		rStatus = kalIoctl(prGlueInfo, wlanoidSetNchoScnChnlTime,
-				   &u4Param, sizeof(uint32_t),
-				   FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen);
-
-		if (rStatus != WLAN_STATUS_SUCCESS) {
-			DBGLOG(INIT, ERROR,
-			       "NCHO set scan channel time fail 0x%x\n",
-			       rStatus);
-			i4Ret = -1;
-		} else {
-			DBGLOG(INIT, TRACE,
-			       "NCHO set scan channel time successed\n");
-			i4Ret = 0;
-		}
-	} else {
-		DBGLOG(REQ, ERROR, "NCHO set failed\n");
-	}
-	return i4Ret;
-}
-int priv_driver_get_ncho_scn_chnl_time(IN struct net_device *prNetDev,
-				       IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	int32_t i4BytesWritten = -1;
-	uint32_t u4Param = 0;
-	uint32_t u4BufLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = { 0 };
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-	struct CMD_HEADER cmdV1Header;
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4BytesWritten;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-	if (rStatus != WLAN_STATUS_SUCCESS || i4Argc >= 2) {
-		DBGLOG(REQ, ERROR, "NCHO error input parameter %d\n", i4Argc);
-		return i4BytesWritten;
-	}
-
-	rStatus = kalIoctl(prGlueInfo, wlanoidQueryNchoScnChnlTime,
-			   &cmdV1Header, sizeof(cmdV1Header),
-			   TRUE, TRUE, TRUE, FALSE, &u4BufLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, ERROR,
-		       "NCHO wlanoidQueryNchoScnChnlTime fail 0x%x\n", rStatus);
-	} else {
-		DBGLOG(REQ, TRACE, "NCHO query ok and ret is %s\n",
-		       cmdV1Header.buffer);
-		i4BytesWritten = kalkStrtou32(cmdV1Header.buffer, 0, &u4Param);
-		if (i4BytesWritten) {
-			DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d!\n",
-			       i4BytesWritten);
-			i4BytesWritten = -1;
-		} else {
-			i4BytesWritten = snprintf(pcCommand, i4TotalLen, "%u",
-						  u4Param);
-		}
-	}
-	return i4BytesWritten;
-}
-
-int priv_driver_set_ncho_scn_home_time(IN struct net_device *prNetDev,
-				       IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	uint32_t u4Param = 0;
-	uint32_t u4SetInfoLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = {0};
-	int32_t i4Ret = -1;
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4Ret;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-
-	if (rStatus == WLAN_STATUS_SUCCESS && i4Argc >= 2) {
-		DBGLOG(REQ, TRACE, "NCHO argc is %i, %s\n", i4Argc,
-		       apcArgv[1]);
-		i4Ret = kalkStrtou32(apcArgv[1], 0, &u4Param);
-		if (i4Ret) {
-			DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d\n",
-			       i4Ret);
-			return -1;
-		}
-
-		DBGLOG(INIT, TRACE, "NCHO set scan home time cmd %d\n",
-		       u4Param);
-		rStatus = kalIoctl(prGlueInfo, wlanoidSetNchoScnHomeTime,
-				   &u4Param, sizeof(uint32_t),
-				   FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen);
-
-		if (rStatus != WLAN_STATUS_SUCCESS) {
-			DBGLOG(INIT, ERROR,
-			       "NCHO set scan home time fail 0x%x\n", rStatus);
-			i4Ret = -1;
-		} else {
-			DBGLOG(INIT, TRACE,
-			       "NCHO set scan home time successed\n");
-			i4Ret = 0;
-		}
-
-	} else {
-		DBGLOG(REQ, ERROR, "NCHO set failed\n");
-	}
-	return i4Ret;
-}
-int priv_driver_get_ncho_scn_home_time(IN struct net_device *prNetDev,
-				       IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	int32_t i4BytesWritten = -1;
-	uint32_t u4Param = 0;
-	uint32_t u4BufLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = { 0 };
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-	struct CMD_HEADER cmdV1Header;
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4BytesWritten;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-	if (rStatus != WLAN_STATUS_SUCCESS || i4Argc >= 2) {
-		DBGLOG(REQ, ERROR, "NCHO error input parameter %d\n", i4Argc);
-		return i4BytesWritten;
-	}
-	rStatus = kalIoctl(prGlueInfo, wlanoidQueryNchoScnHomeTime,
-			   &cmdV1Header, sizeof(cmdV1Header),
-			   TRUE, TRUE, TRUE, FALSE, &u4BufLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, ERROR,
-		       "NCHO wlanoidQueryNchoScnChnlTime fail 0x%x\n", rStatus);
-	} else {
-		DBGLOG(REQ, TRACE, "NCHO query ok and ret is %s\n",
-		       cmdV1Header.buffer);
-		i4BytesWritten = kalkStrtou32(cmdV1Header.buffer, 0, &u4Param);
-		if (i4BytesWritten) {
-			DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d!\n",
-			       i4BytesWritten);
-			i4BytesWritten = -1;
-		} else {
-			i4BytesWritten = snprintf(pcCommand, i4TotalLen, "%u",
-						  u4Param);
-		}
-	}
-	return i4BytesWritten;
-}
-
-int priv_driver_set_ncho_scn_home_away_time(IN struct net_device *prNetDev,
-					IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	uint32_t u4Param = 0;
-	uint32_t u4SetInfoLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = {0};
-	int32_t i4Ret = -1;
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4Ret;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-
-	if (rStatus == WLAN_STATUS_SUCCESS && i4Argc >= 2) {
-		DBGLOG(REQ, TRACE, "NCHO argc is %i, %s\n", i4Argc, apcArgv[1]);
-		i4Ret = kalkStrtou32(apcArgv[1], 0, &u4Param);
-		if (i4Ret) {
-			DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d\n",
-			       i4Ret);
-			return -1;
-		}
-
-		DBGLOG(INIT, TRACE, "NCHO set scan home away time cmd %d\n",
-		       u4Param);
-		rStatus = kalIoctl(prGlueInfo, wlanoidSetNchoScnHomeAwayTime,
-				   &u4Param, sizeof(uint32_t),
-				   FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen);
-
-		if (rStatus != WLAN_STATUS_SUCCESS) {
-			DBGLOG(INIT, ERROR,
-			       "NCHO set scan home away time fail 0x%x\n",
-			       rStatus);
-			i4Ret = -1;
-		} else {
-			DBGLOG(INIT, TRACE,
-			       "NCHO set scan home away time successed\n");
-			i4Ret = 0;
-		}
-	} else {
-		DBGLOG(REQ, ERROR, "NCHO set failed\n");
-	}
-	return i4Ret;
-}
-int priv_driver_get_ncho_scn_home_away_time(IN struct net_device *prNetDev,
-				    IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	int32_t i4BytesWritten = -1;
-	uint32_t u4Param = 0;
-	uint32_t u4BufLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = { 0 };
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-	struct CMD_HEADER cmdV1Header;
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4BytesWritten;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-	if (rStatus != WLAN_STATUS_SUCCESS || i4Argc >= 2) {
-		DBGLOG(REQ, ERROR, "NCHO error input parameter %d\n", i4Argc);
-		return i4BytesWritten;
-	}
-	rStatus = kalIoctl(prGlueInfo, wlanoidQueryNchoScnHomeAwayTime,
-			   &cmdV1Header, sizeof(cmdV1Header),
-			   TRUE, TRUE, TRUE, FALSE, &u4BufLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, ERROR,
-		       "NCHO wlanoidQueryNchoScnHomeAwayTime fail 0x%x\n",
-		       rStatus);
-		return i4BytesWritten;
-	}
-
-	DBGLOG(REQ, TRACE, "NCHO query ok and ret is %s\n", cmdV1Header.buffer);
-	i4BytesWritten = kalkStrtou32(cmdV1Header.buffer, 0, &u4Param);
-	if (i4BytesWritten) {
-		DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d!\n",
-		       i4BytesWritten);
-		i4BytesWritten = -1;
-	} else {
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen, "%u", u4Param);
-	}
-
-	return i4BytesWritten;
-}
-
-int priv_driver_set_ncho_scn_nprobes(IN struct net_device *prNetDev,
-				     IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	uint32_t u4Param = 0;
-	uint32_t u4SetInfoLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = {0};
-	int32_t i4Ret = -1;
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4Ret;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-
-	if (rStatus == WLAN_STATUS_SUCCESS && i4Argc >= 2) {
-		DBGLOG(REQ, TRACE, "NCHO argc is %i, %s\n", i4Argc, apcArgv[1]);
-
-		i4Ret = kalkStrtou32(apcArgv[1], 0, &u4Param);
-		if (i4Ret) {
-			DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d\n",
-			       i4Ret);
-			return -1;
-		}
-
-		DBGLOG(INIT, TRACE, "NCHO set scan nprobes cmd %d\n", u4Param);
-		rStatus = kalIoctl(prGlueInfo, wlanoidSetNchoScnNprobes,
-				   &u4Param, sizeof(uint32_t),
-				   FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen);
-
-		if (rStatus != WLAN_STATUS_SUCCESS) {
-			DBGLOG(INIT, ERROR, "NCHO set scan nprobes fail 0x%x\n",
-			       rStatus);
-			i4Ret = -1;
-		} else {
-			DBGLOG(INIT, TRACE,
-			       "NCHO set scan nprobes successed\n");
-			i4Ret = 0;
-		}
-
-	} else {
-		DBGLOG(REQ, ERROR, "NCHO set failed\n");
-	}
-	return i4Ret;
-}
-
-int priv_driver_get_ncho_scn_nprobes(IN struct net_device *prNetDev,
-				     IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	int32_t i4BytesWritten = -1;
-	uint32_t u4Param = 0;
-	uint32_t u4BufLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = { 0 };
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-	struct CMD_HEADER cmdV1Header;
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4BytesWritten;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-	if (rStatus != WLAN_STATUS_SUCCESS || i4Argc >= 2) {
-		DBGLOG(REQ, ERROR, "NCHO error input parameter %d\n", i4Argc);
-		return i4BytesWritten;
-	}
-
-	rStatus = kalIoctl(prGlueInfo, wlanoidQueryNchoScnNprobes,
-			   &cmdV1Header, sizeof(cmdV1Header),
-			   TRUE, TRUE, TRUE, FALSE, &u4BufLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, ERROR,
-		       "NCHO wlanoidQueryNchoScnNprobes fail 0x%x\n", rStatus);
-		return i4BytesWritten;
-	}
-
-	DBGLOG(REQ, TRACE, "NCHO query ok and ret is %s\n", cmdV1Header.buffer);
-	i4BytesWritten = kalkStrtou32(cmdV1Header.buffer, 0, &u4Param);
-	if (i4BytesWritten) {
-		DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d!\n",
-		       i4BytesWritten);
-		i4BytesWritten = -1;
-	} else {
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen, "%u", u4Param);
-	}
-
-	return i4BytesWritten;
-}
-
-/* handle this command as framework roaming */
-int priv_driver_send_ncho_reassoc(IN struct net_device *prNetDev,
-				  IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	int32_t i4Ret = -1;
-	uint32_t u4Param = 0;
-	uint32_t u4SetInfoLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = {0};
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-	struct _CFG_NCHO_RE_ASSOC_T rReAssoc;
-	struct PARAM_CONNECT rParamConn;
-
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4Ret;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-
-	if (rStatus == WLAN_STATUS_SUCCESS && i4Argc == 3) {
-		DBGLOG(REQ, TRACE, "NCHO argc is %i, %s %s\n", i4Argc,
-		       apcArgv[1], apcArgv[2]);
-
-		i4Ret = kalkStrtou32(apcArgv[2], 0, &u4Param);
-		if (i4Ret) {
-			DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d\n",
-			       i4Ret);
-			return -1;
-		}
-		DBGLOG(INIT, TRACE, "NCHO send reassoc cmd %d\n", u4Param);
-		kalMemZero(&rReAssoc, sizeof(struct _CFG_NCHO_RE_ASSOC_T));
-		rReAssoc.u4CenterFreq = nicChannelNum2Freq(u4Param);
-		CmdStringMacParse(apcArgv[1], (uint8_t **)&apcArgv[1],
-				  &u4SetInfoLen, rReAssoc.aucBssid);
-		DBGLOG(INIT, TRACE, "NCHO Bssid " MACSTR " to roam\n",
-		       MAC2STR(rReAssoc.aucBssid));
-		rParamConn.pucBssid = (uint8_t *)rReAssoc.aucBssid;
-		rParamConn.pucSsid = (uint8_t *)rReAssoc.aucSsid;
-		rParamConn.u4SsidLen = rReAssoc.u4SsidLen;
-		rParamConn.u4CenterFreq = rReAssoc.u4CenterFreq;
-
-		rStatus = kalIoctl(prGlueInfo, wlanoidGetNchoReassocInfo,
-				   &rParamConn, sizeof(struct PARAM_CONNECT),
-				   FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen);
-
-		if (rStatus != WLAN_STATUS_SUCCESS) {
-			DBGLOG(INIT, ERROR,
-			       "NCHO get reassoc information fail 0x%x\n",
-			       rStatus);
-			return -1;
-		}
-		DBGLOG(INIT, TRACE, "NCHO ssid %s to roam\n",
-		       HIDE(rParamConn.pucSsid));
-		rStatus = kalIoctl(prGlueInfo, wlanoidSetConnect, &rParamConn,
-				   sizeof(struct PARAM_CONNECT),
-				   FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen);
-
-		if (rStatus != WLAN_STATUS_SUCCESS) {
-			DBGLOG(INIT, ERROR, "NCHO send reassoc fail 0x%x\n",
-			       rStatus);
-			i4Ret = -1;
-		} else {
-			DBGLOG(INIT, TRACE, "NCHO send reassoc successed\n");
-			i4Ret = 0;
-		}
-	} else {
-		DBGLOG(REQ, ERROR, "NCHO set failed\n");
-	}
-	return i4Ret;
-}
-
-int
-nchoRemainOnChannel(IN struct ADAPTER *prAdapter, IN uint8_t ucChannelNum,
-		    IN uint32_t u4DewellTime)
-{
-	int32_t i4Ret = -1;
-	struct MSG_REMAIN_ON_CHANNEL *prMsgChnlReq =
-					(struct MSG_REMAIN_ON_CHANNEL *) NULL;
-
-	do {
-		if (!prAdapter)
-			break;
-
-		prMsgChnlReq = cnmMemAlloc(prAdapter, RAM_TYPE_MSG,
-				   sizeof(struct MSG_REMAIN_ON_CHANNEL));
-
-		if (prMsgChnlReq == NULL) {
-			ASSERT(FALSE);
-			DBGLOG(REQ, ERROR,
-			       "NCHO there is no memory for message channel req\n");
-			return i4Ret;
-		}
-		kalMemZero(prMsgChnlReq, sizeof(struct MSG_REMAIN_ON_CHANNEL));
-
-		prMsgChnlReq->rMsgHdr.eMsgId = MID_MNY_AIS_REMAIN_ON_CHANNEL;
-		prMsgChnlReq->u4DurationMs = u4DewellTime;
-		prMsgChnlReq->u8Cookie = 0;
-		prMsgChnlReq->ucChannelNum = ucChannelNum;
-
-		if ((ucChannelNum >= 1) && (ucChannelNum <= 14))
-			prMsgChnlReq->eBand = BAND_2G4;
-		else
-			prMsgChnlReq->eBand = BAND_5G;
-
-		mboxSendMsg(prAdapter, MBOX_ID_0,
-			    (struct MSG_HDR *) prMsgChnlReq,
-			    MSG_SEND_METHOD_BUF);
-
-		i4Ret = 0;
-	} while (FALSE);
-
-	return i4Ret;
-}
-
-int
-nchoSendActionFrame(IN struct ADAPTER *prAdapter,
-		    struct _NCHO_ACTION_FRAME_PARAMS_T *prParamActionFrame)
-{
-	int32_t i4Ret = -1;
-	struct MSG_MGMT_TX_REQUEST *prMsgTxReq =
-					(struct MSG_MGMT_TX_REQUEST *) NULL;
-
-	if (!prAdapter || !prParamActionFrame)
-		return i4Ret;
-
-	do {
-		/* Channel & Channel Type & Wait time are ignored. */
-		prMsgTxReq = cnmMemAlloc(prAdapter, RAM_TYPE_MSG,
-					 sizeof(struct MSG_MGMT_TX_REQUEST));
-
-		if (prMsgTxReq == NULL) {
-			ASSERT(FALSE);
-			DBGLOG(REQ, ERROR,
-			       "NCHO there is no memory for message tx req\n");
-			return i4Ret;
-		}
-
-		prMsgTxReq->fgNoneCckRate = FALSE;
-		prMsgTxReq->fgIsWaitRsp = TRUE;
-
-		prMsgTxReq->u8Cookie = 0;
-		prMsgTxReq->rMsgHdr.eMsgId = MID_MNY_AIS_NCHO_ACTION_FRAME;
-		mboxSendMsg(prAdapter, MBOX_ID_0, (struct MSG_HDR *) prMsgTxReq,
-			    MSG_SEND_METHOD_BUF);
-
-		i4Ret = 0;
-	} while (FALSE);
-
-	if ((i4Ret != 0) && (prMsgTxReq != NULL)) {
-		if (prMsgTxReq->prMgmtMsduInfo != NULL)
-			cnmMgtPktFree(prAdapter, prMsgTxReq->prMgmtMsduInfo);
-
-		cnmMemFree(prAdapter, prMsgTxReq);
-	}
-
-	return i4Ret;
-}
-
-uint32_t nchoParseActionFrame(
-	IN struct _NCHO_ACTION_FRAME_PARAMS_T *prParamActionFrame,
-	IN char *pcCommand)
-{
-	uint32_t u4SetInfoLen = 0;
-	uint32_t u4Num = 0;
-	struct _NCHO_AF_INFO_T *prAfInfo = NULL;
-
-	if (!prParamActionFrame || !pcCommand)
-		return WLAN_STATUS_FAILURE;
-
-	prAfInfo = (struct _NCHO_AF_INFO_T *)(pcCommand +
-				kalStrLen(CMD_NCHO_ACTION_FRAME_SEND) + 1);
-	if (prAfInfo->i4len > CMD_NCHO_AF_DATA_LENGTH) {
-		DBGLOG(INIT, ERROR, "NCHO AF data length is %d\n",
-		       prAfInfo->i4len);
-		return WLAN_STATUS_FAILURE;
-	}
-
-	prParamActionFrame->i4len = prAfInfo->i4len;
-	prParamActionFrame->i4channel = prAfInfo->i4channel;
-	prParamActionFrame->i4DwellTime = prAfInfo->i4DwellTime;
-	kalMemZero(prParamActionFrame->aucData, CMD_NCHO_AF_DATA_LENGTH/2);
-	u4SetInfoLen = prAfInfo->i4len;
-	while (u4SetInfoLen > 0 && u4Num < CMD_NCHO_AF_DATA_LENGTH/2) {
-		*(prParamActionFrame->aucData + u4Num) =
-				CmdString2HexParse(prAfInfo->pucData,
-					   (uint8_t **)&prAfInfo->pucData,
-					   (uint8_t *)&u4SetInfoLen);
-		u4Num++;
-	}
-	DBGLOG(INIT, TRACE, "NCHO MAC str is %s\n", prAfInfo->aucBssid);
-	CmdStringMacParse(prAfInfo->aucBssid,
-			  (uint8_t **)&prAfInfo->aucBssid,
-			  &u4SetInfoLen,
-			  prParamActionFrame->aucBssid);
-	return WLAN_STATUS_SUCCESS;
-}
-
-int
-priv_driver_send_ncho_action_frame(IN struct net_device *prNetDev,
-				   IN char *pcCommand, IN int i4TotalLen)
-{
-	NCHO_ACTION_FRAME_PARAMS rParamActionFrame;
-	struct GLUE_INFO *prGlueInfo = NULL;
-	int32_t i4Ret = -1;
-	uint32_t u4SetInfoLen = 0;
-	unsigned long ulTimer = 0;
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4Ret;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	rStatus = nchoParseActionFrame(&rParamActionFrame, pcCommand);
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, ERROR, "NCHO action frame parse error\n");
-		return -1;
-	}
-
-	DBGLOG(INIT, TRACE, "NCHO MAC is " MACSTR "\n",
-		MAC2STR(rParamActionFrame.aucBssid));
-	rStatus = kalIoctl(prGlueInfo,
-			   wlanoidSendNchoActionFrameStart,
-			   &rParamActionFrame,
-			   sizeof(NCHO_ACTION_FRAME_PARAMS),
-			   FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, ERROR, "NCHO send action fail 0x%x\n", rStatus);
-		return -1;
-	}
-
-	reinit_completion(&prGlueInfo->rAisChGrntComp);
-	i4Ret = nchoRemainOnChannel(prGlueInfo->prAdapter,
-				rParamActionFrame.i4channel,
-				rParamActionFrame.i4DwellTime);
-
-	ulTimer = wait_for_completion_timeout(&prGlueInfo->rAisChGrntComp,
-				msecs_to_jiffies(CMD_NCHO_COMP_TIMEOUT));
-	if (ulTimer) {
-		rStatus = kalIoctl(prGlueInfo,
-			   wlanoidSendNchoActionFrameEnd,
-			   NULL, 0, FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen);
-
-		if (rStatus != WLAN_STATUS_SUCCESS) {
-			DBGLOG(INIT, ERROR, "NCHO send action fail 0x%x\n",
-			       rStatus);
-			return -1;
-		}
-		i4Ret = nchoSendActionFrame(prGlueInfo->prAdapter,
-					    &rParamActionFrame);
-	} else {
-		i4Ret = -1;
-		DBGLOG(INIT, ERROR, "NCHO req channel timeout\n");
-	}
-
-	return i4Ret;
-}
-
-int
-priv_driver_set_ncho_wes_mode(IN struct net_device *prNetDev,
-			      IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	uint32_t u4Param = 0;
-	uint32_t u4SetInfoLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = {0};
-	int32_t i4Ret = -1;
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-	uint8_t puCommondBuf[WLAN_CFG_ARGV_MAX] = {0};
-
-
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4Ret;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-
-	if (rStatus == WLAN_STATUS_SUCCESS && i4Argc >= 2) {
-		DBGLOG(REQ, TRACE, "NCHO argc is %i, %s\n", i4Argc, apcArgv[1]);
-		i4Ret = kalkStrtou32(apcArgv[1], 0, &u4Param);
-		if (i4Ret) {
-			DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d\n",
-			       i4Ret);
-			return -1;
-		}
-		/*If WES mode is 1, enable NCHO*/
-		/*If WES mode is 0, disable NCHO*/
-		if (u4Param == TRUE &&
-		    prGlueInfo->prAdapter->rNchoInfo.fgECHOEnabled == FALSE) {
-			kalSnprintf(puCommondBuf, WLAN_CFG_ARGV_MAX, "%s %d",
-				    CMD_NCHO_ENABLE, 1);
-			priv_driver_enable_ncho(prNetDev, puCommondBuf,
-						sizeof(puCommondBuf));
-		} else if (u4Param == FALSE &&
-		    prGlueInfo->prAdapter->rNchoInfo.fgECHOEnabled == TRUE) {
-			kalSnprintf(puCommondBuf, WLAN_CFG_ARGV_MAX, "%s",
-				    CMD_NCHO_DISABLE);
-			priv_driver_disable_ncho(prNetDev, puCommondBuf,
-						 sizeof(puCommondBuf));
-		}
-
-		DBGLOG(INIT, INFO, "NCHO set WES mode cmd %d\n", u4Param);
-		rStatus = kalIoctl(prGlueInfo, wlanoidSetNchoWesMode, &u4Param,
-				   sizeof(uint32_t),
-				   FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen);
-
-		if (rStatus != WLAN_STATUS_SUCCESS) {
-			DBGLOG(INIT, ERROR, "NCHO set WES mode fail 0x%x\n",
-			       rStatus);
-			i4Ret = -1;
-		} else {
-			DBGLOG(INIT, TRACE, "NCHO set WES mode successed\n");
-			i4Ret = 0;
-		}
-	} else {
-		DBGLOG(REQ, ERROR, "NCHO set failed\n");
-	}
-	return i4Ret;
-}
-
-int priv_driver_get_ncho_wes_mode(IN struct net_device *prNetDev,
-				  IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	int32_t i4BytesWritten = -1;
-	uint32_t u4Param = 0;
-	uint32_t u4BufLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = { 0 };
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return -WLAN_STATUS_FAILURE;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-	if (rStatus != WLAN_STATUS_SUCCESS || i4Argc >= 2) {
-		DBGLOG(REQ, ERROR, "NCHO error input parameter %d\n", i4Argc);
-		return i4BytesWritten;
-	}
-
-	rStatus = kalIoctl(prGlueInfo, wlanoidQueryNchoWesMode, &u4Param,
-			   sizeof(uint32_t),
-			   TRUE, TRUE, TRUE, FALSE, &u4BufLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, ERROR, "NCHO wlanoidQueryNchoWesMode fail 0x%x\n",
-		       rStatus);
-	} else {
-		DBGLOG(REQ, TRACE, "NCHO query ok and ret is %d\n", u4Param);
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen, "%u", u4Param);
-	}
-	DBGLOG(REQ, TRACE, "NCHO get result is %s\n", pcCommand);
-	return i4BytesWritten;
-}
-
-int priv_driver_set_ncho_band(IN struct net_device *prNetDev,
-			      IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	uint32_t u4Param = 0;
-	uint32_t u4SetInfoLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = {0};
-	int32_t i4Ret = -1;
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4Ret;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-
-	if (rStatus == WLAN_STATUS_SUCCESS && i4Argc >= 2) {
-		DBGLOG(REQ, TRACE, "NCHO argc is %i, %s\n", i4Argc, apcArgv[1]);
-		i4Ret = kalkStrtou32(apcArgv[1], 0, &u4Param);
-		if (i4Ret) {
-			DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d\n",
-			       i4Ret);
-			return -1;
-		}
-
-		DBGLOG(INIT, TRACE, "NCHO set band cmd %d\n", u4Param);
-		rStatus = kalIoctl(prGlueInfo, wlanoidSetNchoBand, &u4Param,
-				   sizeof(uint32_t),
-				   FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen);
-
-		if (rStatus != WLAN_STATUS_SUCCESS) {
-			DBGLOG(INIT, ERROR, "NCHO set band fail 0x%x\n",
-			       rStatus);
-			i4Ret = -1;
-		} else {
-			DBGLOG(INIT, TRACE, "NCHO set band successed\n");
-			i4Ret = 0;
-		}
-	} else {
-		DBGLOG(REQ, ERROR, "NCHO set failed\n");
-	}
-	return i4Ret;
-}
-int priv_driver_get_ncho_band(IN struct net_device *prNetDev,
-			      IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	int32_t i4BytesWritten = -1;
-	uint32_t u4Param = 0;
-	uint32_t u4BufLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = { 0 };
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4BytesWritten;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-	if (rStatus != WLAN_STATUS_SUCCESS || i4Argc >= 2) {
-		DBGLOG(REQ, ERROR, "NCHO error input parameter %d\n", i4Argc);
-		return i4BytesWritten;
-	}
-
-	rStatus = kalIoctl(prGlueInfo, wlanoidQueryNchoBand, &u4Param,
-			   sizeof(uint32_t),
-			   TRUE, TRUE, TRUE, FALSE, &u4BufLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, ERROR, "NCHO wlanoidQueryNchoBand fail 0x%x\n",
-		       rStatus);
-	} else {
-		DBGLOG(REQ, TRACE, "NCHO query ok and ret is %d\n", u4Param);
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen, "%u", u4Param);
-	}
-	return i4BytesWritten;
-}
-
-int priv_driver_set_ncho_dfs_scn_mode(IN struct net_device *prNetDev,
-				      IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	uint32_t u4Param = 0;
-	uint32_t u4SetInfoLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = {0};
-	int32_t i4Ret = -1;
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4Ret;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-
-	if (rStatus == WLAN_STATUS_SUCCESS && i4Argc >= 2) {
-		DBGLOG(REQ, TRACE, "NCHO argc is %i, %s\n", i4Argc, apcArgv[1]);
-		i4Ret = kalkStrtou32(apcArgv[1], 0, &u4Param);
-		if (i4Ret) {
-			DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d\n",
-			       i4Ret);
-			return -1;
-		}
-
-		DBGLOG(INIT, TRACE, "NCHO set DFS scan cmd %d\n", u4Param);
-		rStatus = kalIoctl(prGlueInfo, wlanoidSetNchoDfsScnMode,
-				   &u4Param, sizeof(uint32_t),
-				   FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen);
-
-		if (rStatus != WLAN_STATUS_SUCCESS) {
-			DBGLOG(INIT, ERROR, "NCHO set DFS scan fail 0x%x\n",
-			       rStatus);
-			i4Ret = -1;
-		} else {
-			DBGLOG(INIT, TRACE, "NCHO set DFS scan successed\n");
-			i4Ret = 0;
-		}
-	} else {
-		DBGLOG(REQ, ERROR, "NCHO set failed\n");
-	}
-	return i4Ret;
-}
-int
-priv_driver_get_ncho_dfs_scn_mode(IN struct net_device *prNetDev,
-				  IN char *pcCommand, IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	int32_t i4BytesWritten = -1;
-	uint32_t u4Param = 0;
-	uint32_t u4BufLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = { 0 };
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-	struct CMD_HEADER cmdV1Header;
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4BytesWritten;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-	if (rStatus != WLAN_STATUS_SUCCESS || i4Argc >= 2) {
-		DBGLOG(REQ, ERROR, "NCHO Error input parameter %d\n", i4Argc);
-		return i4BytesWritten;
-	}
-
-	rStatus = kalIoctl(prGlueInfo, wlanoidQueryNchoDfsScnMode, &cmdV1Header,
-			   sizeof(struct CMD_HEADER),
-			   TRUE, TRUE, TRUE, FALSE, &u4BufLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, ERROR,
-		       "NCHO wlanoidQueryNchoDfsScnMode fail 0x%x\n", rStatus);
-		return i4BytesWritten;
-	}
-
-	DBGLOG(REQ, TRACE, "NCHO query ok and ret is %s\n", cmdV1Header.buffer);
-	i4BytesWritten = kalkStrtou32(cmdV1Header.buffer, 0, &u4Param);
-	if (i4BytesWritten) {
-		DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d!\n",
-		       i4BytesWritten);
-		i4BytesWritten = -1;
-	} else {
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen, "%u", u4Param);
-	}
-
-	return i4BytesWritten;
-}
-
-int
-priv_driver_enable_ncho(IN struct net_device *prNetDev, IN char *pcCommand,
-			IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	uint32_t u4Param = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = {0};
-	int32_t i4BytesWritten = -1;
-	uint32_t u4SetInfoLen = 0;
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4BytesWritten;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-
-	if (rStatus == WLAN_STATUS_SUCCESS && i4Argc >= 2) {
-		DBGLOG(REQ, TRACE, "NCHO argc is %i, %s\n", i4Argc,
-		       apcArgv[1]);
-		i4BytesWritten = kalkStrtou32(apcArgv[1], 0, &u4Param);
-		if (i4BytesWritten) {
-			DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d\n",
-			       i4BytesWritten);
-			i4BytesWritten = -1;
-		} else {
-			DBGLOG(INIT, TRACE, "NCHO set enable cmd %d\n",
-			       u4Param);
-			rStatus = kalIoctl(prGlueInfo, wlanoidSetNchoEnable,
-				&u4Param, sizeof(uint32_t),
-				FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen);
-
-			if (rStatus != WLAN_STATUS_SUCCESS) {
-				DBGLOG(INIT, ERROR,
-				       "NCHO set enable fail 0x%x\n", rStatus);
-				i4BytesWritten = -1;
-			} else {
-				DBGLOG(INIT, TRACE,
-				       "NCHO set enable successed\n");
-				i4BytesWritten = 0;
-			}
-		}
-	} else {
-		DBGLOG(REQ, ERROR, "NCHO set failed\n");
-	}
-	return i4BytesWritten;
-}
-
-int
-priv_driver_disable_ncho(IN struct net_device *prNetDev, IN char *pcCommand,
-			 IN int i4TotalLen)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	int32_t i4BytesWritten = -1;
-	uint32_t u4Param = 0;
-	uint32_t u4BufLen = 0;
-	int32_t i4Argc = 0;
-	int8_t *apcArgv[WLAN_CFG_ARGV_MAX] = { 0 };
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-	struct CMD_HEADER cmdV1Header;
-
-	DBGLOG(INIT, TRACE, "NCHO command is %s\n", pcCommand);
-	ASSERT(prNetDev);
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return i4BytesWritten;
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	rStatus = wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
-	if (rStatus != WLAN_STATUS_SUCCESS || i4Argc >= 2) {
-		DBGLOG(REQ, ERROR, "NCHO error input parameter %d\n", i4Argc);
-		return i4BytesWritten;
-	}
-	/*<1> Set NCHO Disable to FW*/
-	u4Param = FALSE;
-	rStatus = kalIoctl(prGlueInfo, wlanoidSetNchoEnable, &u4Param,
-			sizeof(uint32_t), FALSE, FALSE, TRUE, FALSE, &u4BufLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, ERROR,
-		       "NCHO wlanoidSetNchoEnable :%d fail 0x%x\n",
-		       u4Param, rStatus);
-		return i4BytesWritten;
-	}
-
-	/*<2> Query NCHOEnable Satus*/
-	rStatus = kalIoctl(prGlueInfo, wlanoidQueryNchoEnable,
-			   &cmdV1Header, sizeof(cmdV1Header),
-			   TRUE, TRUE, TRUE, FALSE, &u4BufLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, ERROR, "NCHO wlanoidQueryNchoEnable fail 0x%x\n",
-		       rStatus);
-		return i4BytesWritten;
-	}
-
-	DBGLOG(REQ, TRACE, "NCHO query ok and ret is %s\n", cmdV1Header.buffer);
-
-
-	i4BytesWritten = kalkStrtou32(cmdV1Header.buffer, 0, &u4Param);
-	if (i4BytesWritten) {
-		DBGLOG(REQ, ERROR, "NCHO parse u4Param error %d!\n",
-		       i4BytesWritten);
-		i4BytesWritten = -1;
-	} else {
-		i4BytesWritten = snprintf(pcCommand, i4TotalLen, "%u", u4Param);
-	}
-
-	return i4BytesWritten;
-}
-/*Check NCHO is enable or not.*/
-u_int8_t
-priv_driver_auto_enable_ncho(IN struct net_device *prNetDev)
-{
-	uint8_t puCommondBuf[WLAN_CFG_ARGV_MAX] = {0};
-	struct GLUE_INFO *prGlueInfo = NULL;
-
-	ASSERT(prNetDev);
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-	ASSERT(prGlueInfo);
-
-	kalSnprintf(puCommondBuf, WLAN_CFG_ARGV_MAX, "%s %d", CMD_NCHO_ENABLE,
-		    1);
-#if CFG_SUPPORT_NCHO_AUTO_ENABLE
-	if (prGlueInfo->prAdapter->rNchoInfo.fgECHOEnabled == FALSE) {
-		DBGLOG(INIT, INFO,
-		       "NCHO is unavailable now! Start to NCHO Enable CMD\n");
-		priv_driver_enable_ncho(prNetDev, puCommondBuf,
-					sizeof(puCommondBuf));
-
-	}
-#endif
-	return TRUE;
-}
-
-#endif /* CFG_SUPPORT_NCHO */
 
 #if CFG_SUPPORT_DYNAMIC_PWR_LIMIT
 /* dynamic tx power control */

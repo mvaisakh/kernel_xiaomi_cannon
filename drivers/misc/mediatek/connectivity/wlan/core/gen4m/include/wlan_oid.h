@@ -371,6 +371,8 @@ struct PARAM_CONNECT {
 	uint8_t *pucBssidHint;
 	uint32_t u4CenterFreq;
 	uint8_t ucBssIdx;
+	uint8_t *pucIEs;
+	uint32_t u4IesLen;
 };
 
 struct PARAM_EXTERNAL_AUTH {
@@ -2372,6 +2374,7 @@ struct PARAM_SCAN_REQUEST_ADV {
 	uint8_t ucScnFuncMask;
 	uint8_t aucRandomMac[MAC_ADDR_LEN];
 	uint8_t ucBssIndex;
+	uint32_t u4Flags;
 };
 
 /*--------------------------------------------------------------*/
@@ -2623,6 +2626,23 @@ struct PARAM_BSS_DISALLOWED_LIST {
 	uint8_t aucList[MAC_ADDR_LEN * 16];
 };
 #endif
+
+struct PARAM_SCAN_PARAM {
+	uint8_t fgScanParamType;
+	/* 0: DFS ch dwell time,	1: non-DFS ch dwell time */
+	/* 2: OpCh stay time,		3: OpCh away time */
+	uint16_t u2Data;
+};
+
+#if CFG_SUPPORT_MANIPULATE_TID
+struct PARAM_MANIUPLATE_TID {
+	/* 0:default; others:enable */
+	uint8_t ucMode;
+	uint8_t ucTid;
+	uint32_t u4Uid;
+};
+#endif
+
 /*******************************************************************************
  *                            P U B L I C   D A T A
  *******************************************************************************
@@ -3530,6 +3550,23 @@ wlanoidSetCountryCode(IN struct ADAPTER *prAdapter,
 		      OUT uint32_t *pu4SetInfoLen);
 
 uint32_t
+wlanoidSetBlockIndoorChs(IN struct ADAPTER *prAdapter,
+		      IN void *pvSetBuffer,
+		      IN uint32_t u4SetBufferLen,
+		      OUT uint32_t *pu4SetInfoLen);
+uint32_t
+wlanoidSetBeaconRecv(IN struct ADAPTER *prAdapter,
+		     IN void *pvSetBuffer,
+		     IN uint32_t u4SetBufferLen,
+		     OUT uint32_t *pu4SetInfoLen);
+
+uint32_t
+wlanoidAbortBeaconRecv(IN struct ADAPTER *prAdapter,
+		       IN void *pvSetBuffer,
+		       IN uint32_t u4SetBufferLen,
+		       OUT uint32_t *pu4SetInfoLen);
+
+uint32_t
 wlanoidSetScanMacOui(IN struct ADAPTER *prAdapter,
 		IN void *pvSetBuffer,
 		IN uint32_t u4SetBufferLen,
@@ -3846,6 +3883,12 @@ wlanoidSetNchoRoamScnChnl(IN struct ADAPTER *prAdapter,
 			  OUT uint32_t *pu4SetInfoLen);
 
 uint32_t
+wlanoidAddNchoRoamScnChnl(IN struct ADAPTER *prAdapter,
+			  IN void *pvSetBuffer,
+			  IN uint32_t u4SetBufferLen,
+			  OUT uint32_t *pu4SetInfoLen);
+
+uint32_t
 wlanoidQueryNchoRoamScnChnl(IN struct ADAPTER *prAdapter,
 			    OUT void *pvQueryBuffer,
 			    IN uint32_t u4QueryBufferLen,
@@ -3979,6 +4022,53 @@ wlanoidQueryNchoEnable(IN struct ADAPTER *prAdapter,
 		       OUT uint32_t *pu4QueryInfoLen);
 
 #endif /* CFG_SUPPORT_NCHO */
+
+#if CFG_SUPPORT_MANIPULATE_TID
+uint32_t
+wlanoidManipulateTid(IN struct ADAPTER *prAdapter,
+		     IN void *pvSetBuffer,
+		     IN uint32_t u4SetBufferLen,
+		     OUT uint32_t *pu4SetInfoLen);
+#endif /* CFG_SUPPORT_MANIPULATE_TID */
+
+#if CFG_SUPPORT_ASSURANCE
+uint32_t
+wlanoidSetDisconnectIes(IN struct ADAPTER *prAdapter,
+		     IN void *pvSetBuffer,
+		     IN uint32_t u4SetBufferLen,
+		     OUT uint32_t *pu4SetInfoLen);
+
+uint32_t
+wlanoidSetRoamingReasonEnable(IN struct ADAPTER *prAdapter,
+		     IN void *pvSetBuffer,
+		     IN uint32_t u4SetBufferLen,
+		     OUT uint32_t *pu4SetInfoLen);
+
+uint32_t
+wlanoidGetRoamingReasonEnable(IN struct ADAPTER *prAdapter,
+		       OUT void *pvQueryBuffer,
+		       IN uint32_t u4QueryBufferLen,
+		       OUT uint32_t *pu4QueryInfoLen);
+
+
+uint32_t
+wlanoidSetBrErrReasonEnable(IN struct ADAPTER *prAdapter,
+		     IN void *pvSetBuffer,
+		     IN uint32_t u4SetBufferLen,
+		     OUT uint32_t *pu4SetInfoLen);
+
+uint32_t
+wlanoidGetBrErrReasonEnable(IN struct ADAPTER *prAdapter,
+		       OUT void *pvQueryBuffer,
+		       IN uint32_t u4QueryBufferLen,
+		       OUT uint32_t *pu4QueryInfoLen);
+#endif
+
+uint32_t
+wlanoidAddRoamScnChnl(IN struct ADAPTER *prAdapter,
+		     IN void *pvSetBuffer,
+		     IN uint32_t u4SetBufferLen,
+		     OUT uint32_t *pu4SetInfoLen);
 
 uint32_t
 wlanoidAbortScan(IN struct ADAPTER *prAdapter,
@@ -4161,10 +4251,26 @@ wlanoidExternalAuthDone(IN struct ADAPTER *prAdapter,
 			IN void *pvSetBuffer,
 			IN uint32_t u4SetBufferLen,
 			OUT uint32_t *pu4SetInfoLen);
-
 uint32_t
 wlanoidIndicateBssInfo(IN struct ADAPTER *prAdapter,
-		IN void *pvSetBuffer, IN uint32_t u4SetBufferLen,
-		OUT uint32_t *pu4SetInfoLen);
+			IN void *pvSetBuffer, IN uint32_t u4SetBufferLen,
+			OUT uint32_t *pu4SetInfoLen);
 
+uint32_t
+wlanoidSetScanParam(IN struct ADAPTER *prAdapter,
+			    IN void *pvSetBuffer,
+			    IN uint32_t u4SetBufferLen,
+			    OUT uint32_t *pu4SetInfoLen);
+
+#if CFG_TC10_FEATURE
+uint32_t wlanoidGetBssInfo(IN struct ADAPTER *prAdapter,
+			IN void *pvSetBuffer,
+			IN uint32_t u4SetBufferLen,
+			OUT uint32_t *pu4SetInfoLen);
+
+uint32_t wlanoidGetStaInfo(IN struct ADAPTER *prAdapter,
+			IN void *pvSetBuffer,
+			IN uint32_t u4SetBufferLen,
+			OUT uint32_t *pu4SetInfoLen);
+#endif
 #endif /* _WLAN_OID_H */

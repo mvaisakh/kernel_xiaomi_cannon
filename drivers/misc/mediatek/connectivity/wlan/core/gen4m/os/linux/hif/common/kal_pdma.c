@@ -390,8 +390,12 @@ u_int8_t kalDevPortRead(IN struct GLUE_INFO *prGlueInfo,
 	}
 
 	pRxD->SDPtr0 = (uint64_t)prDmaBuf->AllocPa & DMA_LOWER_32BITS_MASK;
+#ifdef CONFIG_PHYS_ADDR_T_64BIT
 	pRxD->SDPtr1 = ((uint64_t)prDmaBuf->AllocPa >> DMA_BITS_OFFSET) &
 		DMA_HIGHER_4BITS_MASK;
+#else
+	pRxD->SDPtr1 = 0;
+#endif
 skip:
 	pRxD->SDLen0 = prRxRing->u4BufSize;
 	pRxD->DMADONE = 0;
@@ -399,6 +403,8 @@ skip:
 	prRxRing->RxCpuIdx = u4CpuIdx;
 	kalDevRegWrite(prGlueInfo, prRxRing->hw_cidx_addr, prRxRing->RxCpuIdx);
 	prRxRing->fgIsDumpLog = false;
+
+	GLUE_INC_REF_CNT(prGlueInfo->prAdapter->rHifStats.u4EventRxCount);
 
 	return fgRet;
 }
@@ -468,8 +474,12 @@ kalDevPortWrite(IN struct GLUE_INFO *prGlueInfo,
 	pTxD->SDLen0 = u4Len;
 	pTxD->SDLen1 = 0;
 	pTxD->SDPtr0 = (uint64_t)pTxCell->PacketPa & DMA_LOWER_32BITS_MASK;
+#ifdef CONFIG_PHYS_ADDR_T_64BIT
 	pTxD->SDPtr0Ext = ((uint64_t)pTxCell->PacketPa >> DMA_BITS_OFFSET) &
 		DMA_HIGHER_4BITS_MASK;
+#else
+	pTxD->SDPtr0Ext = 0;
+#endif
 	pTxD->SDPtr1 = 0;
 	pTxD->Burst = 0;
 	pTxD->DMADONE = 0;
@@ -480,6 +490,8 @@ kalDevPortWrite(IN struct GLUE_INFO *prGlueInfo,
 	prTxRing->u4UsedCnt++;
 
 	kalDevRegWrite(prGlueInfo, prTxRing->hw_cidx_addr, prTxRing->TxCpuIdx);
+
+	GLUE_INC_REF_CNT(prGlueInfo->prAdapter->rHifStats.u4CmdTxCount);
 
 	return TRUE;
 }
@@ -563,13 +575,14 @@ bool kalDevKickCmd(IN struct GLUE_INFO *prGlueInfo)
 		if (prTxReq->prCmdInfo) {
 			ret = halWpdmaWriteCmd(prGlueInfo,
 				prTxReq->prCmdInfo, prTxReq->ucTC);
-			if (ret == CMD_TX_RESULT_SUCCESS)
+			if (ret == CMD_TX_RESULT_SUCCESS) {
 				if (prTxReq->prCmdInfo->pfHifTxCmdDoneCb)
 					prTxReq->prCmdInfo->pfHifTxCmdDoneCb(
 						prGlueInfo->prAdapter,
 						prTxReq->prCmdInfo);
-			else
+			} else {
 				DBGLOG(HAL, ERROR, "ret: %d\n", ret);
+			}
 		}
 		list_del(prCur);
 		kfree(prTxReq);
@@ -922,10 +935,6 @@ bool kalDevReadData(struct GLUE_INFO *prGlueInfo, uint16_t u2Port,
 
 	prDmaBuf = &pRxCell->DmaBuf;
 
-	if (prMemOps->flushCache)
-		prMemOps->flushCache(prHifInfo, prDmaBuf->AllocVa,
-				     pRxD->SDLen0);
-
 	if (prMemOps->copyRxData &&
 	    !prMemOps->copyRxData(prHifInfo, pRxCell, prDmaBuf, prSwRfb)) {
 		fgRet = false;
@@ -940,8 +949,12 @@ bool kalDevReadData(struct GLUE_INFO *prGlueInfo, uint16_t u2Port,
 #endif /* CFG_TCP_IP_CHKSUM_OFFLOAD */
 
 	pRxD->SDPtr0 = (uint64_t)prDmaBuf->AllocPa & DMA_LOWER_32BITS_MASK;
+#ifdef CONFIG_PHYS_ADDR_T_64BIT
 	pRxD->SDPtr1 = ((uint64_t)prDmaBuf->AllocPa >>
 		DMA_BITS_OFFSET) & DMA_HIGHER_4BITS_MASK;
+#else
+	pRxD->SDPtr1 = 0;
+#endif
 skip:
 	pRxD->SDLen0 = prRxRing->u4BufSize;
 	pRxD->DMADONE = 0;
@@ -949,6 +962,8 @@ skip:
 	prRxRing->RxCpuIdx = u4CpuIdx;
 	kalDevRegWrite(prGlueInfo, prRxRing->hw_cidx_addr, prRxRing->RxCpuIdx);
 	prRxRing->fgIsDumpLog = false;
+
+	GLUE_INC_REF_CNT(prGlueInfo->prAdapter->rHifStats.u4DataRxCount);
 
 #if CFG_TCP_IP_CHKSUM_OFFLOAD
 	if (fgRet)

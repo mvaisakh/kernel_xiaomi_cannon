@@ -85,6 +85,11 @@ INT32 mtk_wcn_consys_stp_btif_open(VOID)
 	WMT_DBG_FUNC("STP open bitf OK\n");
 
 	thread->pThread = mtk_btif_exp_rx_thread_get(g_stp_btif.stpBtifId);
+	if (!thread->pThread) {
+		WMT_INFO_FUNC("thread->pThread is NULL\n");
+		return -1;
+	}
+
 	osal_strncpy(thread->threadName, thread->pThread->comm, sizeof(thread->pThread->comm));
 	mtk_wcn_stp_register_if_tx(STP_BTIF_IF_TX, (MTK_WCN_STP_IF_TX) mtk_wcn_consys_stp_btif_tx);
 	mtk_wcn_stp_register_rx_has_pending_data(STP_BTIF_IF_TX,
@@ -229,7 +234,7 @@ INT32 mtk_wcn_consys_stp_btif_dpidle_ctrl(UINT32 en_flag)
 		WMT_WARN_FUNC("NULL BTIF ID reference!\n");
 		iRet = -1;
 	} else {
-		mtk_wcn_btif_dpidle_ctrl(g_stp_btif.stpBtifId, en_flag);
+		mtk_wcn_btif_dpidle_ctrl(g_stp_btif.stpBtifId, (enum _ENUM_BTIF_DPIDLE_) en_flag);
 		WMT_DBG_FUNC("stp btif dpidle ctrl done,en_flag(%d)\n", en_flag);
 	}
 

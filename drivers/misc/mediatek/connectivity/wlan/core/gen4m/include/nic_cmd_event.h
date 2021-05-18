@@ -508,6 +508,9 @@ enum ENUM_PF_OPCODE {
 enum ENUM_SCN_FUNC_MASK {
 	ENUM_SCN_RANDOM_MAC_EN = (1 << 0),
 	ENUM_SCN_DBDC_SCAN_DIS = (1 << 1),
+	ENUM_SCN_DBDC_SCAN_TYPE3 = (1 << 2),
+	ENUM_SCN_USE_PADDING_AS_BSSID = (1 << 3),
+	ENUM_SCN_RANDOM_SN_EN = (1 << 4),
 };
 
 struct CMD_PACKET_FILTER_CAP {
@@ -1639,10 +1642,14 @@ enum ENUM_PWR_LIMIT_TYPE {
 
 
 /* CMD_SET_PWR_LIMIT_TABLE */
-struct CMD_CHANNEL_POWER_LIMIT { /*Legacy design*/
+struct CMD_CHANNEL_POWER_LIMIT {
 	uint8_t ucCentralCh;
 
 	int8_t cPwrLimitCCK;
+#if (CFG_SUPPORT_DYNA_TX_PWR_CTRL_OFDM_SETTING == 1)
+	int8_t cPwrLimitOFDM_L; /* OFDM_L,  6M ~ 18M */
+	int8_t cPwrLimitOFDM_H; /* OFDM_H, 24M ~ 54M */
+#endif /* CFG_SUPPORT_DYNA_TX_PWR_CTRL_OFDM_SETTING */
 	int8_t cPwrLimit20L; /* MCS0~4 */
 	int8_t cPwrLimit20H; /* MCS5~8 */
 	int8_t cPwrLimit40L; /* MCS0~4 */
@@ -1687,6 +1694,7 @@ struct CMD_CHANNEL_POWER_LIMIT_HE { /*HE SU design*/
 };
 
 struct CMD_SET_COUNTRY_CHANNEL_POWER_LIMIT {
+    /* D-WORD 0 */
 	uint16_t u2CountryCode;
 	uint8_t ucCountryFlag; /*Not used in driver*/
 	uint8_t ucNum; /*Numbers of channel to set power limit*/
@@ -1694,19 +1702,17 @@ struct CMD_SET_COUNTRY_CHANNEL_POWER_LIMIT {
 	/* D-WORD 1 */
 	u_int8_t fgPwrTblKeep;
 	uint8_t ucBandIdx;
-	/* u1LimitType: enum ENUM_PWR_LIMIT_TYPE */
+	/* u1LimitType: enum ENUM_COUNTRY_CHANNEL_TXPOWER_LIMIT_FORMAT */
 	uint8_t ucLimitType;
 	uint8_t au1Reserved[1];
-
 	union {
 		/*Channel power limit entries to be set*/
 		struct CMD_CHANNEL_POWER_LIMIT
-			rChannelPowerLimit[1];
+			rChannelPowerLimit[MAX_CMD_SUPPORT_CHANNEL_NUM];
 		/*Channel HE power limit entries to be set*/
 		struct CMD_CHANNEL_POWER_LIMIT_HE
-			rChPwrLimtHE[1];
+			rChPwrLimtHE[MAX_CMD_SUPPORT_CHANNEL_NUM];
 	} u;
-
 
 };
 
@@ -2461,8 +2467,12 @@ struct CMD_SCHED_SCAN_REQ {
 	uint8_t ucScnFuncMask;
 	struct CHANNEL_INFO aucChannel[64];
 	uint16_t au2MspList[10];
-	uint8_t aucPadding_3[64];
-
+	uint8_t ucBssIndex;
+	uint32_t u4DelayStartInSec;
+	uint32_t u4FastScanIteration;
+	uint32_t u4FastScanPeriod;
+	uint32_t u4SlowScanPeriod;
+	uint8_t aucPadding_3[47];
 	/* keep last */
 	uint8_t aucIE[0];             /* MUST be the last for IE content */
 };
@@ -2958,6 +2968,9 @@ struct EVENT_LOW_LATENCY_INFO {
  *******************************************************************************
  */
 void nicCmdEventQueryMcrRead(IN struct ADAPTER *prAdapter,
+	IN struct CMD_INFO *prCmdInfo, IN uint8_t *pucEventBuf);
+
+void nicCmdEventQueryCfgRead(IN struct ADAPTER *prAdapter,
 	IN struct CMD_INFO *prCmdInfo, IN uint8_t *pucEventBuf);
 
 #if CFG_SUPPORT_QA_TOOL

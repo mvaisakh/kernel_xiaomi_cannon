@@ -84,8 +84,11 @@ const PINT8 g_btm_op_name[] = {
 	"STP_OPID_BTM_EXIT"
 };
 
-static VOID stp_btm_trigger_assert_timeout_handler(ULONG data)
+static VOID stp_btm_trigger_assert_timeout_handler(timer_handler_arg arg)
 {
+	ULONG data;
+
+	GET_HANDLER_DATA(arg, data);
 	if (mtk_wcn_stp_coredump_start_get() == 0)
 		stp_btm_notify_assert_timeout_wq((MTKSTP_BTM_T *)data);
 }
@@ -116,7 +119,8 @@ static INT32 _stp_btm_handler(MTKSTP_BTM_T *stp_btm, P_STP_BTM_OP pStpOp)
 	case STP_OPID_BTM_RST:
 		STP_BTM_PR_INFO("whole chip reset start!\n");
 		if (wmt_detect_get_chip_type() == WMT_CHIP_TYPE_SOC &&
-		    mtk_wcn_stp_coredump_flag_get() != 0 && chip_reset_only == 0) {
+		    mtk_wcn_stp_coredump_flag_get() != 0 && chip_reset_only == 0 &&
+		    stp_dbg_read_memdump_mode(0) != STP_DBG_MEMDUMP_NO_LOG) {
 #ifdef CONFIG_MTK_CONNSYS_DEDICATED_LOG_PATH
 			connsys_dedicated_log_flush_emi();
 #endif
@@ -124,6 +128,14 @@ static INT32 _stp_btm_handler(MTKSTP_BTM_T *stp_btm, P_STP_BTM_OP pStpOp)
 		}
 		STP_BTM_PR_INFO("....+\n");
 		WMT_STEP_DO_ACTIONS_FUNC(STEP_TRIGGER_POINT_BEFORE_CHIP_RESET);
+
+		if (stp_dbg_read_memdump_mode(0) == STP_DBG_MEMDUMP_BUG_ON &&
+			mtk_wcn_stp_coredump_flag_get() != 0 && chip_reset_only == 0) {
+		/* wait for 5 seconds to make sure coredump is written to file */
+			msleep(5000);
+			BUG_ON(1);
+		}
+
 		if (stp_btm->wmt_notify) {
 			stp_btm->wmt_notify(BTM_RST_OP);
 			ret = 0;
@@ -405,15 +417,14 @@ static INT32 _stp_btm_proc(PVOID pvData)
 
 		id = osal_op_get_id(pOp);
 
-		STP_BTM_PR_DBG("======> lxop_get_opid = %d, %s, remaining count = *%d*\n",
-				 id, (id >= osal_array_size(g_btm_op_name)) ? ("???") : (g_btm_op_name[id]),
-				 RB_COUNT(&stp_btm->rActiveOpQ));
-
-		if (id >= STP_OPID_BTM_NUM) {
+		if ((id >= STP_OPID_BTM_NUM) || (id < 0)) {
 			STP_BTM_PR_WARN("abnormal opid id: 0x%x\n", id);
 			result = -1;
 			goto handler_done;
 		}
+
+		STP_BTM_PR_DBG("======> lxop_get_opid = %d, %s, remaining count = *%d*\n", id,
+				g_btm_op_name[id], RB_COUNT(&stp_btm->rActiveOpQ));
 
 		osal_lock_unsleepable_lock(&(stp_btm->wq_spinlock));
 		stp_btm_set_current_op(stp_btm, pOp);
@@ -423,12 +434,12 @@ static INT32 _stp_btm_proc(PVOID pvData)
 		stp_btm_set_current_op(stp_btm, NULL);
 		osal_unlock_unsleepable_lock(&(stp_btm->wq_spinlock));
 
-handler_done:
-
 		if (result) {
 			STP_BTM_PR_WARN("opid id(0x%x)(%s) error(%d)\n", id,
-				(id >= osal_array_size(g_btm_op_name)) ? ("???") : (g_btm_op_name[id]), result);
+					g_btm_op_name[id], result);
 		}
+
+handler_done:
 
 		if (atomic_dec_and_test(&pOp->ref_count)) {
 			_stp_btm_put_op(stp_btm, &stp_btm->rFreeOpQ, pOp);

@@ -204,6 +204,7 @@ u_int8_t rsnSearchSupportedCipher(IN struct ADAPTER
 				  IN uint8_t ucBssIndex);
 
 u_int8_t rsnIsSuitableBSS(IN struct ADAPTER *prAdapter,
+			  IN struct BSS_DESC *prBss,
 			  IN struct RSN_INFO *prBssRsnInfo,
 			  IN uint8_t ucBssIndex);
 
@@ -308,15 +309,20 @@ u_int8_t rsnParseOsenIE(struct ADAPTER *prAdapter,
 			struct IE_WFA_OSEN *prInfoElem,
 			struct RSN_INFO *prOsenInfo);
 
+#if CFG_SUPPORT_DETECT_SECURITY_MODE_CHANGE
 u_int8_t rsnCheckSecurityModeChanged(struct ADAPTER
 				     *prAdapter, struct BSS_INFO *prBssInfo,
 				     struct BSS_DESC *prBssDesc);
+#endif
 
 uint32_t rsnCalculateFTIELen(struct ADAPTER *prAdapter, uint8_t ucBssIdx,
 			     struct STA_RECORD *prStaRec);
 
 void rsnGenerateFTIE(IN struct ADAPTER *prAdapter,
 		     IN OUT struct MSDU_INFO *prMsduInfo);
+
+u_int8_t rsnIsFtOverTheAir(IN struct ADAPTER *prAdapter,
+			IN uint8_t ucBssIdx, IN uint8_t ucStaRecIdx);
 
 /*******************************************************************************
  *                              F U N C T I O N S

@@ -131,7 +131,7 @@ static MTK_WCN_BOOL mtk_wcn_wmt_func_ctrl(ENUM_WMTDRV_TYPE_T type, ENUM_WMT_OPID
 	MTK_WCN_BOOL bOffload;
 	MTK_WCN_BOOL bExplicitPwrOn;
 
-	bOffload = (wmt_detect_get_chip_type() == WMT_CHIP_TYPE_SOC && type == WMTDRV_TYPE_WIFI);
+	bOffload = (type == WMTDRV_TYPE_WIFI);
 	bExplicitPwrOn = (bOffload && opId == WMT_OPID_FUNC_ON &&
 				wmt_lib_get_drv_status(WMTDRV_TYPE_WMT) != DRV_STS_FUNC_ON);
 
@@ -229,10 +229,14 @@ EXPORT_SYMBOL(mtk_wcn_wmt_func_on);
 */
 VOID mtk_wcn_wmt_func_ctrl_for_plat(UINT32 on, ENUM_WMTDRV_TYPE_T type)
 {
+	MTK_WCN_BOOL ret;
+
 	if (on)
-		mtk_wcn_wmt_func_on(type);
+		ret = mtk_wcn_wmt_func_on(type);
 	else
-		mtk_wcn_wmt_func_off(type);
+		ret = mtk_wcn_wmt_func_off(type);
+
+	WMT_INFO_FUNC("on=%d type=%d ret=%d\n", on, type, ret);
 }
 
 INT8 mtk_wcn_wmt_therm_ctrl(ENUM_WMTTHERM_TYPE_T eType)
@@ -266,7 +270,7 @@ INT8 mtk_wcn_wmt_therm_ctrl(ENUM_WMTTHERM_TYPE_T eType)
 	pOpData->opId = WMT_OPID_THERM_CTRL;
 	/*parameter fill */
 	pOpData->au4OpData[0] = eType;
-	pSignal->timeoutValue = MAX_WMT_OP_TIMEOUT;
+	pSignal->timeoutValue = MAX_EACH_WMT_CMD;
 
 	WMT_DBG_FUNC("OPID(%d) type(%zu) start\n", pOp->op.opId, pOp->op.au4OpData[0]);
 	WMT_STEP_DO_ACTIONS_FUNC(STEP_TRIGGER_POINT_BEFORE_READ_THERMAL);
@@ -713,6 +717,11 @@ MTK_WCN_BOOL mtk_wcn_wmt_do_reset(ENUM_WMTDRV_TYPE_T type)
 		"DRV_TYPE_ANT"
 	};
 
+	if ((type < WMTDRV_TYPE_BT) || (type > WMTDRV_TYPE_ANT)) {
+		WMT_INFO_FUNC("Wrong driver type: %d, do not trigger reset.\n", type);
+		return MTK_WCN_BOOL_FALSE;
+	}
+
 	WMT_INFO_FUNC("Subsystem trigger whole chip reset, reset source: %s\n", drv_name[type]);
 	if (mtk_wcn_stp_get_wmt_trg_assert() == 0)
 		iRet = wmt_lib_trigger_reset();
@@ -844,3 +853,29 @@ VOID mtk_wcn_wmt_mpu_lock_release(VOID)
 }
 EXPORT_SYMBOL(mtk_wcn_wmt_mpu_lock_release);
 
+INT32 mtk_wcn_get_reset_info(PUINT8 pBuff, INT32 buffLen)
+{
+	INT32 len = 0;
+	PUINT8 buf;
+
+	if (!pBuff) {
+		WMT_INFO_FUNC("pBuff is NULL\n");
+		return -1;
+	}
+
+	buf = wmt_lib_get_cpupcr_xml_format(&len);
+	if (!buf) {
+		WMT_INFO_FUNC("buf is NULL\n");
+		return -1;
+	}
+	snprintf(pBuff, buffLen, "%s", buf);
+
+	return 0;
+}
+EXPORT_SYMBOL(mtk_wcn_get_reset_info);
+
+INT32 mtk_wcn_get_host_assert_info(PUINT32 type, PUINT32 reason, PUINT32 en)
+{
+	return wmt_lib_get_host_assert_info(type, reason, en);
+}
+EXPORT_SYMBOL(mtk_wcn_get_host_assert_info);

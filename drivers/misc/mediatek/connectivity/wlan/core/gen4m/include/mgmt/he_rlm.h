@@ -142,11 +142,21 @@ struct HE_A_CTRL_OM_T {
  ******************************************************************************
  */
 
-u_int32_t heRlmReqGetHeCapIELen(
+u_int32_t heRlmCalculateHeCapIELen(
+	struct ADAPTER *prAdapter,
+	u_int8_t ucBssIndex,
+	struct STA_RECORD *prStaRec);
+u_int32_t heRlmCalculateHeOpIELen(
 	struct ADAPTER *prAdapter,
 	u_int8_t ucBssIndex,
 	struct STA_RECORD *prStaRec);
 void heRlmReqGenerateHeCapIE(
+	struct ADAPTER *prAdapter,
+	struct MSDU_INFO *prMsduInfo);
+void heRlmRspGenerateHeCapIE(
+	struct ADAPTER *prAdapter,
+	struct MSDU_INFO *prMsduInfo);
+void heRlmRspGenerateHeOpIE(
 	struct ADAPTER *prAdapter,
 	struct MSDU_INFO *prMsduInfo);
 void heRlmRecHeCapInfo(

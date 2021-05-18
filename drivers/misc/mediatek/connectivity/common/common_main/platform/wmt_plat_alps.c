@@ -30,17 +30,12 @@
 */
 
 
-#ifdef CONFIG_PM_WAKELOCKS
-#else
-#include <linux/wakelock.h>
-#endif
-#define CFG_WMT_WAKELOCK_SUPPORT 1
-
 #ifdef DFT_TAG
 #undef DFT_TAG
 #endif
 #define DFT_TAG         "[WMT-PLAT]"
 
+#include <linux/version.h>
 
 /*******************************************************************************
 *                    E X T E R N A L   R E F E R E N C E S
@@ -49,15 +44,17 @@
 #include <linux/delay.h>
 
 /* ALPS header files */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0))
 #ifndef CONFIG_RTC_DRV_MT6397
 #include <mtk_rtc.h>
 #else
 #include <linux/mfd/mt6397/rtc_misc.h>
 #endif
+#endif
+
 #ifdef CONFIG_MTK_MT6306_GPIO_SUPPORT
 #include <mtk_6306_gpio.h>
 #endif
-
 /* ALPS and COMBO header files */
 #include <mtk_wcn_cmb_stub.h>
 /* MTK_WCN_COMBO header files */
@@ -129,10 +126,8 @@ INT32 wmtPlatLogLvl = WMT_PLAT_LOG_INFO;
 */
 
 static ENUM_STP_TX_IF_TYPE gCommIfType = STP_MAX_IF_TX;
-#if CFG_WMT_WAKELOCK_SUPPORT
 static OSAL_SLEEPABLE_LOCK gOsSLock;
 static OSAL_WAKE_LOCK wmt_wake_lock;
-#endif
 
 irq_cb wmt_plat_bgf_irq_cb;
 device_audio_if_cb wmt_plat_audio_if_cb;
@@ -377,12 +372,11 @@ INT32 wmt_plat_init(P_PWR_SEQ_TIME pPwrSeqTime, UINT32 co_clock_type)
 	iret = mtk_wcn_cmb_stub_reg(&stub_cb);
 
 	/*init wmt function ctrl wakelock if wake lock is supported by host platform */
-#ifdef CFG_WMT_WAKELOCK_SUPPORT
 	osal_strcpy(wmt_wake_lock.name, "wmtFuncCtrl");
 	wmt_wake_lock.init_flag = 0;
 	osal_wake_lock_init(&wmt_wake_lock);
 	osal_sleepable_lock_init(&gOsSLock);
-#endif
+
 	/* init hw */
 	if (wmt_detect_get_chip_type() == WMT_CHIP_TYPE_SOC)
 		iret += mtk_wcn_consys_hw_init();
@@ -410,11 +404,9 @@ INT32 wmt_plat_deinit(VOID)
 	/* 2. unreg to cmb_stub */
 	iret += mtk_wcn_cmb_stub_unreg();
 	/*3. wmt wakelock deinit */
-#ifdef CFG_WMT_WAKELOCK_SUPPORT
 	osal_wake_lock_deinit(&wmt_wake_lock);
 	osal_sleepable_lock_deinit(&gOsSLock);
 	WMT_DBG_FUNC("destroy wmt_wake_lock\n");
-#endif
 	WMT_DBG_FUNC("WMT-PLAT: ALPS platform init (%d)\n", iret);
 
 	return 0;
@@ -637,6 +629,12 @@ INT32 wmt_plat_eirq_ctrl(ENUM_PIN_ID id, ENUM_PIN_STATE state)
 					WMT_PLAT_PR_ERR("request_irq fail,irq_no(%d),iret(%d)\n",
 							  bgf_irq_num, iret);
 					return iret;
+				} else {
+					iret = enable_irq_wake(bgf_irq_num);
+					if (iret)
+						WMT_PLAT_PR_ERR("enable irq wake fail,irq_no(%d),iret(%d)\n",
+							bgf_irq_num, iret);
+					iret = 0;
 				}
 			} else {
 				struct device_node *node;
@@ -726,7 +724,7 @@ INT32 wmt_plat_gpio_ctrl(ENUM_PIN_ID id, ENUM_PIN_STATE state)
 {
 	INT32 iret = -1;
 
-	if ((id < PIN_ID_MAX) && (state < PIN_STA_MAX)) {
+	if ((id >= 0) && (id < PIN_ID_MAX) && (state < PIN_STA_MAX)) {
 		/* TODO: [FixMe][GeorgeKuo] do sanity check to const function table when init and skip checking here */
 		if (gfp_set_pin_table[id])
 			iret = (*(gfp_set_pin_table[id]))(state);	/* .handler */
@@ -849,8 +847,10 @@ static INT32 wmt_plat_rtc_ctrl(ENUM_PIN_STATE state)
 {
 	switch (state) {
 	case PIN_STA_INIT:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0))
 		rtc_gpio_enable_32k(RTC_GPIO_USER_GPS);
 		WMT_DBG_FUNC("WMT-PLAT:RTC init\n");
+#endif
 		break;
 	case PIN_STA_SHOW:
 		WMT_INFO_FUNC("WMT-PLAT:RTC PIN_STA_SHOW start\n");
@@ -1371,10 +1371,10 @@ static INT32 wmt_plat_soc_gps_lna_ctrl(ENUM_PIN_STATE state)
 		break;
 	}
 #else
-	struct pinctrl_state *gps_lna_init;
-	struct pinctrl_state *gps_lna_oh;
-	struct pinctrl_state *gps_lna_ol;
-	struct pinctrl *consys_pinctrl;
+	struct pinctrl_state *gps_lna_init = NULL;
+	struct pinctrl_state *gps_lna_oh = NULL;
+	struct pinctrl_state *gps_lna_ol = NULL;
+	struct pinctrl *consys_pinctrl = NULL;
 
 	WMT_PLAT_PR_DBG("ENTER++\n");
 	consys_pinctrl = mtk_wcn_consys_get_pinctrl();
@@ -1545,7 +1545,6 @@ static INT32 wmt_plat_tdm_req_ctrl(ENUM_PIN_STATE state)
 
 INT32 wmt_plat_wake_lock_ctrl(ENUM_WL_OP opId)
 {
-#ifdef CFG_WMT_WAKELOCK_SUPPORT
 	static INT32 counter;
 	INT32 ret = 0;
 
@@ -1576,11 +1575,6 @@ INT32 wmt_plat_wake_lock_ctrl(ENUM_WL_OP opId)
 	}
 
 	return 0;
-#else
-	WMT_WARN_FUNC("WMT-PLAT: host awake function is not supported.");
-
-	return 0;
-#endif
 }
 
 

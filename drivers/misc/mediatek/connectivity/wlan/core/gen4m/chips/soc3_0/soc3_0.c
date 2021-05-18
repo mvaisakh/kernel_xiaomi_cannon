@@ -83,7 +83,8 @@
 #include "hal_dmashdl_soc3_0.h"
 #include <linux/platform_device.h>
 #include <connectivity_build_in_adapter.h>
-
+#include <linux/mfd/mt6359p/registers.h>
+#include <linux/regmap.h>
 #if (CFG_SUPPORT_VCODE_VDFS == 1)
 #include <linux/pm_qos.h>
 #endif /*#ifndef CFG_BUILD_X86_PLATFORM*/
@@ -411,7 +412,7 @@ void soc3_0asicConnac2xWpdmaConfig(
 	bool fgResetHif)
 {
 	struct ADAPTER *prAdapter = prGlueInfo->prAdapter;
-	union WPDMA_GLO_CFG_STRUCT GloCfg[CONNAC2X_WFDMA_COUNT];
+	union WPDMA_GLO_CFG_STRUCT GloCfg[CONNAC2X_WFDMA_COUNT] = {0};
 	uint32_t u4DmaCfgCr = 0;
 	uint32_t idx = 0;
 	struct mt66xx_chip_info *chip_info = prAdapter->chip_info;
@@ -665,10 +666,14 @@ void soc3_0_WfdmaAxiCtrl(
 void soc3_0_ConstructPatchName(struct GLUE_INFO *prGlueInfo,
 	uint8_t **apucName, uint8_t *pucNameIdx)
 {
-	snprintf(apucName[(*pucNameIdx)], SOC3_0_FILE_NAME_MAX,
+	int ret = 0;
+
+	ret = kalSnprintf(apucName[(*pucNameIdx)], SOC3_0_FILE_NAME_MAX,
 					"soc3_0_patch_wmmcu_1_%x_hdr.bin",
 					wlanGetEcoVersion(
 						prGlueInfo->prAdapter));
+	if (ret < 0 || ret >= CFG_FW_NAME_MAX_LEN)
+		DBGLOG(INIT, ERROR, "kalSnprintf failed, ret: %d\n", ret);
 }
 
 struct BUS_INFO soc3_0_bus_info = {
@@ -815,6 +820,7 @@ struct CHIP_DBG_OPS soc3_0_debug_ops = {
 	.showUmacFwtblInfo = connac2x_show_umac_wtbl_info,
 	.showCsrInfo = NULL,
 	.showDmaschInfo = soc3_0_show_dmashdl_info,
+	.dumpMacInfo = soc3_0_dump_mac_info,
 	.showHifInfo = NULL,
 	.printHifDbgInfo = NULL,
 	.show_rx_rate_info = connac2x_show_rx_rate_info,
@@ -859,7 +865,7 @@ struct mt66xx_chip_info mt66xx_chip_info_soc3_0 = {
 	.is_support_wacpu = FALSE,
 	.txd_append_size = SOC3_0_TX_DESC_APPEND_LENGTH,
 	.rxd_size = SOC3_0_RX_DESC_LENGTH,
-
+	.init_evt_rxd_size = SOC3_0_RX_DESC_LENGTH,
 	.pse_header_length = CONNAC2X_NIC_TX_PSE_HEADER_LENGTH,
 	.init_event_size = CONNAC2X_RX_INIT_EVENT_LENGTH,
 	.eco_info = soc3_0_eco_table,
@@ -868,6 +874,8 @@ struct mt66xx_chip_info mt66xx_chip_info_soc3_0 = {
 	.top_hvr = CONNAC2X_TOP_HVR,
 	.top_fvr = CONNAC2X_TOP_FVR,
 	.arb_ac_mode_addr = SOC3_0_ARB_AC_MODE_ADDR,
+	.custom_oid_interface_version = MTK_CUSTOM_OID_INTERFACE_VERSION,
+	.em_interface_version = MTK_EM_INTERFACE_VERSION,
 	.asicCapInit = asicConnac2xCapInit,
 #if CFG_ENABLE_FW_DOWNLOAD
 	.asicEnableFWDownload = NULL,
@@ -910,7 +918,7 @@ struct mt66xx_chip_info mt66xx_chip_info_soc3_0 = {
 #endif
 	.checkbushang = soc3_0_CheckBusHang,
 	.dumpBusHangCr = soc3_0_DumpBusHangCr,
-	.em_interface_version = MTK_EM_INTERFACE_VERSION,
+	.cmd_max_pkt_size = CFG_TX_MAX_PKT_SIZE, /* size 1600 */
 };
 
 struct mt66xx_hif_driver_data mt66xx_driver_data_soc3_0 = {
@@ -1108,12 +1116,12 @@ void soc3_0_DumpWfsyscpupcr(struct ADAPTER *prAdapter)
 		HAL_MCR_RD(prAdapter, WFSYS_CPUPCR_ADDR, &var_pc);
 		HAL_MCR_RD(prAdapter, WFSYS_LP_ADDR, &var_lp);
 
-		snprintf(log_buf_pc[i], CPUPCR_BUF_SZ, "%llu.%06llu/0x%08x;",
+		kalSnprintf(log_buf_pc[i], CPUPCR_BUF_SZ, "%llu.%06llu/0x%08x;",
 					log_sec,
 					log_nsec,
 					var_pc);
 
-		snprintf(log_buf_lp[i], CPUPCR_BUF_SZ, "%llu.%06llu/0x%08x;",
+		kalSnprintf(log_buf_lp[i], CPUPCR_BUF_SZ, "%llu.%06llu/0x%08x;",
 					log_sec,
 					log_nsec,
 					var_lp);
@@ -1295,7 +1303,7 @@ static void soc3_0_DumpMemory32(uint32_t *pu4StartAddr,
 
 	while (u4Count > 0) {
 
-		snprintf(buf, TMP_BUF_SZ, "%08x", pu4StartAddr[0]);
+		kalSnprintf(buf, TMP_BUF_SZ, "%08x", pu4StartAddr[0]);
 
 		if (u4Count > ONE_LINE_MAX_COUNT)
 			endCount = ONE_LINE_MAX_COUNT;
@@ -1303,7 +1311,7 @@ static void soc3_0_DumpMemory32(uint32_t *pu4StartAddr,
 			endCount = u4Count;
 
 		for (i = 1; i < endCount; i++) {
-			snprintf(tmp, TMP_BUF_SZ, " %08x", pu4StartAddr[i]);
+			kalSnprintf(tmp, TMP_BUF_SZ, " %08x", pu4StartAddr[i]);
 			strncat(buf, tmp, strlen(tmp));
 		}
 
@@ -1677,7 +1685,7 @@ static void DumpAXIMasterDebugCr(struct ADAPTER *prAdapter)
 #define	AXI_MASTER_DUMP_CR_NUM 9
 
 	uint32_t ReadRegValue = 0;
-	uint32_t u4Value[AXI_MASTER_DUMP_CR_NUM];
+	uint32_t u4Value[AXI_MASTER_DUMP_CR_NUM] = {0};
 	uint32_t i;
 
 	ReadRegValue = AXI_MASTER_DUMP_CR_START;
@@ -2038,7 +2046,7 @@ int wf_pwr_on_consys_mcu(void)
 	wf_ioremap_read(CONN_HW_VER_ADDR, &value);
 	check = 0;
 	polling_count = 0;
-	while (value != CONNSYS_VERSION_ID) {
+	while (value != kalGetConnsysVerId()) {
 		if (polling_count > 10) {
 			check = -1;
 			ret = -1;
@@ -2188,7 +2196,7 @@ int wf_pwr_on_consys_mcu(void)
 	wf_ioremap_read(WFSYS_VERSION_ID_ADDR, &value);
 	check = 0;
 	polling_count = 0;
-	while (value != CONNSYS_VERSION_ID) {
+	while (value != WFSYS_VERSION_ID) {
 		if (polling_count > 10) {
 			check = -1;
 			ret = -1;
@@ -2323,7 +2331,7 @@ int wf_pwr_off_consys_mcu(void)
 	wf_ioremap_read(CONN_HW_VER_ADDR, &value);
 	check = 0;
 	polling_count = 0;
-	while (value != CONNSYS_VERSION_ID) {
+	while (value != kalGetConnsysVerId()) {
 		if (polling_count > 10) {
 			check = -1;
 			ret = -1;
@@ -2409,7 +2417,6 @@ int wf_pwr_off_consys_mcu(void)
 		soc3_0_DumpWfsysInfo();
 		soc3_0_DumpWfsysdebugflag();
 	}
-
 	/* bus clock ctrl */
 	conninfra_bus_clock_ctrl(CONNDRV_TYPE_WIFI, CONNINFRA_BUS_CLOCK_ALL, 0);
 
@@ -2539,7 +2546,14 @@ void wlanCoAntVFE28En(IN struct ADAPTER *prAdapter)
 
 	if (fgCoAnt) {
 		if (gCoAntVFE28En == FALSE) {
+#if (KERNEL_VERSION(4, 15, 0) <= CFG80211_VERSION_CODE)
+			regmap_write(g_regmap,
+				MT6359_LDO_VFE28_OP_EN_SET, 0x1 << 8);
+			regmap_write(g_regmap,
+				MT6359_LDO_VFE28_OP_CFG_CLR, 0x1 << 8);
+#else
 			KERNEL_pmic_ldo_vfe28_lp(8, 0, 1, 0);
+#endif
 			DBGLOG(INIT, INFO, "CoAntVFE28 PMIC Enable\n");
 			gCoAntVFE28En = TRUE;
 		} else {
@@ -2553,7 +2567,13 @@ void wlanCoAntVFE28En(IN struct ADAPTER *prAdapter)
 void wlanCoAntVFE28Dis(void)
 {
 	if (gCoAntVFE28En == TRUE) {
+#if (KERNEL_VERSION(4, 15, 0) <= CFG80211_VERSION_CODE)
+		regmap_write(g_regmap, MT6359_LDO_VFE28_OP_EN_CLR, 0x1 << 8);
+		regmap_write(g_regmap, MT6359_LDO_VFE28_OP_CFG_CLR, 0x1 << 8);
+		regmap_write(g_regmap, MT6359_LDO_VFE28_OP_CFG_CLR, 0x1 << 8);
+#else
 		KERNEL_pmic_ldo_vfe28_lp(8, 0, 0, 0);
+#endif
 		DBGLOG(INIT, INFO, "CoAntVFE28 PMIC Disable\n");
 		gCoAntVFE28En = FALSE;
 	} else {
@@ -2844,45 +2864,67 @@ void soc3_0_ConstructFirmwarePrio(struct GLUE_INFO *prGlueInfo,
 	uint8_t **apucNameTable, uint8_t **apucName,
 	uint8_t *pucNameIdx, uint8_t ucMaxNameIdx)
 {
+	int ret = 0;
 	uint8_t ucIdx = 0;
 
 	for (ucIdx = 0; apucsoc3_0FwName[ucIdx]; ucIdx++) {
-		if ((*pucNameIdx + 3) < ucMaxNameIdx) {
-			/* Type 1. WIFI_RAM_CODE_soc1_0_1_1 */
-			snprintf(*(apucName + (*pucNameIdx)),
-					CFG_FW_NAME_MAX_LEN, "%s_%u_%u",
-					apucsoc3_0FwName[ucIdx],
-					CFG_WIFI_IP_SET,
-					wlanGetEcoVersion(
-						prGlueInfo->prAdapter));
-			(*pucNameIdx) += 1;
-
-			/* Type 2. WIFI_RAM_CODE_soc1_0_1_1.bin */
-			snprintf(*(apucName + (*pucNameIdx)),
-					CFG_FW_NAME_MAX_LEN, "%s_%u_%u.bin",
-					apucsoc3_0FwName[ucIdx],
-					CFG_WIFI_IP_SET,
-					wlanGetEcoVersion(
-						prGlueInfo->prAdapter));
-			(*pucNameIdx) += 1;
-
-			/* Type 3. WIFI_RAM_CODE_soc1_0 */
-			snprintf(*(apucName + (*pucNameIdx)),
-					CFG_FW_NAME_MAX_LEN, "%s",
-					apucsoc3_0FwName[ucIdx]);
-			(*pucNameIdx) += 1;
-
-			/* Type 4. WIFI_RAM_CODE_soc1_0.bin */
-			snprintf(*(apucName + (*pucNameIdx)),
-					CFG_FW_NAME_MAX_LEN, "%s.bin",
-					apucsoc3_0FwName[ucIdx]);
-			(*pucNameIdx) += 1;
-		} else {
+		if ((*pucNameIdx + 3) >= ucMaxNameIdx) {
 			/* the table is not large enough */
 			DBGLOG(INIT, ERROR,
 				"kalFirmwareImageMapping >> file name array is not enough.\n");
 			ASSERT(0);
+			continue;
 		}
+
+		/* Type 1. WIFI_RAM_CODE_soc1_0_1_1 */
+		ret = kalSnprintf(*(apucName + (*pucNameIdx)),
+				CFG_FW_NAME_MAX_LEN, "%s_%u_%u",
+				apucsoc3_0FwName[ucIdx],
+				CFG_WIFI_IP_SET,
+				wlanGetEcoVersion(
+					prGlueInfo->prAdapter));
+		if (ret >= 0 && ret < CFG_FW_NAME_MAX_LEN)
+			(*pucNameIdx) += 1;
+		else
+			DBGLOG(INIT, ERROR,
+					"[%u] kalSnprintf failed, ret: %d\n",
+					__LINE__, ret);
+
+		/* Type 2. WIFI_RAM_CODE_soc1_0_1_1.bin */
+		ret = kalSnprintf(*(apucName + (*pucNameIdx)),
+				CFG_FW_NAME_MAX_LEN, "%s_%u_%u.bin",
+				apucsoc3_0FwName[ucIdx],
+				CFG_WIFI_IP_SET,
+				wlanGetEcoVersion(
+					prGlueInfo->prAdapter));
+		if (ret >= 0 && ret < CFG_FW_NAME_MAX_LEN)
+			(*pucNameIdx) += 1;
+		else
+			DBGLOG(INIT, ERROR,
+					"[%u] kalSnprintf failed, ret: %d\n",
+					__LINE__, ret);
+
+		/* Type 3. WIFI_RAM_CODE_soc1_0 */
+		ret = kalSnprintf(*(apucName + (*pucNameIdx)),
+				CFG_FW_NAME_MAX_LEN, "%s",
+				apucsoc3_0FwName[ucIdx]);
+		if (ret >= 0 && ret < CFG_FW_NAME_MAX_LEN)
+			(*pucNameIdx) += 1;
+		else
+			DBGLOG(INIT, ERROR,
+					"[%u] kalSnprintf failed, ret: %d\n",
+					__LINE__, ret);
+
+		/* Type 4. WIFI_RAM_CODE_soc1_0.bin */
+		ret = kalSnprintf(*(apucName + (*pucNameIdx)),
+				CFG_FW_NAME_MAX_LEN, "%s.bin",
+				apucsoc3_0FwName[ucIdx]);
+		if (ret >= 0 && ret < CFG_FW_NAME_MAX_LEN)
+			(*pucNameIdx) += 1;
+		else
+			DBGLOG(INIT, ERROR,
+					"[%u] kalSnprintf failed, ret: %d\n",
+					__LINE__, ret);
 	}
 }
 
@@ -2957,7 +2999,7 @@ soc3_0_kalFirmwareImageMapping(
 				prChipInfo->fw_dl_ops->constructPatchName(
 					prGlueInfo, apucName, &idx);
 			else
-				snprintf(apucName[idx], SOC3_0_FILE_NAME_MAX,
+				kalSnprintf(apucName[idx], SOC3_0_FILE_NAME_MAX,
 					"soc3_0_patch_wmmcu_1_%x_hdr.bin",
 					wlanGetEcoVersion(
 						prGlueInfo->prAdapter));
@@ -2965,7 +3007,7 @@ soc3_0_kalFirmwareImageMapping(
 		} else if (eDlIdx == IMG_DL_IDX_MCU_ROM_EMI) {
 			/* construct the file name for MCU ROM EMI */
 			/* soc3_0_ram_wmmcu_1_1_hdr.bin */
-			snprintf(apucName[idx], SOC3_0_FILE_NAME_MAX,
+			kalSnprintf(apucName[idx], SOC3_0_FILE_NAME_MAX,
 					"soc3_0_ram_wmmcu_1_%x_hdr.bin",
 					wlanGetEcoVersion(
 						prGlueInfo->prAdapter));
@@ -2974,7 +3016,7 @@ soc3_0_kalFirmwareImageMapping(
 		} else if (eDlIdx == IMG_DL_IDX_WIFI_ROM_EMI) {
 			/* construct the file name for WiFi ROM EMI */
 			/* soc3_0_ram_wifi_1_1_hdr.bin */
-			snprintf(apucName[idx], SOC3_0_FILE_NAME_MAX,
+			kalSnprintf(apucName[idx], SOC3_0_FILE_NAME_MAX,
 					"soc3_0_ram_wifi_1_%x_hdr.bin",
 					wlanGetEcoVersion(
 						prGlueInfo->prAdapter));
@@ -3218,6 +3260,12 @@ uint32_t soc3_0_wlanPowerOnDownload(
 		soc3_0_kalFirmwareImageMapping(prAdapter->prGlueInfo,
 			&prFwBuffer, &u4FwSize, IMG_DL_IDX_MCU_ROM_EMI);
 
+		if (prFwBuffer == NULL) {
+			DBGLOG(INIT, WARN, "FW[%u] load error!\n",
+			       IMG_DL_IDX_MCU_ROM_EMI);
+			return WLAN_STATUS_FAILURE;
+		}
+
 		u4Status = soc3_0_wlanImageSectionDownloadStage(
 			prAdapter, prFwBuffer, u4FwSize, 1,
 			IMG_DL_IDX_MCU_ROM_EMI);
@@ -3233,6 +3281,12 @@ uint32_t soc3_0_wlanPowerOnDownload(
 			soc3_0_kalFirmwareImageMapping(prAdapter->prGlueInfo,
 				&prFwBuffer, &u4FwSize,
 				IMG_DL_IDX_WIFI_ROM_EMI);
+
+			if (prFwBuffer == NULL) {
+				DBGLOG(INIT, WARN, "FW[%u] load error!\n",
+				       IMG_DL_IDX_WIFI_ROM_EMI);
+				return WLAN_STATUS_FAILURE;
+			}
 
 			u4Status = soc3_0_wlanImageSectionDownloadStage(
 				prAdapter, prFwBuffer, u4FwSize, 1,
@@ -3337,18 +3391,8 @@ int32_t soc3_0_wlanPowerOnInit(
 *	pfWlanProbe((void *)prPlatDev,
 *			(void *)prPlatDev->id_entry->driver_data)
 */
-#if defined(SOC3_0)
-#if defined(_HIF_AXI)
-/* prPlatDev is already created by initWlan()->glRegisterBus()::axi.c */
-	void *pvData = (void *)g_prPlatDev;
-	void *pvDriverData = (void *)g_prPlatDev->id_entry->driver_data;
-#endif
-
-#if defined(_HIF_PCIE)
-	void *pvData = NULL;
+	void *pvData;
 	void *pvDriverData = (void *)&mt66xx_driver_data_soc3_0;
-#endif
-#endif
 
 	int32_t i4Status = 0;
 	enum ENUM_POWER_ON_INIT_FAIL_REASON {
@@ -3376,30 +3420,9 @@ int32_t soc3_0_wlanPowerOnInit(
 	eFailReason = FAIL_REASON_NUM;
 
 	do {
-#if defined(_HIF_AXI)
-		/* AXI goes over here, to be conti... */
 		prChipInfo = ((struct mt66xx_hif_driver_data *)pvDriverData)
 					->chip_info;
-
 		pvData = (void *)prChipInfo->pdev;
-
-		/* we should call axi_enable_device(
-		*        (struct platform_device *)pvData);
-		* since it is invoked from within hifAxiProbe()::axi.c,
-		* before calling pfWlanProbe(), to be conti...
-		*/
-#endif
-
-#if defined(_HIF_PCIE)
-		prChipInfo = ((struct mt66xx_hif_driver_data *)pvDriverData)
-					->chip_info;
-
-		pvData = (void *)prChipInfo->pdev;
-
-		/* no need pci_enable_device(dev),
-		 * it has already been done in PCI driver's probe() function
-		 */
-#endif
 
 		if (eDownloadItem == ENUM_WLAN_POWER_ON_DOWNLOAD_EMI) {
 			if (fgSimplifyResetFlow) {
@@ -3449,9 +3472,9 @@ int32_t soc3_0_wlanPowerOnInit(
 					DBGLOG_LIMITED(INIT, INFO,
 					"[Wi-Fi PWR On] EMI download End\n");
 				}
-			}
 
-			wlanWakeLockUninit(prGlueInfo);
+				wlanWakeLockUninit(prGlueInfo);
+			}
 
 			wlanNetDestroy(prWdev);
 			}
@@ -3542,16 +3565,11 @@ int32_t soc3_0_wlanPowerOnInit(
 #if 0  /* Sample's gen4m code base doesn't support */
 		prAdapter->u4HifDbgFlag = 0;
 		prAdapter->u4HifChkFlag = 0;
-		prAdapter->u4TxHangFlag = 0;
 		prAdapter->u4NoMoreRfb = 0;
 #endif
 
 		prAdapter->u4OwnFailedCount = 0;
 		prAdapter->u4OwnFailedLogCount = 0;
-
-#if 0  /* Sample's gen4m code base doesn't support */
-		prAdapter->fgEnHifDbgInfo = TRUE;
-#endif
 
 		/* Additional with chip reset optimize*/
 		prAdapter->ucCmdSeqNum = 0;
@@ -4427,7 +4445,6 @@ int soc3_0_wlanPreCalPwrOn(void)
 
 	/* Download patch and send PHY action */
 	do {
-#if defined(_HIF_AXI)
 		retryCount = 0;
 		while (g_prPlatDev == NULL) {
 			DBGLOG(INIT, WARN,
@@ -4444,13 +4461,7 @@ int soc3_0_wlanPreCalPwrOn(void)
 			}
 		}
 
-		pvDriverData = (void *)g_prPlatDev->id_entry->driver_data;
-#endif
-
-#if defined(_HIF_PCIE)
 		pvDriverData = (void *)&mt66xx_driver_data_soc3_0;
-#endif
-
 		prChipInfo = ((struct mt66xx_hif_driver_data *)
 			pvDriverData)->chip_info;
 		pvData = (void *)prChipInfo->pdev;

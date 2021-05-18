@@ -1294,6 +1294,7 @@ struct mt66xx_chip_info {
 	const unsigned int is_support_wacpu;	/* support WA-CPU */
 	const unsigned int txd_append_size;	/* hw mac txd append */
 	const unsigned int rxd_size;	        /* hw mac rxd size */
+	const unsigned int init_evt_rxd_size;	/* init event rxd size */
 	const unsigned int pse_header_length;	/* NIC_TX_PSE_HEADER_LENGTH */
 	const unsigned int init_event_size;     /* init event w/o rxd size */
 	const unsigned int event_hdr_size;      /* event w/o rxd size */
@@ -1305,7 +1306,9 @@ struct mt66xx_chip_info {
 #if (CFG_SUPPORT_802_11AX == 1)
 	const unsigned int arb_ac_mode_addr;
 #endif /* CFG_SUPPORT_802_11AX == 1 */
+	const unsigned int custom_oid_interface_version;
 	const unsigned int em_interface_version;
+	const unsigned int cmd_max_pkt_size;
 
 	const struct ECO_INFO *eco_info;	/* chip version table */
 	uint8_t eco_ver;	/* chip version */
@@ -1340,8 +1343,6 @@ struct mt66xx_chip_info {
 	uint32_t (*asicGetChipID)(IN struct ADAPTER *prAdapter);
 	void (*fillHifTxDesc)(IN uint8_t **pDest, IN uint16_t *pInfoBufLen);
 	uint32_t (*downloadBufferBin)(IN struct ADAPTER *prAdapter);
-	void (*showTaskStack)(IN struct task_struct *tsk,
-			      IN unsigned long *sp);
 	void (*asicRxProcessRxvforMSP)(IN struct ADAPTER *prAdapter,
 		IN OUT struct SW_RFB *prRetSwRfb);
 	uint8_t (*asicRxGetRcpiValueFromRxv)(

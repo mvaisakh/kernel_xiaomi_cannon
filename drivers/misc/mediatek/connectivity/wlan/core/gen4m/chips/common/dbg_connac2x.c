@@ -186,10 +186,8 @@ static void connac2x_dump_tmac_info(
 	DBGLOG(HAL, INFO, "\t\tHdrFmt = %d(%s)\n",
 	((txd->u4DW1 & CONNAC2X_TX_DESC_HEADER_FORMAT_MASK) >>
 		CONNAC2X_TX_DESC_HEADER_FORMAT_OFFSET),
-	((txd->u4DW1 & CONNAC2X_TX_DESC_HEADER_FORMAT_MASK) >>
-		CONNAC2X_TX_DESC_HEADER_FORMAT_OFFSET) < 4 ?
 	hdr_fmt_str[((txd->u4DW1 & CONNAC2X_TX_DESC_HEADER_FORMAT_MASK) >>
-		CONNAC2X_TX_DESC_HEADER_FORMAT_OFFSET)] : "N/A");
+		CONNAC2X_TX_DESC_HEADER_FORMAT_OFFSET)]);
 
 	switch ((txd->u4DW1 & CONNAC2X_TX_DESC_HEADER_FORMAT_MASK) >>
 		CONNAC2X_TX_DESC_HEADER_FORMAT_OFFSET) {
@@ -1402,10 +1400,10 @@ static void connac2x_print_wtbl_info(
 			"\tFCAP_20_TO_80_MHZ:%d\n",
 			pwtbl->trx_cap.wtbl_d9.field.fcap,
 			((pwtbl->trx_cap.wtbl_d9.field.fcap) &
-			(0x1)),
+			(BIT(0))),
 			pwtbl->trx_cap.wtbl_d9.field.fcap,
 			(((pwtbl->trx_cap.wtbl_d9.field.fcap) &
-			(0x10)) >> 1));
+			(BIT(1))) >> 1));
 
 		/* Rate Info (DW10~13) */
 		LOG_FUNC("Rate Info (DW10~13):");
@@ -1587,6 +1585,10 @@ int32_t connac2x_show_umac_wtbl_info(
 
 	wtbl_raw_dw = (unsigned char *)kalMemAlloc(
 		sizeof(struct fwtbl_umac_struct), VIR_MEM_TYPE);
+	if (!wtbl_raw_dw) {
+		DBGLOG(REQ, ERROR, "WTBL : Memory alloc failed\n");
+		return 0;
+	}
 	/* Read UWTBL Entries */
 	for (wtbl_offset = 0; wtbl_offset <
 		sizeof(struct fwtbl_umac_struct);

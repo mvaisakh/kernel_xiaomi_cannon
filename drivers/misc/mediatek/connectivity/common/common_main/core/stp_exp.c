@@ -225,7 +225,7 @@ INT32 _mtk_wcn_stp_register_event_cb(INT32 type, MTK_WCN_STP_EVENT_CB func)
 INT32 mtk_wcn_stp_register_event_cb(INT32 type, MTK_WCN_STP_EVENT_CB func)
 #endif
 {
-	if (type < MTKSTP_MAX_TASK_NUM) {
+	if ((type < MTKSTP_MAX_TASK_NUM) && (type >= BT_TASK_INDX)) {
 		event_callback_tbl[type] = func;
 
 		/*clear rx queue */
@@ -244,7 +244,7 @@ INT32 _mtk_wcn_stp_register_tx_event_cb(INT32 type, MTK_WCN_STP_EVENT_CB func)
 INT32 mtk_wcn_stp_register_tx_event_cb(INT32 type, MTK_WCN_STP_EVENT_CB func)
 #endif
 {
-	if (type < MTKSTP_MAX_TASK_NUM)
+	if ((type < MTKSTP_MAX_TASK_NUM) && (type >= BT_TASK_INDX))
 		tx_event_callback_tbl[type] = func;
 	else
 		osal_bug_on(0);

@@ -105,7 +105,7 @@ unsigned long g_ulFlag;/* GLUE_FLAG_XXX */
 struct completion g_RstOffComp;
 struct completion g_RstOnComp;
 struct completion g_triggerComp;
-KAL_WAKE_LOCK_T g_IntrWakeLock;
+KAL_WAKE_LOCK_T *g_IntrWakeLock;
 struct task_struct *wlan_reset_thread;
 static int g_rst_data;
 u_int8_t g_IsWholeChipRst = FALSE;
@@ -243,7 +243,7 @@ void glResetInit(struct GLUE_INFO *prGlueInfo)
 	fw_log_connsys_coredump_init();
 #endif
 	update_driver_reset_status(fgIsResetting);
-	KAL_WAKE_LOCK_INIT(NULL, &g_IntrWakeLock, "WLAN Reset");
+	KAL_WAKE_LOCK_INIT(NULL, g_IntrWakeLock, "WLAN Reset");
 	init_waitqueue_head(&g_waitq_rst);
 	init_completion(&g_RstOffComp);
 	init_completion(&g_RstOnComp);
@@ -282,6 +282,114 @@ void glResetUninit(void)
 #endif
 #endif
 }
+/*----------------------------------------------------------------------------*/
+/*!
+ * @brief Send reset event to upper layer.
+ *
+ * @param none
+ *
+ * @retval none
+ */
+/*----------------------------------------------------------------------------*/
+#if CFG_TC10_FEATURE
+static void glNotifyChipReset(void)
+{
+
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+
+	struct GLUE_INFO *prGlueInfo = NULL;
+	struct net_device *prDev = NULL;
+	struct wiphy *wiphy = NULL;
+	struct wireless_dev *wdev = NULL;
+	struct PARAM_HANG_INFO *list;
+	uint32_t size = 0;
+	uint8_t ucBssIndex = 0;
+	uint32_t type = 0, reason = 0, en = 0;
+
+	char aucDriverVersionStr[] = "MTK_" STR(NIC_DRIVER_MAJOR_VERSION) "_"
+					     STR(NIC_DRIVER_MINOR_VERSION) "_"
+					     STR(NIC_DRIVER_SERIAL_VERSION) "-"
+					     DRIVER_BUILD_DATE;
+
+	char cid[] = "MT6631";
+
+	DBGLOG(AIS, INFO, "glNotifyChipReset start\n");
+	prGlueInfo = (struct GLUE_INFO *) wiphy_priv(
+			     wlanGetWiphy());
+	if (prGlueInfo == NULL) {
+		DBGLOG(INIT, ERROR, "prGlueInfo null\n");
+		return;
+	}
+
+	wiphy = priv_to_wiphy(prGlueInfo);
+	if (wiphy == NULL) {
+		DBGLOG(INIT, ERROR, "wiphy null\n");
+		return;
+	}
+
+	prDev = wlanGetNetDev(prGlueInfo, ucBssIndex);
+	if (prDev == NULL) {
+		DBGLOG(INIT, ERROR, "prDev null\n");
+		return;
+	}
+
+	wdev = prDev->ieee80211_ptr;
+
+	if (wdev == NULL) {
+		DBGLOG(INIT, ERROR, "wdev null\n");
+		return;
+	}
+
+	size = sizeof(struct PARAM_HANG_INFO);
+	list = kalMemAlloc(size, VIR_MEM_TYPE);
+	if (!list) {
+		DBGLOG(INIT, ERROR, "alloc list fail\n");
+		return;
+	}
+
+	kalMemZero(list, size);
+	kalMemZero(list->rawData, 512);
+
+	list->id = GRID_HANG_INFO;
+	/* len does not include id and len */
+	list->len = size - 2;
+
+	if (prGlueInfo->prAdapter) {
+		kalStrnCpy(list->fwVer,
+			prGlueInfo->prAdapter->rVerInfo.aucReleaseManifest,
+			sizeof(list->fwVer) - 1);
+	}
+
+	DBGLOG(AIS, TRACE, "fwVer=%s\n", list->fwVer);
+
+	kalStrnCpy(list->driverVer, aucDriverVersionStr,
+		sizeof(list->driverVer) - 1);
+
+	DBGLOG(AIS, TRACE, "driverVer=%s\n", list->driverVer);
+
+	kalStrnCpy(list->cidInfo, cid,
+		sizeof(list->cidInfo) - 1);
+
+	DBGLOG(AIS, TRACE, "cidInfo=%s\n", list->cidInfo);
+
+	mtk_wcn_get_host_assert_info(&type, &reason, &en);
+
+	list->hangType = reason;
+
+	DBGLOG(AIS, TRACE, "hangType=%d\n", list->hangType);
+
+	mtk_wcn_get_reset_info(list->rawData, 512);
+
+	DBGLOG(AIS, TRACE, "Dump=\n%s\n", list->rawData);
+
+	mtk_cfg80211_vendor_event_generic_response(
+		wiphy, wdev, size, (uint8_t *)list);
+	kalMemFree(list, VIR_MEM_TYPE, size);
+	DBGLOG(AIS, INFO, "glNotifyChipReset end\n");
+}
+#endif
+
 /*----------------------------------------------------------------------------*/
 /*!
  * @brief This routine is called for generating reset request to WMT
@@ -495,7 +603,6 @@ int32_t glIsWmtCodeDump(void)
 	return mtk_wcn_stp_coredump_start_get();
 }
 
-#if (CFG_SUPPORT_CONNINFRA == 0)
 static void triggerHifDumpIfNeed(void)
 {
 	struct GLUE_INFO *prGlueInfo;
@@ -507,6 +614,7 @@ static void triggerHifDumpIfNeed(void)
 	prGlueInfo = (struct GLUE_INFO *) wiphy_priv(wlanGetWiphy());
 	if (!prGlueInfo || !prGlueInfo->u4ReadyFlag || !prGlueInfo->prAdapter)
 		return;
+
 	prAdapter = prGlueInfo->prAdapter;
 	prAdapter->u4HifDbgFlag |= DEG_HIF_DEFAULT_DUMP;
 	kalSetHifDbgEvent(prAdapter->prGlueInfo);
@@ -514,6 +622,7 @@ static void triggerHifDumpIfNeed(void)
 	kalMsleep(100);
 }
 
+#if (CFG_SUPPORT_CONNINFRA == 0)
 static void dumpWlanThreadsIfNeed(void)
 {
 	struct GLUE_INFO *prGlueInfo;
@@ -583,6 +692,9 @@ static void glResetCallback(enum _ENUM_WMTDRV_TYPE_T eSrcType,
 				wifi_rst.rst_data = RESET_SUCCESS;
 				fgIsResetting = FALSE;
 				schedule_work(&(wifi_rst.rst_work));
+#if CFG_TC10_FEATURE
+				glNotifyChipReset();
+#endif
 				break;
 
 			case WMTRSTMSG_RESET_END_FAIL:
@@ -677,7 +789,7 @@ void glRstWholeChipRstParamInit(void)
 }
 void glRstSetRstEndEvent(void)
 {
-	KAL_WAKE_LOCK(NULL, &g_IntrWakeLock);
+	KAL_WAKE_LOCK(NULL, g_IntrWakeLock);
 
 	set_bit(GLUE_FLAG_RST_END_BIT, &g_ulFlag);
 
@@ -688,7 +800,7 @@ void glRstSetRstEndEvent(void)
 
 int glRstwlanPreWholeChipReset(enum consys_drv_type type, char *reason)
 {
-	bool bRet = TRUE;
+	bool bRet = 0;
 	struct GLUE_INFO *prGlueInfo;
 
 	prGlueInfo = (struct GLUE_INFO *) wiphy_priv(wlanGetWiphy());
@@ -703,6 +815,9 @@ int glRstwlanPreWholeChipReset(enum consys_drv_type type, char *reason)
 		DBGLOG(REQ, WARN, "wifi driver is off now\n");
 		return bRet;
 	}
+
+	triggerHifDumpIfNeed();
+
 	g_WholeChipRstType = type;
 	g_WholeChipRstReason = reason;
 
@@ -782,7 +897,7 @@ void glReset_timeinit(struct timeval *rNowTs, struct timeval *rLastTs)
 
 bool IsOverRstTimeThreshold(struct timeval *rNowTs, struct timeval *rLastTs)
 {
-	struct timeval rTimeout, rTime;
+	struct timeval rTimeout, rTime = {0};
 	bool fgIsTimeout = FALSE;
 
 	rTimeout.tv_sec = 30;
@@ -858,10 +973,10 @@ void glResetSubsysRstProcedure(
 			if (g_fgRstRecover == TRUE)
 				g_fgRstRecover = FALSE;
 			else {
-				if (g_eWfRstSource == WF_RST_SOURCE_FW)
-					fw_log_connsys_coredump_start(-1, NULL);
-				else
-					fw_log_connsys_coredump_start(
+			if (g_eWfRstSource == WF_RST_SOURCE_FW)
+				fw_log_connsys_coredump_start(-1, NULL);
+			else
+				fw_log_connsys_coredump_start(
 						CONNDRV_TYPE_WIFI,
 						apucRstReason[eResetReason]);
 			}
@@ -893,10 +1008,11 @@ void glResetSubsysRstProcedure(
 			if (g_eWfRstSource == WF_RST_SOURCE_FW)
 				fw_log_connsys_coredump_start(-1, NULL);
 			else
-				fw_log_connsys_coredump_start(
-						CONNDRV_TYPE_WIFI,
-						apucRstReason[eResetReason]);
+			fw_log_connsys_coredump_start(
+					CONNDRV_TYPE_WIFI,
+					apucRstReason[eResetReason]);
 		}
+
 #endif
 		glResetMsgHandler(WMTMSG_TYPE_RESET,
 				  WMTRSTMSG_0P5RESET_START);
@@ -967,8 +1083,8 @@ int wlan_reset_thread_main(void *data)
 		prGlueInfo = (struct GLUE_INFO *) wiphy_priv(wlanGetWiphy());
 		if (test_and_clear_bit(GLUE_FLAG_RST_START_BIT, &g_ulFlag) &&
 			 ((prGlueInfo) && (prGlueInfo->u4ReadyFlag))) {
-			if (KAL_WAKE_LOCK_ACTIVE(NULL, &g_IntrWakeLock))
-				KAL_WAKE_UNLOCK(NULL, &g_IntrWakeLock);
+			if (KAL_WAKE_LOCK_ACTIVE(NULL, g_IntrWakeLock))
+				KAL_WAKE_UNLOCK(NULL, g_IntrWakeLock);
 
 			if (g_IsWholeChipRst) {
 #if (CFG_ANDORID_CONNINFRA_COREDUMP_SUPPORT == 1)
@@ -1001,8 +1117,8 @@ int wlan_reset_thread_main(void *data)
 				g_SubsysRstTotalCnt);
 		}
 		if (test_and_clear_bit(GLUE_FLAG_RST_END_BIT, &g_ulFlag)) {
-			if (KAL_WAKE_LOCK_ACTIVE(NULL, &g_IntrWakeLock))
-				KAL_WAKE_UNLOCK(NULL, &g_IntrWakeLock);
+			if (KAL_WAKE_LOCK_ACTIVE(NULL, g_IntrWakeLock))
+				KAL_WAKE_UNLOCK(NULL, g_IntrWakeLock);
 			DBGLOG(INIT, INFO, "Whole chip reset end start\n");
 			glResetMsgHandler(WMTMSG_TYPE_RESET,
 				WMTRSTMSG_RESET_END);

@@ -315,7 +315,7 @@ void asicConnac2xWfdmaDummyCrRead(
 	struct ADAPTER *prAdapter,
 	u_int8_t *pfgResult)
 {
-	u_int32_t u4RegValue;
+	u_int32_t u4RegValue = 0;
 
 	HAL_MCR_RD(prAdapter,
 		CONNAC2X_WFDMA_DUMMY_CR,
@@ -359,7 +359,7 @@ void asicConnac2xWfdmaReInit(
 		struct GL_HIF_INFO *prHifInfo;
 		uint32_t u4Idx;
 
-		DBGLOG(INIT, INFO, "WFDMA reinit after bk/sr(deep sleep)\n");
+		DBGLOG(INIT, TRACE, "WFDMA reinit after bk/sr(deep sleep)\n");
 		prHifInfo = &prAdapter->prGlueInfo->rHifInfo;
 		for (u4Idx = 0; u4Idx < NUM_OF_TX_RING; u4Idx++) {
 			prHifInfo->TxRing[u4Idx].TxSwUsedIdx = 0;
@@ -499,7 +499,7 @@ void asicConnac2xWpdmaConfig(
 	bool fgResetHif)
 {
 	struct ADAPTER *prAdapter = prGlueInfo->prAdapter;
-	union WPDMA_GLO_CFG_STRUCT GloCfg[CONNAC2X_WFDMA_COUNT];
+	union WPDMA_GLO_CFG_STRUCT GloCfg[CONNAC2X_WFDMA_COUNT] = {0};
 	uint32_t u4DmaCfgCr;
 	uint32_t idx;
 	struct mt66xx_chip_info *chip_info = prAdapter->chip_info;
@@ -835,7 +835,7 @@ void asicConnac2xLowPowerOwnRead(
 	prChipInfo = prAdapter->chip_info;
 
 	if (prChipInfo->is_support_asic_lp) {
-		u_int32_t u4RegValue = 0;
+		u_int32_t u4RegValue;
 
 		HAL_MCR_RD(prAdapter,
 				CONNAC2X_BN0_LPCTL_ADDR,
@@ -856,7 +856,7 @@ void asicConnac2xLowPowerOwnSet(
 	prChipInfo = prAdapter->chip_info;
 
 	if (prChipInfo->is_support_asic_lp) {
-		u_int32_t u4RegValue = 0;
+		u_int32_t u4RegValue;
 
 		HAL_MCR_WR(prAdapter,
 				CONNAC2X_BN0_LPCTL_ADDR,
@@ -879,7 +879,7 @@ void asicConnac2xLowPowerOwnClear(
 	prChipInfo = prAdapter->chip_info;
 
 	if (prChipInfo->is_support_asic_lp) {
-		u_int32_t u4RegValue = 0;
+		u_int32_t u4RegValue;
 
 		HAL_MCR_WR(prAdapter,
 			CONNAC2X_BN0_LPCTL_ADDR,

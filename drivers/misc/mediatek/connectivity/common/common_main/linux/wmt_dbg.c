@@ -198,7 +198,6 @@ static const WMT_DEV_DBG_FUNC wmt_dev_dbg_func[] = {
 	[0x2f] = wmt_dbg_set_bt_link_status,
 	[0x30] = wmt_dbg_show_thread_debug_info,
 	[0x31] = wmt_dbg_gps_suspend,
-
 	[0x32] = wmt_dbg_alarm_ctrl,
 #ifdef CONFIG_MTK_ENG_BUILD
 	[0xa0] = wmt_dbg_step_test,
@@ -309,7 +308,7 @@ INT32 wmt_dbg_assert_test(INT32 par1, INT32 par2, INT32 par3)
 		wmt_lib_trigger_assert(par2, 30);
 		ENABLE_PSM_MONITOR();
 		return 0;
-	} else if (par3 == 5) {
+	}  else if (par3 == 5) {
 		if (DISABLE_PSM_MONITOR()) {
 			WMT_ERR_FUNC("wake up failed\n");
 			return -1;
@@ -318,12 +317,7 @@ INT32 wmt_dbg_assert_test(INT32 par1, INT32 par2, INT32 par3)
 		wmt_lib_trigger_assert(4, par2);
 		ENABLE_PSM_MONITOR();
 		return 0;
-	} else if (par3 == 6) {
-		return wmt_dbg_cmd_test_api(WMTDRV_CMD_COS_TRACE_ENABLE);
-	} else if (par3 == 7) {
-		return wmt_dbg_cmd_test_api(WMTDRV_CMD_COS_TRACE_DISABLE);
 	}
-
 
 	times = par3;
 	do {
@@ -371,12 +365,6 @@ INT32 wmt_dbg_cmd_test_api(ENUM_WMTDRV_CMD_T cmd)
 	case WMTDRV_CMD_FWTRACE_TEST:
 		pOp->op.au4OpData[0] = 5;
 		break;
-	case WMTDRV_CMD_COS_TRACE_ENABLE:
-		pOp->op.au4OpData[0] = 6;
-		break;
-	case WMTDRV_CMD_COS_TRACE_DISABLE:
-		pOp->op.au4OpData[0] = 7;
-		break;
 	default:
 		if (WMTDRV_CMD_COEXDBG_00 <= cmd && WMTDRV_CMD_COEXDBG_15 >= cmd) {
 			pOp->op.au4OpData[0] = 2;
@@ -398,25 +386,12 @@ INT32 wmt_dbg_cmd_test_api(ENUM_WMTDRV_CMD_T cmd)
 		return -1;
 	}
 	bRet = wmt_lib_put_act_op(pOp);
-
-#ifdef CONFIG_MTK_CONNSYS_DEDICATED_LOG_PATH
-	if (cmd == WMTDRV_CMD_COS_TRACE_ENABLE) {
-		connsys_dedicated_log_enable_flush_emi_loop();
-	} else if (cmd == WMTDRV_CMD_COS_TRACE_DISABLE) {
-		connsys_dedicated_log_disable_flush_emi_loop();
-		connsys_dedicated_log_flush_emi();
-		msleep(500);
-	}
-#endif
-
 	ENABLE_PSM_MONITOR();
 	if ((cmd != WMTDRV_CMD_ASSERT) &&
 	    (cmd != WMTDRV_CMD_EXCEPTION) &&
 	    (cmd != WMTDRV_CMD_NOACK_TEST) &&
 	    (cmd != WMTDRV_CMD_WARNRST_TEST) &&
-		(cmd != WMTDRV_CMD_FWTRACE_TEST) &&
-		(cmd != WMTDRV_CMD_COS_TRACE_ENABLE) &&
-		(cmd != WMTDRV_CMD_COS_TRACE_DISABLE)) {
+		(cmd != WMTDRV_CMD_FWTRACE_TEST)) {
 		if (bRet == MTK_WCN_BOOL_FALSE) {
 			gCoexBuf.availSize = 0;
 		} else {
@@ -472,14 +447,17 @@ INT32 wmt_dbg_chip_rst(INT32 par1, INT32 par2, INT32 par3)
 
 INT32 wmt_dbg_func_ctrl(INT32 par1, INT32 par2, INT32 par3)
 {
+	MTK_WCN_BOOL ret = MTK_WCN_BOOL_FALSE;
+
 	if (par2 < WMTDRV_TYPE_WMT || par2 == WMTDRV_TYPE_LPBK) {
 		if (par3 == 0) {
 			WMT_INFO_FUNC("function off test, type(%d)\n", par2);
-			mtk_wcn_wmt_func_off(par2);
+			ret = mtk_wcn_wmt_func_off(par2);
 		} else {
 			WMT_INFO_FUNC("function on test, type(%d)\n", par2);
-			mtk_wcn_wmt_func_on(par2);
+			ret = mtk_wcn_wmt_func_on(par2);
 		}
+		WMT_INFO_FUNC("function test return %d\n", ret);
 	} else
 		WMT_INFO_FUNC("function ctrl test, invalid type(%d)\n", par2);
 
@@ -937,12 +915,15 @@ static INT32 wmt_dbg_fw_log_ctrl(INT32 par1, INT32 onoff, INT32 level)
 
 INT32 wmt_dbg_pre_pwr_on_ctrl(INT32 par1, INT32 enable, INT32 par3)
 {
+	MTK_WCN_BOOL ret = MTK_WCN_BOOL_FALSE;
 
 	WMT_INFO_FUNC("%s pre power on function\n", enable ? "enable" : "disable");
 
 	if (enable) {
 		/* Turn LPBK off and set always power on flag to 1 */
-		mtk_wcn_wmt_func_off(WMTDRV_TYPE_LPBK);
+		ret = mtk_wcn_wmt_func_off(WMTDRV_TYPE_LPBK);
+		if (!ret)
+			WMT_WARN_FUNC("mtk_wcn_wmt_func_off(WMTDRV_TYPE_LPBK) return %d\n", ret);
 		wmt_dev_apo_ctrl(1);
 	} else {
 		/* Just set always power on flag to 0 */
@@ -1250,7 +1231,7 @@ static INT32 wmt_dbg_jtag_flag_ctrl(INT32 par1, INT32 par2, INT32 par3)
 static INT32 wmt_dbg_lte_to_wmt_test(UINT32 opcode, UINT32 msg_len)
 {
 	conn_md_ipc_ilm_t ilm;
-	struct local_para *p_buf_str;
+	struct local_para *p_buf_str = NULL;
 	INT32 i = 0;
 	INT32 iRet = -1;
 
@@ -1468,7 +1449,8 @@ static VOID delay_work_func(struct work_struct *work)
 		return;
 	}
 
-	(*wmt_dev_dbg_func[dbgWork->x]) (dbgWork->x, dbgWork->y, dbgWork->z);
+	if ((dbgWork->x >= 0) && (dbgWork->x < 0x33))
+		(*wmt_dev_dbg_func[dbgWork->x]) (dbgWork->x, dbgWork->y, dbgWork->z);
 
 	kvfree(dbgWork);
 }

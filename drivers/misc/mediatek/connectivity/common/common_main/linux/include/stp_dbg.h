@@ -374,6 +374,12 @@ typedef enum _ENUM_ASSERT_INFO_PARSER_TYPE_ {
 	STP_DBG_PARSER_TYPE_MAX
 } ENUM_ASSERT_INFO_PARSER_TYPE, *P_ENUM_ASSERT_INFO_PARSER_TYPE;
 
+enum STP_DBG_MEMDUMP_MODE {
+	STP_DBG_MEMDUMP_NO_LOG = 0,
+	STP_DBG_MEMDUMP_NORMAL = 2,
+	STP_DBG_MEMDUMP_BUG_ON = 3
+};
+
 VOID stp_dbg_nl_init(VOID);
 VOID stp_dbg_nl_deinit(VOID);
 INT32 stp_dbg_core_dump_deinit_gcoredump(VOID);
@@ -405,6 +411,7 @@ INT32 stp_dbg_poll_dmaregs(UINT32 times, UINT32 sleep);
 INT32 stp_dbg_poll_cpupcr_ctrl(UINT32 en);
 INT32 stp_dbg_set_version_info(UINT32 chipid, PUINT8 pRomVer, PUINT8 pPatchVer, PUINT8 pPatchBrh);
 INT32 stp_dbg_set_wifiver(UINT32 wifiver);
+INT32 stp_dbg_get_host_assert_info(PUINT32 drv_type, PUINT32 reason, PUINT32 en);
 INT32 stp_dbg_set_host_assert_info(UINT32 drv_type, UINT32 reason, UINT32 en);
 VOID stp_dbg_set_keyword(PINT8 keyword);
 UINT32 stp_dbg_get_host_trigger_assert(VOID);
@@ -421,4 +428,6 @@ INT32 stp_dbg_start_coredump_timer(VOID);
 INT32 stp_dbg_start_emi_dump(VOID);
 INT32 stp_dbg_stop_emi_dump(VOID);
 INT32 stp_dbg_nl_send_data(const PINT8 buf, INT32 len);
+
+INT32 stp_dbg_read_memdump_mode(INT32 read_file);
 #endif /* end of _STP_DEBUG_H_ */

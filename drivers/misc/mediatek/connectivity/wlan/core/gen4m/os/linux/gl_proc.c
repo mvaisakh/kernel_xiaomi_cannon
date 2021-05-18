@@ -179,8 +179,8 @@ static ssize_t procDbgLevelRead(struct file *filp, char __user *buf,
 	    "Usage: Module Index:Module Level, such as 0x00:0xff\n\n"
 	    "Debug Module\tIndex\tLevel\tDebug Module\tIndex\tLevel\n\n";
 	u4StrLen = kalStrLen(str);
-	kalStrnCpy(temp, str, u4StrLen + 1);
-	temp += kalStrLen(temp);
+	kalStrnCpy(temp, str, u4StrLen);
+	temp += u4StrLen;
 
 	u2ModuleNum =
 	    (sizeof(aucDbModuleName) /
@@ -351,8 +351,8 @@ static ssize_t procCfgRead(struct file *filp, char __user *buf, size_t count,
 	    "'D': driver part current setting\n"
 	    "===================================\n";
 	u4StrLen = kalStrLen(str);
-	kalStrnCpy(temp, str, u4StrLen + 1);
-	temp += kalStrLen(temp);
+	kalStrnCpy(temp, str, u4StrLen);
+	temp += u4StrLen;
 
 	for (i = 0; i < WLAN_CFG_ENTRY_NUM_MAX; i++) {
 		prWlanCfgEntry =
@@ -378,7 +378,7 @@ static ssize_t procCfgRead(struct file *filp, char __user *buf, size_t count,
 				WLAN_CFG_VALUE_LEN_MAX - 1]);
 			kalMemSet(g_aucProcBuf, ' ', u4StrLen);
 			kalStrnCpy(g_aucProcBuf, str2, kalStrLen(str2) + 1);
-			g_aucProcBuf[u4StrLen-1] = '\n';
+			g_aucProcBuf[u4StrLen-1] = 0;
 			goto procCfgReadLabel;
 		}
 
@@ -411,7 +411,7 @@ static ssize_t procCfgRead(struct file *filp, char __user *buf, size_t count,
 				WLAN_CFG_VALUE_LEN_MAX - 1]);
 			kalMemSet(g_aucProcBuf, ' ', u4StrLen);
 			kalStrnCpy(g_aucProcBuf, str2, kalStrLen(str2) + 1);
-			g_aucProcBuf[u4StrLen-1] = '\n';
+			g_aucProcBuf[u4StrLen-1] = 0;
 			goto procCfgReadLabel;
 		}
 
@@ -712,7 +712,9 @@ static ssize_t procMCRWrite(struct file *file, const char __user *buffer,
 
 	i4CopySize =
 	    (count < (sizeof(acBuf) - 1)) ? count : (sizeof(acBuf) - 1);
-	if (copy_from_user(acBuf, buffer, i4CopySize))
+	if (copy_from_user(acBuf, buffer, i4CopySize) ||
+		i4CopySize < 0 ||
+		i4CopySize > PROC_MCR_ACCESS_MAX_USER_INPUT_LEN)
 		return 0;
 	acBuf[i4CopySize] = '\0';
 
@@ -842,13 +844,13 @@ static ssize_t procPktDelayDbgCfgRead(struct file *filp, char __user *buf,
 	uint8_t *temp = &g_aucProcBuf[0];
 	uint8_t *str = NULL;
 	uint32_t u4CopySize = 0;
-	uint8_t ucTxRxFlag;
-	uint8_t ucTxIpProto;
-	uint16_t u2TxUdpPort;
-	uint32_t u4TxDelayThreshold;
-	uint8_t ucRxIpProto;
-	uint16_t u2RxUdpPort;
-	uint32_t u4RxDelayThreshold;
+	uint8_t ucTxRxFlag = 0;
+	uint8_t ucTxIpProto = 0;
+	uint16_t u2TxUdpPort = 0;
+	uint32_t u4TxDelayThreshold = 0;
+	uint8_t ucRxIpProto = 0;
+	uint16_t u2RxUdpPort = 0;
+	uint32_t u4RxDelayThreshold = 0;
 	uint32_t u4StrLen = 0;
 
 	/* if *f_ops>0, we should return 0 to make cat command exit */
@@ -863,8 +865,8 @@ static ssize_t procPktDelayDbgCfgRead(struct file *filp, char __user *buf,
 		"Print tx TCP delay more than 500us log,               such as: echo txLog 6 0 500 > pktDelay\n"
 		"Close log,                                            such as: echo reset 0 0 0 > pktDelay\n\n";
 	u4StrLen = kalStrLen(str);
-	kalStrnCpy(temp, str, u4StrLen + 1);
-	temp += kalStrLen(temp);
+	kalStrnCpy(temp, str, u4StrLen);
+	temp += u4StrLen;
 
 #if (CFG_SUPPORT_STATISTICS == 1)
 	StatsEnvGetPktDelay(&ucTxRxFlag, &ucTxIpProto, &u2TxUdpPort,
@@ -876,13 +878,11 @@ static ssize_t procPktDelayDbgCfgRead(struct file *filp, char __user *buf,
 		SNPRINTF(temp, g_aucProcBuf,
 			("txLog %x %d %d\n", ucTxIpProto, u2TxUdpPort,
 			u4TxDelayThreshold));
-		temp += kalStrLen(temp);
 	}
 	if (ucTxRxFlag & BIT(1)) {
 		SNPRINTF(temp, g_aucProcBuf,
 			("rxLog %x %d %d\n", ucRxIpProto, u2RxUdpPort,
 			u4RxDelayThreshold));
-		temp += kalStrLen(temp);
 	}
 	if (ucTxRxFlag == 0)
 		SNPRINTF(temp, g_aucProcBuf,
@@ -1392,7 +1392,7 @@ int32_t procCreateFsEntry(struct GLUE_INFO *prGlueInfo)
 {
 	struct proc_dir_entry *prEntry;
 
-	DBGLOG(INIT, INFO, "[%s]\n", __func__);
+	DBGLOG(INIT, TRACE, "[%s]\n", __func__);
 	g_prGlueInfo_proc = prGlueInfo;
 
 	prEntry = proc_create(PROC_MCR_ACCESS, 0664, gprProcRoot, &mcr_ops);

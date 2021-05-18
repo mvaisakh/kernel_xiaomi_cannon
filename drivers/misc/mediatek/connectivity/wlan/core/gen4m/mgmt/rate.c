@@ -200,6 +200,8 @@ rateGetRateSetFromIEs(IN struct IE_SUPPORTED_RATE *prIeSupportedRate,
 		ASSERT(prIeSupportedRate->ucLength <= RATE_NUM_SW);
 
 		for (i = 0; i < prIeSupportedRate->ucLength; i++) {
+			if (i >= ELEM_MAX_LEN_SUP_RATES)
+				break;
 			ucRate =
 			    prIeSupportedRate->aucSupportedRates[i] & RATE_MASK;
 

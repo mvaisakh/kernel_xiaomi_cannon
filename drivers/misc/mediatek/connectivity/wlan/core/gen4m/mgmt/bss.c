@@ -142,6 +142,12 @@ struct APPEND_VAR_IE_ENTRY txBcnIETable[] = {
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_VHT_OP_MODE_NOTIFICATION), NULL,
 	   rlmRspGenerateVhtOpNotificationIE}	/*199 */
 #endif
+#if CFG_SUPPORT_802_11AX
+	, {0, heRlmCalculateHeCapIELen,
+	   heRlmRspGenerateHeCapIE}    /* 255, EXT 35 */
+	, {0, heRlmCalculateHeOpIELen,
+	   heRlmRspGenerateHeOpIE}      /* 255, EXT 36 */
+#endif
 #if CFG_SUPPORT_MTK_SYNERGY
 	, {(ELEM_HDR_LEN + ELEM_MIN_LEN_MTK_OUI), NULL,
 	   rlmGenerateMTKOuiIE}	/* 221 */
@@ -163,6 +169,8 @@ struct APPEND_VAR_IE_ENTRY txProbRspIETable[] = {
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_HT_OP), NULL,
 	   rlmRspGenerateHtOpIE}	/* 61 */
 #if CFG_ENABLE_WIFI_DIRECT
+	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_WPA), NULL,
+	   rsnGenerateWPAIE}	/* 221 */
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_RSN), NULL,
 	   rsnGenerateRSNIE}	/* 48 */
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_OBSS_SCAN), NULL,
@@ -181,6 +189,12 @@ struct APPEND_VAR_IE_ENTRY txProbRspIETable[] = {
 	   rlmRspGenerateVhtOpIE}	/*192 */
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_VHT_OP_MODE_NOTIFICATION), NULL,
 	   rlmRspGenerateVhtOpNotificationIE}	/*199 */
+#endif
+#if CFG_SUPPORT_802_11AX
+	, {0, heRlmCalculateHeCapIELen,
+	   heRlmRspGenerateHeCapIE}    /* 255, EXT 35 */
+	, {0, heRlmCalculateHeOpIELen,
+	   heRlmRspGenerateHeOpIE}      /* 255, EXT 36 */
 #endif
 #if CFG_SUPPORT_MTK_SYNERGY
 	, {(ELEM_HDR_LEN + ELEM_MIN_LEN_MTK_OUI), NULL,
@@ -258,11 +272,17 @@ void bssDetermineStaRecPhyTypeSet(IN struct ADAPTER *prAdapter,
 
 		if (!(eEncStatus == ENUM_ENCRYPTION3_ENABLED ||
 		      eEncStatus == ENUM_ENCRYPTION3_KEY_ABSENT ||
-		      eEncStatus == ENUM_ENCRYPTION_DISABLED)) {
+		      eEncStatus == ENUM_ENCRYPTION_DISABLED ||
+		      eEncStatus == ENUM_ENCRYPTION4_ENABLED ||
+		      eEncStatus == ENUM_ENCRYPTION4_KEY_ABSENT
+		     )) {
 			DBGLOG(BSS, INFO,
 			       "Ignore the HT/VHT Bit for TKIP as pairwise cipher configed!\n");
 			prStaRec->ucPhyTypeSet &=
 			    ~(PHY_TYPE_BIT_HT | PHY_TYPE_BIT_VHT);
+#if (CFG_SUPPORT_802_11AX == 1)
+			prStaRec->ucPhyTypeSet &= ~(PHY_TYPE_BIT_HE);
+#endif
 		}
 
 		ucHtOption = prWifiVar->ucStaHt;
@@ -277,6 +297,10 @@ void bssDetermineStaRecPhyTypeSet(IN struct ADAPTER *prAdapter,
 	else if (prStaRec->eStaType == STA_TYPE_P2P_GO) {
 		ucHtOption = prWifiVar->ucP2pGcHt;
 		ucVhtOption = prWifiVar->ucP2pGcVht;
+#if (CFG_SUPPORT_802_11AX == 1)
+		ucHeOption = prWifiVar->ucP2pGcHe;
+#endif
+
 	}
 
 	/* Set HT/VHT capability from Feature Option */
@@ -327,16 +351,25 @@ void bssDetermineApBssInfoPhyTypeSet(IN struct ADAPTER *prAdapter,
 	struct WIFI_VAR *prWifiVar = &prAdapter->rWifiVar;
 	uint8_t ucHtOption = FEATURE_ENABLED;
 	uint8_t ucVhtOption = FEATURE_ENABLED;
+#if (CFG_SUPPORT_802_11AX == 1)
+	uint8_t ucHeOption = FEATURE_ENABLED;
+#endif
 
 	/* Decide AP mode PHY type set */
 	if (fgIsPureAp) {
 		ucHtOption = prWifiVar->ucApHt;
 		ucVhtOption = prWifiVar->ucApVht;
+#if (CFG_SUPPORT_802_11AX == 1)
+		ucHeOption = prWifiVar->ucApHe;
+#endif
 	}
 	/* Decide P2P GO PHY type set */
 	else {
 		ucHtOption = prWifiVar->ucP2pGoHt;
 		ucVhtOption = prWifiVar->ucP2pGoVht;
+#if (CFG_SUPPORT_802_11AX == 1)
+		ucHeOption = prWifiVar->ucP2pGoHe;
+#endif
 	}
 
 	/* Set HT/VHT capability from Feature Option */
@@ -361,6 +394,15 @@ void bssDetermineApBssInfoPhyTypeSet(IN struct ADAPTER *prAdapter,
 			(prBssInfo->eBand == BAND_5G)) {
 		prBssInfo->ucPhyTypeSet |= PHY_TYPE_BIT_VHT;
 	}
+
+#if (CFG_SUPPORT_802_11AX == 1)
+	if (IS_FEATURE_DISABLED(ucHeOption))
+		prBssInfo->ucPhyTypeSet &= ~PHY_TYPE_BIT_HE;
+	else if (IS_FEATURE_FORCE_ENABLED(ucHeOption))
+		prBssInfo->ucPhyTypeSet |= PHY_TYPE_BIT_HE;
+	else if (!fgIsPureAp && IS_FEATURE_ENABLED(ucHeOption))
+		prBssInfo->ucPhyTypeSet |= PHY_TYPE_BIT_HE;
+#endif
 
 	prBssInfo->ucPhyTypeSet &= prAdapter->rWifiVar.ucAvailablePhyTypeSet;
 
@@ -1430,6 +1472,9 @@ void bssAddClient(IN struct ADAPTER *prAdapter, IN struct BSS_INFO *prBssInfo,
 	LINK_FOR_EACH_ENTRY(prCurrStaRec, prClientList, rLinkEntry,
 			    struct STA_RECORD) {
 
+		if (!prCurrStaRec)
+			break;
+
 		if (prCurrStaRec == prStaRec) {
 			DBGLOG(BSS, WARN,
 			       "Current Client List already contains that struct STA_RECORD["
@@ -1500,6 +1545,9 @@ struct STA_RECORD *bssRemoveClientByMac(IN struct ADAPTER *prAdapter,
 	LINK_FOR_EACH_ENTRY(prCurrStaRec, prClientList, rLinkEntry,
 			    struct STA_RECORD) {
 
+		if (!prCurrStaRec)
+			break;
+
 		if (EQUAL_MAC_ADDR(prCurrStaRec->aucMacAddr, pucMac)) {
 
 			LINK_REMOVE_KNOWN_ENTRY(prClientList,
@@ -1529,6 +1577,9 @@ struct STA_RECORD *bssGetClientByMac(IN struct ADAPTER *prAdapter,
 
 	LINK_FOR_EACH_ENTRY(prCurrStaRec, prClientList, rLinkEntry,
 			    struct STA_RECORD) {
+
+		if (!prCurrStaRec)
+			break;
 
 		if (EQUAL_MAC_ADDR(prCurrStaRec->aucMacAddr, pucMac))
 			return prCurrStaRec;
@@ -2273,11 +2324,17 @@ void bssDumpBssInfo(IN struct ADAPTER *prAdapter, IN uint8_t ucBssIndex)
 	       MAC2STR(prBssInfo->aucOwnMacAddr), MAC2STR(prBssInfo->aucBSSID),
 	       HIDE(prBssInfo->aucSSID));
 
-	DBGLOG(SW4, INFO,
-	       "BSS IDX[%u] Type[%s] OPMode[%s] ConnState[%u] Absent[%u]\n",
-	       prBssInfo->ucBssIndex, apucNetworkType[prBssInfo->eNetworkType],
-	       apucNetworkOpMode[prBssInfo->eCurrentOPMode],
-	       prBssInfo->eConnectionState, prBssInfo->fgIsNetAbsent);
+	if (prBssInfo->eNetworkType >= 0
+			&& prBssInfo->eNetworkType < NETWORK_TYPE_NUM
+			&& prBssInfo->eCurrentOPMode >= 0
+			&& prBssInfo->eCurrentOPMode < OP_MODE_NUM) {
+		DBGLOG(SW4, INFO,
+			"BSS IDX[%u] Type[%s] OPMode[%s] ConnState[%u] Absent[%u]\n",
+			prBssInfo->ucBssIndex,
+			apucNetworkType[prBssInfo->eNetworkType],
+			apucNetworkOpMode[prBssInfo->eCurrentOPMode],
+			prBssInfo->eConnectionState, prBssInfo->fgIsNetAbsent);
+	}
 
 	DBGLOG(SW4, INFO,
 	       "Channel[%u] Band[%u] SCO[%u] Assoc40mBwAllowed[%u] 40mBwAllowed[%u]\n",
@@ -2429,6 +2486,13 @@ uint32_t bssGetIotApAction(IN struct ADAPTER *prAdapter,
 		DBGLOG(BSS, INFO, "GetIotApAction Param Error!\n");
 		return -EINVAL;
 	}
+	/*To make sure one Bss only parse once*/
+	if (prBssDesc->fgIotApActionValid)
+		return prBssDesc->ucIotApAct;
+
+
+	prBssDesc->fgIotApActionValid = TRUE;
+	prBssDesc->ucIotApAct = WLAN_IOT_AP_VOID;
 
 	pucIes = &prBssDesc->aucIEBuf[0];
 	for (ucCnt = 0; ucCnt < CFG_IOT_AP_RULE_MAX_CNT; ucCnt++) {
@@ -2516,14 +2580,9 @@ uint32_t bssGetIotApAction(IN struct ADAPTER *prAdapter,
 				continue;
 			/*Matched, Fall through*/
 		}
-
-		/*All MATCH*/
-		DBGLOG(BSS, INFO, MACSTR" is IOTAP:%d Act:%d\n",
-			prBssDesc->aucBSSID, ucCnt, prIotApRule->ucAction);
-		return prIotApRule->ucAction;
+		/*All match, set the actions*/
+		prBssDesc->ucIotApAct = prIotApRule->ucAction;
 	}
-	DBGLOG(BSS, TRACE, MACSTR" is NOT IOTAP\n",
-		prBssDesc->aucBSSID);
-	return WLAN_IOT_AP_VOID;
+	return prBssDesc->ucIotApAct;
 }
 #endif

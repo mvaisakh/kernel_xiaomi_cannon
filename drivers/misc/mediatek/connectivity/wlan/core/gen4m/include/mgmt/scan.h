@@ -106,6 +106,7 @@
 #define SCN_BSS_DESC_SAME_SSID_THRESHOLD	20
 
 #define SCN_BSS_DESC_STALE_SEC			20 /* Scan Request Timeout */
+
 /* For WFD scan need about 15s. */
 #define SCN_BSS_DESC_STALE_SEC_WFD		30
 
@@ -123,13 +124,19 @@
 
 /* Full2Partial */
 /* Define a full scan as scan channel number larger than this number */
-#define SCAN_FULL2PARTIAL_CHANNEL_NUM           (25)
+#define SCAN_FULL2PARTIAL_CHANNEL_NUM           (20)
 #define SCAN_CHANNEL_BITMAP_ARRAY_LEN           (8)
 #define BITS_OF_UINT                            (32)
 #define BITS_OF_BYTE                            (8)
 
 /* dwell time setting, should align FW setting */
 #define SCAN_CHANNEL_DWELL_TIME_MIN_MSEC         (42)
+/* dwell time for beacon timeout scan */
+#define SCAN_BEACON_TIMEOUT_DWELL_TIME_MSEC      (200)
+
+/* dwell time setting, reduce APP trigger scan dwell time to 20 */
+#define SCAN_CHANNEL_MIN_DWELL_TIME_MSEC_APP	(20)
+#define SCAN_CHANNEL_DWELL_TIME_MSEC_APP	(40)
 
 /*----------------------------------------------------------------------------*/
 /* MSG_SCN_SCAN_REQ                                                           */
@@ -407,6 +414,11 @@ struct BSS_DESC {
 	 */
 #endif
 
+	/* the beacon doesn't advertise the FT AKM but will
+	 * use FT when supported clients connect
+	 */
+	uint8_t ucIsAdaptive11r;
+
 	/* The received IE length exceed the maximum IE buffer size */
 	u_int8_t fgIsIEOverflow;
 
@@ -423,6 +435,11 @@ struct BSS_DESC {
 
 	/* Support AP Selection */
 	struct AIS_BLACKLIST_ITEM *prBlack;
+
+#if CFG_SUPPORT_802_11K
+	struct NEIGHBOR_AP *prNeighbor;
+	uint8_t fgQueriedCandidates;
+#endif
 #if CFG_SUPPORT_MBO
 	uint8_t fgIsDisallowed;
 #endif
@@ -434,8 +451,9 @@ struct BSS_DESC {
 	u_int8_t fgSeenProbeResp;
 	u_int8_t fgExsitBssLoadIE;
 	u_int8_t fgMultiAnttenaAndSTBC;
-	u_int8_t fgDeauthLastTime;
 	uint32_t u4UpdateIdx;
+	uint8_t fgIotApActionValid;
+	uint8_t ucIotApAct;
 #if CFG_SUPPORT_RSN_SCORE
 	u_int8_t fgIsRSNSuitableBss;
 #endif
@@ -477,6 +495,9 @@ struct SCAN_PARAM {	/* Used by SCAN FSM */
 	uint16_t u2ChannelDwellTime;
 	uint16_t u2ChannelMinDwellTime;
 	uint16_t u2TimeoutValue;
+	uint16_t u2OpChStayTime;	/* ms unit */
+	uint8_t ucDfsChDwellTime;	/* ms unit */
+	uint8_t ucPerScanChCnt;
 
 	uint8_t aucBSSID[MAC_ADDR_LEN];
 
@@ -574,6 +595,9 @@ struct SCAN_INFO {
 
 	/* Scan log cache */
 	struct SCAN_LOG_CACHE rScanLogCache;
+
+	/* Support beacon report */
+	uint8_t fgWipsBcnReport;
 };
 
 /* Incoming Mailbox Messages */
@@ -612,6 +636,9 @@ struct MSG_SCN_SCAN_REQ_V2 {
 	uint16_t u2ChannelDwellTime;	/* In TU. 1024us. */
 	uint16_t u2ChannelMinDwellTime;	/* In TU. 1024us. */
 	uint16_t u2TimeoutValue;	/* ms unit */
+	uint16_t u2OpChStayTime;	/* ms unit */
+	uint8_t ucDfsChDwellTime;	/* ms unit */
+	uint8_t ucPerScanChCnt;
 
 	uint8_t aucBSSID[MAC_ADDR_LEN];
 	enum ENUM_SCAN_CHANNEL eScanChannel;
@@ -713,6 +740,7 @@ uint32_t scanCountBits(IN uint32_t bitMap[], IN uint32_t bitMapSize);
 void scanSetRequestChannel(IN struct ADAPTER *prAdapter,
 		IN uint32_t u4ScanChannelNum,
 		IN struct RF_CHANNEL_INFO arChannel[],
+		IN uint32_t u4ScanFlags,
 		IN uint8_t fgIsOnlineScan,
 		OUT struct MSG_SCN_SCAN_REQ_V2 *prScanReqMsg);
 
@@ -921,5 +949,13 @@ void scanResetBssDesc(IN struct ADAPTER *prAdapter,
 void scanCheckEpigramVhtIE(IN uint8_t *pucBuf, IN struct BSS_DESC *prBssDesc);
 void scanParseVHTCapIE(IN uint8_t *pucIE, IN struct BSS_DESC *prBssDesc);
 void scanParseVHTOpIE(IN uint8_t *pucIE, IN struct BSS_DESC *prBssDesc);
+
+void scanCheckAdaptive11rIE(IN uint8_t *pucBuf, IN struct BSS_DESC *prBssDesc);
+
+void scanUpdateSWIPSBcn(IN struct ADAPTER *prAdapter,
+			IN struct BSS_DESC *prBss, IN uint8_t ucBssIndex);
+
+void scanAbortBeaconRecv(IN struct ADAPTER *prAdapter, IN uint8_t ucBssIndex,
+			 IN enum SWPIS_ABORT_REASON abortReason);
 
 #endif /* _SCAN_H */

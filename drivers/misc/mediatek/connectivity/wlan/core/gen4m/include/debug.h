@@ -229,6 +229,7 @@ struct CHIP_DBG_OPS {
 	void (*showTxdInfo)(struct ADAPTER *prAdapter, u_int32_t fid);
 	bool (*showCsrInfo)(struct ADAPTER *prAdapter);
 	void (*showDmaschInfo)(struct ADAPTER *prAdapter);
+	void (*dumpMacInfo)(struct ADAPTER *prAdapter);
 	int32_t (*showWtblInfo)(
 		struct ADAPTER *prAdapter,
 		uint32_t u4Index,
@@ -556,12 +557,7 @@ void halShowPleInfo(IN struct ADAPTER *prAdapter,
 	u_int8_t fgDumpTxd);
 void halShowDmaschInfo(IN struct ADAPTER *prAdapter);
 void haldumpMacInfo(IN struct ADAPTER *prAdapter);
-void halGetPleTxdInfo(IN struct ADAPTER *prAdapter,
-		      uint32_t fid, uint32_t *result);
-void halGetPsePayload(IN struct ADAPTER *prAdapter,
-		      uint32_t fid, uint32_t *result);
 void halDumpTxdInfo(IN struct ADAPTER *prAdapter, uint32_t *tmac_info);
-void halShowLitePleInfo(IN struct ADAPTER *prAdapter);
 void halShowTxdInfo(
 	struct ADAPTER *prAdapter,
 	u_int32_t fid);

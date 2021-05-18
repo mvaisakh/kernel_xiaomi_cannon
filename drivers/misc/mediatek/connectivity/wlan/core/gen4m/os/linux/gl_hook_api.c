@@ -4632,8 +4632,11 @@ uint32_t ServiceWlanOid(void *winfos,
 
 		return WLAN_STATUS_SUCCESS;
 	case OP_WLAN_OID_GET_RECAL_CONTENT:
+		if (!rsp_data)
+			return WLAN_STATUS_INVALID_DATA;
+
 		if (prReCalInfo->u4Count > 0) {
-			kalMemCopy(u4BufLen, &prReCalInfo->prCalArray[0],
+			kalMemCopy(rsp_data, &prReCalInfo->prCalArray[0],
 			(prReCalInfo->u4Count * sizeof(struct RECAL_DATA_T)));
 		}
 

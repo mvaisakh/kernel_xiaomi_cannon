@@ -176,7 +176,7 @@
 #define DHCP_MAGIC_NUMBER                       0x63825363
 
 #define ARP_OPERATION_OFFSET                    6
-#define ARP_SNEDER_MAC_OFFSET                   8
+#define ARP_SENDER_MAC_OFFSET                   8
 #define ARP_SENDER_IP_OFFSET                    14
 #define ARP_TARGET_MAC_OFFSET                   18
 #define ARP_TARGET_IP_OFFSET                    24
@@ -838,6 +838,8 @@
 #define STATUS_CODE_DESTINATION_STA_NOT_QSTA        50
 /* Association denied because the ListenInterval is too large */
 #define STATUS_CODE_ASSOC_DENIED_LARGE_LIS_INTERVAL 51
+/* Invalid pairwise master key identifier (PMKID) */
+#define STATUS_INVALID_PMKID                        53
 
 /* proprietary definition of reserved field of Status Code */
 /* Join failure */
@@ -1065,6 +1067,10 @@
 	255	/* Reserved */
 
 #if CFG_SUPPORT_MBO
+
+#define MBO_IE_VENDOR_TYPE 0x506f9a16
+#define MBO_OUI_TYPE 22
+
 /* MBO v0.0_r19, 4.2: MBO Attributes */
 /* Table 4-5: MBO Attributes */
 /* OCE v0.0.10, Table 4-3: OCE Attributes */
@@ -1082,7 +1088,20 @@ enum MBO_ATTR_ID {
 	OCE_ATTR_ID_REDUCED_WAN_METRICS = 103,
 	OCE_ATTR_ID_RNR_COMPLETENESS = 104,
 };
-#endif
+
+/* MBO v0.0_r19, 4.2.7: Transition Rejection Reason Code Attribute */
+/* Table 4-21: Transition Rejection Reason Code Field Values */
+enum MBO_TRANSITION_REJECT_REASON {
+	MBO_TRANSITION_REJECT_REASON_UNSPECIFIED = 0,
+	MBO_TRANSITION_REJECT_REASON_FRAME_LOSS = 1,
+	MBO_TRANSITION_REJECT_REASON_DELAY = 2,
+	MBO_TRANSITION_REJECT_REASON_QOS_CAPACITY = 3,
+	MBO_TRANSITION_REJECT_REASON_RSSI = 4,
+	MBO_TRANSITION_REJECT_REASON_INTERFERENCE = 5,
+	MBO_TRANSITION_REJECT_REASON_SERVICES = 6,
+};
+
+#endif /* CFG_SUPPORT_MBO */
 
 /* 7.3.2.1 SSID element */
 #define ELEM_MAX_LEN_SSID                           32
@@ -1228,10 +1247,10 @@ enum BEACON_REPORT_DETAIL {
 #define MEASUREMENT_REPORT_MODE_REJECT_REFUSED BIT(2)
 
 /* 7.3.2.25 RSN information element */
-/* one pairwise, one AKM suite, one PMKID */
-#define ELEM_MAX_LEN_WPA                            34
-/* one pairwise, one AKM suite, one PMKID */
-#define ELEM_MAX_LEN_RSN                            38
+/* two pairwise, one AKM suite, one PMKID */
+#define ELEM_MAX_LEN_WPA                            38
+/* two pairwise, one AKM suite, one PMKID */
+#define ELEM_MAX_LEN_RSN                            42
 /* one pairwise, one AKM suite, one BKID */
 #define ELEM_MAX_LEN_WAPI                           38
 /* one pairwise, one AKM suite, one BKID */
@@ -1249,6 +1268,13 @@ enum BEACON_REPORT_DETAIL {
 #define ELEM_EXT_CAP_SCHEDULE_PSMP                  BIT(6)
 
 #define ELEM_EXT_CAP_BSS_TRANSITION_BIT             19
+#if CFG_TC10_FEATURE
+#define ELEM_EXT_CAP_PROXY_ARP_BIT                  12
+#define ELEM_EXT_CAP_TFS_BIT                        16
+#define ELEM_EXT_CAP_WNM_SLEEP_BIT                  17
+#define ELEM_EXT_CAP_TIM_BCAST_BIT                  18
+#define ELEM_EXT_CAP_DMS_BIT                        26
+#endif
 #define ELEM_EXT_CAP_MBSSID_BIT                     22
 #define ELEM_EXT_CAP_UTC_TSF_OFFSET_BIT             27
 #define ELEM_EXT_CAP_INTERWORKING_BIT               31
@@ -1295,6 +1321,11 @@ enum BEACON_REPORT_DETAIL {
 #define RRM_CAP_INFO_BEACON_TABLE_BIT               6
 #define RRM_CAP_INFO_TSM_BIT                        14
 #define RRM_CAP_INFO_RRM_BIT                        17
+
+#if CFG_TC10_FEATURE
+#define RRM_CAP_INFO_QBSS_LOAD_BIT                  9
+#define RRM_CAP_INFO_BSS_AVG_DELAY_BIT              31
+#endif
 
 /* 7.3.2.56 HT capabilities element */
 #define ELEM_MAX_LEN_HT_CAP \
@@ -1752,6 +1783,13 @@ enum BEACON_REPORT_DETAIL {
 #define VENDOR_IE_EPIGRAM_VHTTYPE1                  0x0400
 #define VENDOR_IE_EPIGRAM_VHTTYPE2                  0x0408
 #define VENDOR_IE_EPIGRAM_VHTTYPE3                  0x0418
+
+/* Cisco IE */
+#define VENDOR_IE_CISCO_OUI                        0x004096
+#define VENDOR_IE_CISCO_TYPE                       0x2C
+
+/* Samsung Electronics IE*/
+#define VENDOR_IE_SAMSUNG_OUI                      0x0000F0
 
 #if CFG_SUPPORT_PASSPOINT
 #define VENDOR_OUI_TYPE_HS20                        16
@@ -2634,6 +2672,14 @@ struct IE_VENDOR_EPIGRAM_IE {
 	uint8_t pucData[1];
 } __KAL_ATTRIB_PACKED__;
 
+struct IE_VENDOR_ADAPTIVE_11R_IE {
+	uint8_t ucId;
+	uint8_t ucLength;
+	uint8_t aucOui[3];
+	uint8_t aucVendorType[1];
+	uint8_t pucData[1];
+} __KAL_ATTRIB_PACKED__;
+
 /*8.4.1.50 Operating Mode field*/
 struct IE_VHT_OP_MODE_NOTIFICATION {
 	uint8_t ucId;
@@ -3256,6 +3302,38 @@ struct IE_MTK_OUI {
 	uint8_t aucCapability[4];
 	uint8_t aucInfoElem[1];
 } __KAL_ATTRIB_PACKED__;
+
+#if CFG_SUPPORT_ASSURANCE
+struct IE_ASSURANCE_ROAMING_REASON {
+	uint8_t ucId;
+	uint8_t ucLength;
+	uint8_t aucOui[3];
+	uint8_t ucOuiType;
+	uint8_t ucSubType;
+	uint8_t ucVersion;
+	uint8_t ucSubTypeReason;
+	uint8_t ucReason;
+	uint8_t ucSubTypeRcpi;
+	uint8_t ucRcpi;
+	uint8_t ucSubTypeRcpiThreshold;
+	uint8_t ucRcpiThreshold;
+	uint8_t ucSubTypeCuThreshold;
+	uint8_t ucCuThreshold;
+} __KAL_ATTRIB_PACKED__;
+
+struct IE_ASSURANCE_BEACON_REPORT {
+	uint8_t ucId;
+	uint8_t ucLength;
+	uint8_t aucOui[3];
+	uint8_t ucOuiType;
+	uint8_t ucSubType;
+	uint8_t ucVersion;
+	uint8_t ucLen;
+	uint8_t ucReason;
+} __KAL_ATTRIB_PACKED__;
+
+#endif
+
 
 struct SUB_IE_BSS_TERM_DURATION {
 	uint8_t ucSubId;

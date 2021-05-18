@@ -78,8 +78,7 @@
  *                              C O N S T A N T S
  *******************************************************************************
  */
-#define AIS_BG_SCAN_INTERVAL_MIN_SEC        2	/* 30 // exponential to 960 */
-#define AIS_BG_SCAN_INTERVAL_MAX_SEC        2	/* 960 // 16min */
+#define AIS_BG_SCAN_INTERVAL_MSEC	    10000 /* MSEC */
 
 #define AIS_DELAY_TIME_OF_DISCONNECT_SEC    5	/* 10 */
 
@@ -106,6 +105,12 @@
 
 /* Support AP Selection*/
 #define AIS_BLACKLIST_TIMEOUT               15 /* seconds */
+
+#define AIS_BTM_DIS_IMMI_TIMEOUT	    10000 /* MSEC */
+#define AIS_BTM_DIS_IMMI_STATE_0	    0
+#define AIS_BTM_DIS_IMMI_STATE_1	    1
+#define AIS_BTM_DIS_IMMI_STATE_2	    2
+#define AIS_BTM_DIS_IMMI_STATE_3	    3
 
 /*******************************************************************************
  *                             D A T A   T Y P E S
@@ -196,8 +201,12 @@ struct AIS_BLACKLIST_ITEM {
 	uint8_t ucSSIDLen;
 	uint8_t aucSSID[32];
 	OS_SYSTIME rAddTime;
-	uint32_t u4DisapperTime;
+	u_int8_t fgDeauthLastTime;
 	u_int8_t fgIsInFWKBlacklist;
+#if CFG_SUPPORT_MBO
+	uint8_t fgDisallowed;
+	uint16_t u2DisallowSec;
+#endif
 };
 /* end Support AP Selection */
 
@@ -205,16 +214,10 @@ struct AIS_FSM_INFO {
 	enum ENUM_AIS_STATE ePreviousState;
 	enum ENUM_AIS_STATE eCurrentState;
 
-	u_int8_t fgTryScan;
-
 	u_int8_t fgIsScanning;
 
 	u_int8_t fgIsChannelRequested;
 	u_int8_t fgIsChannelGranted;
-
-#if CFG_SUPPORT_ROAMING
-	u_int8_t fgIsRoamingScanPending;
-#endif				/* CFG_SUPPORT_ROAMING */
 
 	uint8_t ucAvailableAuthTypes;	/* Used for AUTH_MODE_AUTO_SWITCH */
 
@@ -238,7 +241,14 @@ struct AIS_FSM_INFO {
 
 	struct TIMER rDeauthDoneTimer;
 
+#if CFG_SUPPORT_DETECT_SECURITY_MODE_CHANGE
 	struct TIMER rSecModeChangeTimer;
+#endif
+
+#if CFG_SUPPORT_DFS
+	struct TIMER rCSATimer;
+#endif
+	struct TIMER rBtmRespTxDoneTimer;
 
 	uint8_t ucSeqNumOfReqMsg;
 	uint8_t ucSeqNumOfChReq;
@@ -254,6 +264,7 @@ struct AIS_FSM_INFO {
 	uint32_t u4ChGrantedInterval;
 
 	uint8_t ucConnTrialCount;
+	uint8_t ucConnTrialCountLimit;
 
 	struct PARAM_SCAN_REQUEST_ADV rScanRequest;
 	uint8_t aucScanIEBuf[MAX_IE_LENGTH];
@@ -284,6 +295,11 @@ struct AIS_FSM_INFO {
 
 	/* Scan target channel when device roaming */
 	uint8_t fgTargetChnlScanIssued;
+
+#if CFG_TC10_FEATURE
+	/* roaming count */
+	uint16_t u2ConnectedCount;
+#endif
 };
 
 struct AIS_OFF_CHNL_TX_REQ_INFO {
@@ -304,15 +320,23 @@ enum WNM_AIS_BSS_TRANSITION {
 	BSS_TRANSITION_DISASSOC,
 	BSS_TRANSITION_MAX_NUM
 };
-struct MSG_AIS_BSS_TRANSITION_T {
+struct MSG_AIS_BSS_TRANSITION {
 	struct MSG_HDR rMsgHdr;	/* Must be the first member */
-	uint8_t ucToken;
-	u_int8_t fgNeedResponse;
-	uint8_t ucValidityInterval;
-	enum WNM_AIS_BSS_TRANSITION eTransitionType;
-	uint16_t u2CandListLen;
-	uint8_t *pucCandList;
 	uint8_t ucBssIndex;
+};
+
+enum WPA3_STATUS_REPORT {
+	WPA3_NO_NETWORK_FOUND = 1025,
+	WPA3_AUTH_OPEN_NO_ACK,
+	WPA3_AUTH_OPEN_NO_RESP,
+	WPA3_AUTH_OPEN_SENDING_FAIL,
+	WPA3_AUTH_SAE_NO_ACK,
+	WPA3_AUTH_SAE_NO_RESP,
+	WPA3_AUTH_SAE_SENDING_FAIL,
+	WPA3_ASSOC_NO_ACK,
+	WPA3_ASSOC_NO_RESP,
+	WPA3_ASSOC_SENDING_FAIL,
+	WPA3_STATUS_REPORT_NUM
 };
 /*******************************************************************************
  *                            P U B L I C   D A T A
@@ -343,7 +367,10 @@ void aisFsmInit(IN struct ADAPTER *prAdapter, uint8_t ucBssIndex);
 
 void aisFsmUninit(IN struct ADAPTER *prAdapter, uint8_t ucBssIndex);
 
-bool aisFsmIsInProcessBeaconTimeout(IN struct ADAPTER *prAdapter,
+bool aisFsmIsInProcessPostpone(IN struct ADAPTER *prAdapter,
+	uint8_t ucBssIndex);
+
+bool aisFsmIsInBeaconTimeout(IN struct ADAPTER *prAdapter,
 	uint8_t ucBssIndex);
 
 void aisFsmStateInit_JOIN(IN struct ADAPTER *prAdapter,
@@ -465,13 +492,16 @@ void aisBssBeaconTimeout(IN struct ADAPTER *prAdapter,
 	IN uint8_t ucBssIndex);
 
 void aisBssBeaconTimeout_impl(IN struct ADAPTER *prAdapter,
-	IN uint8_t ucReason, IN uint8_t ucBssIndex);
+	IN uint8_t ucBcnTimeoutReason, IN uint8_t ucDisconnectReason,
+	IN uint8_t ucBssIndex);
 
 void aisBssLinkDown(IN struct ADAPTER *prAdapter,
 	IN uint8_t ucBssIndex);
 
+#if CFG_SUPPORT_DETECT_SECURITY_MODE_CHANGE
 void aisBssSecurityChanged(IN struct ADAPTER *prAdapter,
 	IN uint8_t ucBssIndex);
+#endif
 
 uint32_t
 aisDeauthXmitComplete(IN struct ADAPTER *prAdapter,
@@ -519,8 +549,15 @@ void aisFsmRunEventChannelTimeout(IN struct ADAPTER
 void aisFsmRunEventDeauthTimeout(IN struct ADAPTER
 				 *prAdapter, unsigned long ulParamPtr);
 
+#if CFG_SUPPORT_DETECT_SECURITY_MODE_CHANGE
 void aisFsmRunEventSecModeChangeTimeout(IN struct ADAPTER
 					*prAdapter, unsigned long ulParamPtr);
+#endif
+
+#if CFG_SUPPORT_DFS
+void aisFsmRunEventCSACountTimeOut(IN struct ADAPTER *prAdapter,
+				   unsigned long ulParamPtr);
+#endif
 
 /*----------------------------------------------------------------------------*/
 /* OID/IOCTL Handling                                                         */
@@ -542,6 +579,9 @@ u_int8_t aisFsmIsRequestPending(IN struct ADAPTER *prAdapter,
 				IN u_int8_t bRemove,
 				IN uint8_t ucBssIndex);
 
+void aisFsmRemoveRoamingRequest(
+	IN struct ADAPTER *prAdapter, IN uint8_t ucBssIndex);
+
 struct AIS_REQ_HDR *aisFsmGetNextRequest(IN struct ADAPTER *prAdapter,
 				IN uint8_t ucBssIndex);
 
@@ -550,6 +590,10 @@ u_int8_t aisFsmInsertRequest(IN struct ADAPTER *prAdapter,
 			     IN uint8_t ucBssIndex);
 
 u_int8_t aisFsmInsertRequestToHead(IN struct ADAPTER *prAdapter,
+			     IN enum ENUM_AIS_REQUEST_TYPE eReqType,
+			     IN uint8_t ucBssIndex);
+
+u_int8_t aisFsmClearRequest(IN struct ADAPTER *prAdapter,
 			     IN enum ENUM_AIS_REQUEST_TYPE eReqType,
 			     IN uint8_t ucBssIndex);
 
@@ -565,17 +609,25 @@ aisFuncTxMgmtFrame(IN struct ADAPTER *prAdapter,
 void aisFsmRunEventMgmtFrameTx(IN struct ADAPTER *prAdapter,
 				IN struct MSG_HDR *prMsgHdr);
 
+#if CFG_SUPPORT_NCHO
+void aisFsmRunEventNchoActionFrameTx(IN struct ADAPTER *prAdapter,
+				IN struct MSG_HDR *prMsgHdr);
+#endif
+
 void aisFuncValidateRxActionFrame(IN struct ADAPTER *prAdapter,
 				IN struct SW_RFB *prSwRfb);
 
 void aisFsmRunEventBssTransition(IN struct ADAPTER *prAdapter,
 				IN struct MSG_HDR *prMsgHdr);
 
+void aisFsmBtmRespTxDoneTimeout(
+	IN struct ADAPTER *prAdapter, unsigned long ulParam);
+
 void aisFsmRunEventCancelTxWait(IN struct ADAPTER *prAdapter,
 		IN struct MSG_HDR *prMsgHdr);
 
 enum ENUM_AIS_STATE aisFsmStateSearchAction(
-	IN struct ADAPTER *prAdapter, uint8_t ucPhase, uint8_t ucBssIndex);
+	IN struct ADAPTER *prAdapter, uint8_t ucBssIndex);
 #if defined(CFG_TEST_MGMT_FSM) && (CFG_TEST_MGMT_FSM != 0)
 void aisTest(void);
 #endif /* CFG_TEST_MGMT_FSM */
@@ -591,12 +643,14 @@ struct AIS_BLACKLIST_ITEM *aisQueryBlackList(struct ADAPTER *prAdapter,
 /* end Support AP Selection */
 
 /* Support 11K */
-void aisResetNeighborApList(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex);
 #if CFG_SUPPORT_802_11K
-void aisCollectNeighborAP(struct ADAPTER *prAdapter, uint8_t *pucApBuf,
+uint32_t aisCollectNeighborAP(struct ADAPTER *prAdapter, uint8_t *pucApBuf,
 			  uint16_t u2ApBufLen, uint8_t ucValidInterval,
 			  uint8_t ucBssIndex);
+void aisResetNeighborApList(struct ADAPTER *prAdapter,
+	uint8_t ucBssIndex);
+uint8_t aisCheckNeighborApValidity(IN struct ADAPTER *prAdapter,
+	uint8_t ucBssIndex);
 #endif
 void aisSendNeighborRequest(struct ADAPTER *prAdapter,
 	uint8_t ucBssIndex);
@@ -617,7 +671,7 @@ struct AIS_SPECIFIC_BSS_INFO *aisGetAisSpecBssInfo(
 	IN struct ADAPTER *prAdapter,
 	IN uint8_t ucBssIndex);
 
-struct BSS_TRANSITION_MGT_PARAM_T *
+struct BSS_TRANSITION_MGT_PARAM *
 	aisGetBTMParam(
 	IN struct ADAPTER *prAdapter,
 	IN uint8_t ucBssIndex);
@@ -645,9 +699,11 @@ uint8_t aisGetTargetBssDescChannel(
 	IN struct ADAPTER *prAdapter,
 	IN uint8_t ucBssIndex);
 
+#if CFG_SUPPORT_DETECT_SECURITY_MODE_CHANGE
 struct TIMER *aisGetSecModeChangeTimer(
 	IN struct ADAPTER *prAdapter,
 	IN uint8_t ucBssIndex);
+#endif
 
 struct TIMER *aisGetScanDoneTimer(
 	IN struct ADAPTER *prAdapter,
@@ -720,6 +776,10 @@ struct GL_DETECT_REPLAY_INFO *
 	IN struct ADAPTER *prAdapter,
 	IN uint8_t ucBssIndex);
 #endif
+
+uint8_t *
+	aisGetFsmState(
+	IN enum ENUM_AIS_STATE);
 
 struct FT_IES *
 	aisGetFtIe(

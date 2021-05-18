@@ -154,4 +154,13 @@ uint32_t assocCalculateConnIELen(struct ADAPTER *prAdapter, uint8_t ucBssIdx,
 void assocGenerateConnIE(struct ADAPTER *prAdapter,
 			   struct MSDU_INFO *prMsduInfo);
 
+#if CFG_SUPPORT_ASSURANCE
+
+uint32_t assocCalculateRoamReasonLen(struct ADAPTER *prAdapter,
+		uint8_t ucBssIdx, struct STA_RECORD *prStaRec);
+
+void assocGenerateRoamReason(struct ADAPTER *prAdapter,
+	struct MSDU_INFO *prMsduInfo);
+
+#endif
 #endif /* _ASSOC_H */

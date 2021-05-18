@@ -279,6 +279,10 @@ void nicTxInitialize(IN struct ADAPTER *prAdapter)
 #endif
 
 	prTxCtrl->i4PendingFwdFrameCount = 0;
+	prTxCtrl->i4PendingFwdFrameWMMCount[WMM_AC_BE_INDEX] = 0;
+	prTxCtrl->i4PendingFwdFrameWMMCount[WMM_AC_BK_INDEX] = 0;
+	prTxCtrl->i4PendingFwdFrameWMMCount[WMM_AC_VI_INDEX] = 0;
+	prTxCtrl->i4PendingFwdFrameWMMCount[WMM_AC_VO_INDEX] = 0;
 
 	/* Assign init value */
 	/* Tx sequence number */
@@ -450,6 +454,9 @@ uint32_t nicTxAcquireResourcePLE(IN struct ADAPTER
 	prTxCtrl = &prAdapter->rTxCtrl;
 	prTc = &prTxCtrl->rTc;
 
+	if (ucTC >= TC_NUM)
+		return WLAN_STATUS_FAILURE;
+
 	if (!nicTxResourceIsPleCtrlNeeded(prAdapter, ucTC))
 		return WLAN_STATUS_SUCCESS;
 
@@ -511,7 +518,7 @@ uint32_t nicTxAcquireResource(IN struct ADAPTER *prAdapter,
 	KAL_SPIN_LOCK_DECLARATION();
 
 	/* enable/disable TX resource control */
-	if (!prAdapter->rTxCtrl.fgIsTxResourceCtrl)
+	if (!prAdapter->rTxCtrl.fgIsTxResourceCtrl || ucTC >= TC_NUM)
 		return WLAN_STATUS_SUCCESS;
 
 	ASSERT(prAdapter);
@@ -673,7 +680,7 @@ u_int8_t nicTxReleaseResource(IN struct ADAPTER *prAdapter,
 
 	ASSERT(prAdapter);
 	/* enable/disable TX resource control */
-	if (!prAdapter->rTxCtrl.fgIsTxResourceCtrl)
+	if (!prAdapter->rTxCtrl.fgIsTxResourceCtrl || ucTc >= TC_NUM)
 		return TRUE;
 
 	/* No need to do PLE resource control */
@@ -1313,6 +1320,7 @@ uint32_t nicTxMsduInfoListMthread(IN struct ADAPTER
 				ASSERT(0);
 		}
 		nicTxFillDataDesc(prAdapter, prMsduInfo);
+		GLUE_INC_REF_CNT(prAdapter->rHifStats.u4DataInCount);
 
 		prMsduInfo = prNextMsduInfo;
 	}
@@ -1573,12 +1581,20 @@ void nicTxMsduQueueByRR(struct ADAPTER *prAdapter)
 		if (QUEUE_IS_NOT_EMPTY(prTxQue)) {
 			QUEUE_REMOVE_HEAD(prTxQue, prMsduInfo,
 					  struct MSDU_INFO *);
-			ucPortIdx = halTxRingDataSelect(prAdapter, prMsduInfo);
-			prDataPort = (ucPortIdx == TX_RING_DATA1_IDX_1) ?
-				prDataPort1 : prDataPort0;
-			QUEUE_INSERT_TAIL(prDataPort,
-					  (struct QUE_ENTRY *) prMsduInfo);
-			au4TxCnt[u4Idx]++;
+			if (prMsduInfo != NULL) {
+				ucPortIdx = halTxRingDataSelect(
+					prAdapter, prMsduInfo);
+				prDataPort =
+					(ucPortIdx == TX_RING_DATA1_IDX_1) ?
+					prDataPort1 : prDataPort0;
+				QUEUE_INSERT_TAIL(prDataPort,
+					(struct QUE_ENTRY *) prMsduInfo);
+				au4TxCnt[u4Idx]++;
+			} else {
+				/* unset empty queue */
+				u4IsNotAllQueneEmpty &= ~BIT(u4Idx);
+				DBGLOG(NIC, WARN, "prMsduInfo is NULL\n");
+			}
 		} else {
 			/* unset empty queue */
 			u4IsNotAllQueneEmpty &= ~BIT(u4Idx);
@@ -1795,6 +1811,8 @@ nicTxFillDesc(IN struct ADAPTER *prAdapter,
 			prStaRec->aprTxDescTemplate[prMsduInfo->ucUserPriority];
 	}
 	if (prTxDescTemplate) {
+		prMsduInfo->ucWlanIndex = nicTxGetWlanIdx(prAdapter,
+			prMsduInfo->ucBssIndex, prMsduInfo->ucStaRecIndex);
 		if (prMsduInfo->ucPacketType == TX_PACKET_TYPE_DATA)
 			kalMemCopy(prTxDesc, prTxDescTemplate,
 				u4TxDescLength + prChipInfo->txd_append_size);
@@ -2244,6 +2262,8 @@ uint32_t nicTxMsduQueue(IN struct ADAPTER *prAdapter,
 #endif
 
 	while (QUEUE_IS_NOT_EMPTY(prQue)) {
+		u_int8_t fgTxDoneHandler;
+
 		QUEUE_REMOVE_HEAD(prQue, prMsduInfo, struct MSDU_INFO *);
 
 		if (prMsduInfo == NULL) {
@@ -2257,6 +2277,9 @@ uint32_t nicTxMsduQueue(IN struct ADAPTER *prAdapter,
 			break;
 		}
 
+		fgTxDoneHandler = prMsduInfo->pfTxDoneHandler ?
+				TRUE : FALSE;
+
 #if !CFG_SUPPORT_MULTITHREAD
 		nicTxFillDataDesc(prAdapter, prMsduInfo);
 #endif
@@ -2268,7 +2291,16 @@ uint32_t nicTxMsduQueue(IN struct ADAPTER *prAdapter,
 					       PHASE_HIF_TX);
 		}
 
-		if (prMsduInfo->pfTxDoneHandler) {
+		if (!fgTxDoneHandler)
+			wlanTxProfilingTagMsdu(prAdapter, prMsduInfo,
+						TX_PROF_TAG_DRV_TX_DONE);
+
+#if (CFG_SUPPORT_STATISTICS == 1)
+		StatsEnvTxTime2Hif(prAdapter, prMsduInfo);
+#endif
+		HAL_WRITE_TX_DATA(prAdapter, prMsduInfo);
+
+		if (fgTxDoneHandler) {
 			KAL_SPIN_LOCK_DECLARATION();
 
 			/* Record native packet pointer for Tx done log */
@@ -2296,14 +2328,7 @@ uint32_t nicTxMsduQueue(IN struct ADAPTER *prAdapter,
 			cnmTimerStartTimer(prAdapter,
 				&prMsduInfo->rLifetimeTimer,
 				NIC_TX_REMAINING_LIFE_TIME);
-		} else
-			wlanTxLifetimeTagPacket(prAdapter, prMsduInfo,
-						TX_PROF_TAG_DRV_TX_DONE);
-
-#if (CFG_SUPPORT_STATISTICS == 1)
-		StatsEnvTxTime2Hif(prAdapter, prMsduInfo);
-#endif
-		HAL_WRITE_TX_DATA(prAdapter, prMsduInfo);
+		}
 	}
 
 	HAL_KICK_TX_DATA(prAdapter);
@@ -2592,6 +2617,9 @@ void nicTxFreePacket(IN struct ADAPTER *prAdapter,
 			cnmMemFree(prAdapter, prNativePacket);
 	} else if (prMsduInfo->eSrc == TX_PACKET_FORWARDING) {
 		GLUE_DEC_REF_CNT(prTxCtrl->i4PendingFwdFrameCount);
+		GLUE_DEC_REF_CNT(prTxCtrl
+			->i4PendingFwdFrameWMMCount[
+			aucACI2TxQIdx[aucTid2ACI[prMsduInfo->ucUserPriority]]]);
 	}
 }
 
@@ -2717,9 +2745,6 @@ u_int8_t nicTxFillMsduInfo(IN struct ADAPTER *prAdapter,
 			   IN struct MSDU_INFO *prMsduInfo, IN void *prPacket)
 {
 	struct GLUE_INFO *prGlueInfo;
-#if CFG_CHANGE_CRITICAL_PACKET_PRIORITY
-	struct BSS_INFO *prBssInfo;
-#endif
 
 	ASSERT(prAdapter);
 
@@ -2798,22 +2823,6 @@ u_int8_t nicTxFillMsduInfo(IN struct ADAPTER *prAdapter,
 		    GLUE_TEST_PKT_FLAG(prPacket, ENUM_PKT_1X)) {
 			/* Set BSS/STA lowest basic rate */
 			prMsduInfo->ucRateMode = MSDU_RATE_MODE_LOWEST_RATE;
-
-#if CFG_CHANGE_CRITICAL_PACKET_PRIORITY
-			/* Set higher priority */
-		if (prMsduInfo->ucBssIndex <= MAX_BSSID_NUM) {
-			prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter,
-				prMsduInfo->ucBssIndex);
-			if (GLUE_TEST_PKT_FLAG(prPacket, ENUM_PKT_ARP) &&
-			   prBssInfo && (prBssInfo->u4PrivateData < BSS_P2P_NUM)
-				&& p2pFuncIsAPMode(
-				prAdapter->rWifiVar.prP2PConnSettings
-				[prBssInfo->u4PrivateData])) {
-			prMsduInfo->ucUserPriority = NIC_TX_CRITICAL_DATA_TID;
-			prMsduInfo->ucTC = HIF_TX_AC3_INDEX;
-				}
-			}
-#endif
 		}
 	}
 
@@ -3010,6 +3019,7 @@ uint32_t nicTxInitCmd(IN struct ADAPTER *prAdapter,
 	ASSERT(u2OverallBufferLength <=
 	       prAdapter->u4CoalescingBufCachedSize);
 
+	GLUE_INC_REF_CNT(prAdapter->rHifStats.u4CmdInCount);
 	/* <2> Write frame to data port */
 	HAL_WRITE_TX_PORT(prAdapter, u2Port/*NIC_TX_INIT_CMD_PORT*/,
 			  (uint32_t) u2OverallBufferLength,
@@ -4113,7 +4123,7 @@ nicTxDummyTxDone(IN struct ADAPTER *prAdapter,
 		 IN struct MSDU_INFO *prMsduInfo,
 		 IN enum ENUM_TX_RESULT_CODE rTxDoneStatus)
 {
-	struct PERF_MONITOR_T *prPerMonitor = &prAdapter->rPerMonitor;
+	struct PERF_MONITOR *prPerMonitor = &prAdapter->rPerMonitor;
 
 	if (rTxDoneStatus == 0) {
 		prPerMonitor->ulTotalTxSuccessCount++;
@@ -4886,6 +4896,11 @@ static uint32_t nicTxDirectStartXmitMain(struct sk_buff
 				&prAdapter->rTxDirectHifQueue[ucHifTc],
 				prQueueEntry, struct QUE_ENTRY *);
 			prMsduInfo = (struct MSDU_INFO *) prQueueEntry;
+			if (prMsduInfo == NULL) {
+				DBGLOG(TX, WARN,
+					"prMsduInfo is NULL\n");
+				break;
+			}
 		} else {
 			break;
 		}
@@ -4904,11 +4919,21 @@ static uint32_t nicTxDirectStartXmitMain(struct sk_buff
  * \retval none
  */
 /*----------------------------------------------------------------------------*/
+#if KERNEL_VERSION(4, 15, 0) <= LINUX_VERSION_CODE
+void nicTxDirectTimerCheckSkbQ(struct timer_list *timer)
+#else
 void nicTxDirectTimerCheckSkbQ(unsigned long data)
+#endif
+
 {
+#if KERNEL_VERSION(4, 15, 0) <= LINUX_VERSION_CODE
+	struct ADAPTER *prAdapter =
+		from_timer(prAdapter, timer, rTxDirectSkbTimer);
+	struct GLUE_INFO *prGlueInfo = prAdapter->prGlueInfo;
+#else
 	struct GLUE_INFO *prGlueInfo = (struct GLUE_INFO *)data;
 	struct ADAPTER *prAdapter = prGlueInfo->prAdapter;
-
+#endif
 	if (skb_queue_len(&prAdapter->rTxDirectSkbQueue))
 		nicTxDirectStartXmit(NULL, prGlueInfo);
 	else
@@ -4926,10 +4951,20 @@ void nicTxDirectTimerCheckSkbQ(unsigned long data)
  * \retval none
  */
 /*----------------------------------------------------------------------------*/
+#if KERNEL_VERSION(4, 15, 0) <= LINUX_VERSION_CODE
+void nicTxDirectTimerCheckHifQ(struct timer_list *timer)
+#else
 void nicTxDirectTimerCheckHifQ(unsigned long data)
+#endif
 {
+#if KERNEL_VERSION(4, 15, 0) <= LINUX_VERSION_CODE
+	struct ADAPTER *prAdapter =
+		from_timer(prAdapter, timer, rTxDirectHifTimer);
+	struct GLUE_INFO *prGlueInfo = prAdapter->prGlueInfo;
+#else
 	struct GLUE_INFO *prGlueInfo = (struct GLUE_INFO *)data;
 	struct ADAPTER *prAdapter = prGlueInfo->prAdapter;
+#endif
 	uint8_t ucHifTc = 0;
 	uint32_t u4StaPsBitmap, u4BssAbsentBitmap;
 	uint8_t ucStaRecIndex, ucBssIndex;
@@ -5070,7 +5105,7 @@ end:
 
 void nicTxResourceUpdate_v1(IN struct ADAPTER *prAdapter)
 {
-	uint8_t string[128], idx, i, tc_num;
+	uint8_t string[128], idx, i, tc_num, ret = 0;
 	uint32_t u4share, u4remains;
 	struct WIFI_VAR *prWifiVar = &prAdapter->rWifiVar;
 	uint32_t *pau4TcPageCount;
@@ -5153,13 +5188,17 @@ void nicTxResourceUpdate_v1(IN struct ADAPTER *prAdapter)
 
 		/* construct prefix: Tc0Page, Tc1Page... */
 		memset(string, 0, sizeof(string) / sizeof(uint8_t));
-		snprintf(string, sizeof(string) / sizeof(uint8_t),
+		ret = snprintf(string, sizeof(string) / sizeof(uint8_t),
 			 "Tc%xPage", idx);
-
-		/* update the final value */
-		prWifiVar->au4TcPageCount[idx] =
-			(uint32_t) wlanCfgGetUint32(prAdapter,
-	    string, prWifiVar->au4TcPageCount[idx]);
+		if (ret > (sizeof(string) / sizeof(uint8_t))) {
+			DBGLOG(NIC, INFO,
+			"sprintf failed of page count:%d\n", ret);
+		} else {
+			/* update the final value */
+			prWifiVar->au4TcPageCount[idx] =
+				(uint32_t) wlanCfgGetUint32(prAdapter,
+				string, prWifiVar->au4TcPageCount[idx]);
+		}
 	}
 
 #if QM_ADAPTIVE_TC_RESOURCE_CTRL
@@ -5168,13 +5207,17 @@ void nicTxResourceUpdate_v1(IN struct ADAPTER *prAdapter)
 
 		/* construct prefix: Tc0Grt, Tc1Grt... */
 		memset(string, 0, sizeof(string) / sizeof(uint8_t));
-		snprintf(string, sizeof(string) / sizeof(uint8_t),
+		ret = snprintf(string, sizeof(string) / sizeof(uint8_t),
 			 "Tc%xGrt", idx);
-
-		/* update the final value */
-		prQM->au4GuaranteedTcResource[idx] =
-			(uint32_t) wlanCfgGetUint32(prAdapter,
-	    string, prQM->au4GuaranteedTcResource[idx]);
+		if (ret > (sizeof(string) / sizeof(uint8_t))) {
+			DBGLOG(NIC, INFO,
+			"sprintf failed of guaranteed page count:%d\n", ret);
+		} else {
+			/* update the final value */
+			prQM->au4GuaranteedTcResource[idx] =
+				(uint32_t) wlanCfgGetUint32(prAdapter,
+				string, prQM->au4GuaranteedTcResource[idx]);
+		}
 	}
 #endif /* end of #if QM_ADAPTIVE_TC_RESOURCE_CTRL */
 #endif /* end of #if CFG_SUPPORT_CFG_FILE */

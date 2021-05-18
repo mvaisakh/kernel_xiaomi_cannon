@@ -134,7 +134,7 @@ static u_int8_t cnmTimerSetTimer(IN struct ADAPTER *prAdapter,
 		fgNeedWakeLock = TRUE;
 
 		if (!prRootTimer->fgWakeLocked) {
-			KAL_WAKE_LOCK(prAdapter, &prRootTimer->rWakeLock);
+			KAL_WAKE_LOCK(prAdapter, prRootTimer->rWakeLock);
 			prRootTimer->fgWakeLocked = TRUE;
 		}
 	} else {
@@ -169,7 +169,7 @@ void cnmTimerInitialize(IN struct ADAPTER *prAdapter)
 	LINK_INITIALIZE(&prRootTimer->rLinkHead);
 	KAL_RELEASE_SPIN_LOCK(prAdapter, SPIN_LOCK_TIMER);
 
-	KAL_WAKE_LOCK_INIT(prAdapter, &prRootTimer->rWakeLock, "WLAN Timer");
+	KAL_WAKE_LOCK_INIT(prAdapter, prRootTimer->rWakeLock, "WLAN Timer");
 	prRootTimer->fgWakeLocked = FALSE;
 }
 
@@ -194,10 +194,10 @@ void cnmTimerDestroy(IN struct ADAPTER *prAdapter)
 	prRootTimer = &prAdapter->rRootTimer;
 
 	if (prRootTimer->fgWakeLocked) {
-		KAL_WAKE_UNLOCK(prAdapter, &prRootTimer->rWakeLock);
+		KAL_WAKE_UNLOCK(prAdapter, prRootTimer->rWakeLock);
 		prRootTimer->fgWakeLocked = FALSE;
 	}
-	KAL_WAKE_LOCK_DESTROY(prAdapter, &prRootTimer->rWakeLock);
+	KAL_WAKE_LOCK_DESTROY(prAdapter, prRootTimer->rWakeLock);
 
 	KAL_ACQUIRE_SPIN_LOCK(prAdapter, SPIN_LOCK_TIMER);
 	LINK_INITIALIZE(&prRootTimer->rLinkHead);
@@ -259,7 +259,7 @@ cnmTimerInitTimerOption(IN struct ADAPTER *prAdapter,
 		/* Remove dead timer to prevent infinite loop */
 		LINK_REMOVE_KNOWN_ENTRY(&prAdapter->rRootTimer.rLinkHead,
 			&prTimer->rLinkEntry);
-		kal_show_stack(prAdapter, NULL, NULL);
+		dump_stack();
 	}
 
 	LINK_ENTRY_INITIALIZE(&prTimer->rLinkEntry);
@@ -308,7 +308,7 @@ static void cnmTimerStopTimer_impl(IN struct ADAPTER *prAdapter,
 
 			if (fgAcquireSpinlock && prRootTimer->fgWakeLocked) {
 				KAL_WAKE_UNLOCK(prAdapter,
-					&prRootTimer->rWakeLock);
+					prRootTimer->rWakeLock);
 				prRootTimer->fgWakeLocked = FALSE;
 			}
 		}
@@ -492,9 +492,7 @@ void cnmTimerDoTimeOutCheck(IN struct ADAPTER *prAdapter)
 			} else {
 				log_dbg(CNM, WARN, "timer was re-inited, func %p\n",
 					prTimer->pfMgmtTimeOutFunc);
-				/* Remove dead timer to prevent infinite loop */
-				LINK_REMOVE_KNOWN_ENTRY(&prRootTimer->rLinkHead,
-					&prTimer->rLinkEntry);
+				break;
 			}
 
 			/* Search entire list again because of nest del and add
@@ -535,7 +533,7 @@ void cnmTimerDoTimeOutCheck(IN struct ADAPTER *prAdapter)
 	}
 
 	if (prRootTimer->fgWakeLocked && !fgNeedWakeLock) {
-		KAL_WAKE_UNLOCK(prAdapter, &prRootTimer->rWakeLock);
+		KAL_WAKE_UNLOCK(prAdapter, prRootTimer->rWakeLock);
 		prRootTimer->fgWakeLocked = FALSE;
 	}
 

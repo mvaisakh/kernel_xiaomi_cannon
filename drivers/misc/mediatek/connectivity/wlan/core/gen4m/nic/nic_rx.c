@@ -1009,6 +1009,33 @@ void nicRxProcessPktWithoutReorder(IN struct ADAPTER
 	nicRxReturnRFB(prAdapter, prSwRfb);
 }
 
+u_int8_t nicRxCheckForwardPktResource(
+	IN struct ADAPTER *prAdapter, uint32_t ucTid)
+{
+	struct TX_CTRL *prTxCtrl;
+	uint8_t i, uTxQidx;
+
+	prTxCtrl = &prAdapter->rTxCtrl;
+	uTxQidx = aucACI2TxQIdx[aucTid2ACI[ucTid]];
+
+	/* If the resource used more than half, we could control WMM resource
+	 * by limit every AC queue.
+	 */
+	for (i = uTxQidx+1; i < WMM_AC_INDEX_NUM; i++) {
+		if (GLUE_GET_REF_CNT(prTxCtrl
+			->i4PendingFwdFrameWMMCount[uTxQidx]) >=
+			GLUE_GET_REF_CNT(prTxCtrl
+			->i4PendingFwdFrameWMMCount[i]) &&
+			GLUE_GET_REF_CNT(prTxCtrl
+			->i4PendingFwdFrameWMMCount[i]) > 0 &&
+			GLUE_GET_REF_CNT(prTxCtrl
+			->i4PendingFwdFrameCount) > prAdapter
+			->rQM.u4MaxForwardBufferCount)
+			return FALSE;
+	}
+	return TRUE;
+}
+
 /*----------------------------------------------------------------------------*/
 /*!
  * @brief Process forwarding data packet
@@ -1037,6 +1064,24 @@ void nicRxProcessForwardPkt(IN struct ADAPTER *prAdapter,
 	prTxCtrl = &prAdapter->rTxCtrl;
 	prRxCtrl = &prAdapter->rRxCtrl;
 
+	if (prSwRfb->ucTid >= TX_DESC_TID_NUM) {
+		DBGLOG_LIMITED(RX, WARN,
+		       "Wrong forward packet: tid:%d\n", prSwRfb->ucTid);
+		prSwRfb->ucTid = 0;
+	}
+
+	if (!nicRxCheckForwardPktResource(prAdapter, prSwRfb->ucTid)) {
+		nicRxReturnRFB(prAdapter, prSwRfb);
+		return;
+	}
+
+	DBGLOG_LIMITED(RX, TRACE, "to forward packet: %d,%d,%d,%d,%d\n",
+		GLUE_GET_REF_CNT(prTxCtrl->i4PendingFwdFrameWMMCount[0]),
+		GLUE_GET_REF_CNT(prTxCtrl->i4PendingFwdFrameWMMCount[1]),
+		GLUE_GET_REF_CNT(prTxCtrl->i4PendingFwdFrameWMMCount[2]),
+		GLUE_GET_REF_CNT(prTxCtrl->i4PendingFwdFrameWMMCount[3]),
+		GLUE_GET_REF_CNT(prTxCtrl->i4PendingFwdFrameCount));
+
 	prMsduInfo = cnmPktAlloc(prAdapter, 0);
 
 	if (prMsduInfo &&
@@ -1057,13 +1102,31 @@ void nicRxProcessForwardPkt(IN struct ADAPTER *prAdapter,
 		prMsduInfo->eSrc = TX_PACKET_FORWARDING;
 		prMsduInfo->ucBssIndex = secGetBssIdxByWlanIdx(prAdapter,
 					 prSwRfb->ucWlanIdx);
+		prMsduInfo->ucUserPriority = prSwRfb->ucTid;
 
 		/* release RX buffer (to rIndicatedRfbList) */
 		prSwRfb->pvPacket = NULL;
 		nicRxReturnRFB(prAdapter, prSwRfb);
 
+		/* Handle if prMsduInfo out of bss index range*/
+		if (prMsduInfo->ucBssIndex > MAX_BSSID_NUM) {
+			DBGLOG(QM, INFO,
+			    "Invalid bssidx:%u\n", prMsduInfo->ucBssIndex);
+			if (prMsduInfo->pfTxDoneHandler != NULL)
+				prMsduInfo->pfTxDoneHandler(prAdapter,
+						prMsduInfo,
+						TX_RESULT_DROPPED_IN_DRIVER);
+			nicTxReturnMsduInfo(prAdapter, prMsduInfo);
+			return;
+		}
+
 		/* increase forward frame counter */
 		GLUE_INC_REF_CNT(prTxCtrl->i4PendingFwdFrameCount);
+
+		/* add resource control for WMM forward packet */
+		GLUE_INC_REF_CNT(prTxCtrl
+			->i4PendingFwdFrameWMMCount[
+			aucACI2TxQIdx[aucTid2ACI[prSwRfb->ucTid]]]);
 
 		/* send into TX queue */
 		KAL_ACQUIRE_SPIN_LOCK(prAdapter, SPIN_LOCK_QM_TX_QUEUE);
@@ -1082,8 +1145,9 @@ void nicRxProcessForwardPkt(IN struct ADAPTER *prAdapter,
 	} else {		/* no TX resource */
 		DBGLOG(QM, INFO, "No Tx MSDU_INFO for forwarding frames\n");
 		nicRxReturnRFB(prAdapter, prSwRfb);
+		if (prMsduInfo)
+			nicTxReturnMsduInfo(prAdapter, prMsduInfo);
 	}
-
 }
 
 /*----------------------------------------------------------------------------*/
@@ -1670,6 +1734,7 @@ void nicRxProcessDataPacket(IN struct ADAPTER *prAdapter,
 	struct RX_CTRL *prRxCtrl;
 	struct SW_RFB *prRetSwRfb, *prNextSwRfb;
 	struct HW_MAC_RX_DESC *prRxStatus;
+
 	u_int8_t fgDrop;
 	uint8_t ucBssIndex = 0;
 	struct mt66xx_chip_info *prChipInfo;
@@ -1682,6 +1747,8 @@ void nicRxProcessDataPacket(IN struct ADAPTER *prAdapter,
 	ASSERT(prAdapter);
 	ASSERT(prSwRfb);
 
+	nicRxFillRFB(prAdapter, prSwRfb);
+
 	fgDrop = FALSE;
 
 	prRxCtrl = &prAdapter->rRxCtrl;
@@ -1693,6 +1760,29 @@ void nicRxProcessDataPacket(IN struct ADAPTER *prAdapter,
 	prSwRfb->fgDataFrame = TRUE;
 	prSwRfb->fgFragFrame = FALSE;
 	prSwRfb->fgReorderBuffer = FALSE;
+
+#if CFG_WIFI_SW_CIPHER_MISMATCH
+	if (prSwRfb->prStaRec &&
+	    prSwRfb->prStaRec->fgTransmitKeyExist &&
+	    prSwRfb->prStaRec->ucStaState == STA_STATE_3 &&
+	    prSwRfb->fgIsBC == FALSE &&
+	    prSwRfb->fgIsMC == FALSE &&
+	    !prSwRfb->fgIsCipherMS) {
+		uint16_t u2FrameCtrl = 0;
+
+		if (prSwRfb->fgHdrTran == FALSE) {
+			u2FrameCtrl = ((struct WLAN_MAC_HEADER *)
+				prSwRfb->pvHeader)->u2FrameCtrl;
+			prSwRfb->fgIsCipherMS =
+				!RXM_IS_PROTECTED_FRAME(u2FrameCtrl);
+		} else if (prSwRfb->prRxStatusGroup4) {
+			u2FrameCtrl = HAL_RX_STATUS_GET_FRAME_CTL_FIELD(
+					      prSwRfb->prRxStatusGroup4);
+			prSwRfb->fgIsCipherMS =
+				!RXM_IS_PROTECTED_FRAME(u2FrameCtrl);
+		}
+	}
+#endif
 
 	if (prRxDescOps->nic_rxd_sanity_check)
 		fgDrop = prRxDescOps->nic_rxd_sanity_check(
@@ -1717,7 +1807,6 @@ void nicRxProcessDataPacket(IN struct ADAPTER *prAdapter,
 #if CFG_HIF_RX_STARVATION_WARNING
 		prRxCtrl->u4QueuedCnt++;
 #endif
-		nicRxFillRFB(prAdapter, prSwRfb);
 		ucBssIndex = secGetBssIdxByWlanIdx(prAdapter,
 						   prSwRfb->ucWlanIdx);
 		GLUE_SET_PKT_BSS_IDX(prSwRfb->pvPacket, ucBssIndex);
@@ -1801,6 +1890,9 @@ void nicRxProcessDataPacket(IN struct ADAPTER *prAdapter,
 							&prRxCtrl->u4LastRxTime
 							[prStaRec->ucBssIndex]);
 					}
+					secCheckRxEapolPacketEncryption(
+						prAdapter, prRetSwRfb,
+						prStaRec);
 					nicRxProcessPktWithoutReorder(
 						prAdapter, prRetSwRfb);
 					break;
@@ -3217,7 +3309,7 @@ void nicRxProcessMgmtPacket(IN struct ADAPTER *prAdapter,
 #if CFG_SUPPORT_802_11W
 	/* BOOL   fgMfgDrop = FALSE; */
 #endif
-#if CFG_WIFI_WORKAROUND_HWITS00010371_PMF_CIPHER_MISMATCH
+#if CFG_WIFI_SW_CIPHER_MISMATCH
 	struct WLAN_MAC_HEADER *prWlanHeader = NULL;
 #endif
 	ASSERT(prAdapter);
@@ -3225,7 +3317,7 @@ void nicRxProcessMgmtPacket(IN struct ADAPTER *prAdapter,
 
 	nicRxFillRFB(prAdapter, prSwRfb);
 
-#if CFG_WIFI_WORKAROUND_HWITS00010371_PMF_CIPHER_MISMATCH
+#if CFG_WIFI_SW_CIPHER_MISMATCH
 	prWlanHeader = (struct WLAN_MAC_HEADER *) prSwRfb->pvHeader;
 #endif
 	ucSubtype = (*(uint8_t *) (prSwRfb->pvHeader) &
@@ -3295,7 +3387,7 @@ void nicRxProcessMgmtPacket(IN struct ADAPTER *prAdapter,
 	}
 #endif
 
-#if CFG_WIFI_WORKAROUND_HWITS00010371_PMF_CIPHER_MISMATCH
+#if CFG_WIFI_SW_CIPHER_MISMATCH
 	if ((rsnCheckBipKeyInstalled(prAdapter, prSwRfb->prStaRec))
 		&& (prSwRfb->prStaRec->ucStaState == STA_STATE_3)
 		&& (!(prWlanHeader->u2FrameCtrl & MASK_FC_PROTECTED_FRAME))
@@ -3654,9 +3746,9 @@ void nicRxReturnRFB(IN struct ADAPTER *prAdapter,
 		/* QUEUE_INSERT_TAIL */
 		QUEUE_INSERT_TAIL(&prRxCtrl->rFreeSwRfbList, prQueEntry);
 		if (prAdapter->u4NoMoreRfb != 0) {
-			DBGLOG(RX, ERROR, "Free rfb and set IntEvent!!!!!\n");
+			DBGLOG_LIMITED(RX, INFO,
+				"Free rfb and set IntEvent!!!!!\n");
 			kalSetIntEvent(prAdapter->prGlueInfo);
-			DBGLOG(RX, ERROR, "After set interrupt event\n");
 		}
 	} else {
 		/* QUEUE_INSERT_TAIL */
@@ -4045,7 +4137,7 @@ uint32_t nicRxProcessActionFrame(IN struct ADAPTER *
 
 		if (prAisSpecBssInfo->fgMgmtProtection
 		    && (!(prActFrame->u2FrameCtrl & MASK_FC_PROTECTED_FRAME)
-#if CFG_WIFI_WORKAROUND_HWITS00010371_PMF_CIPHER_MISMATCH
+#if CFG_WIFI_SW_CIPHER_MISMATCH
 			&& (prSwRfb->fgIsCipherMS))) {
 #else
 			&& (prSwRfb->ucSecMode == CIPHER_SUITE_CCMP))) {
@@ -4113,19 +4205,13 @@ uint32_t nicRxProcessActionFrame(IN struct ADAPTER *
 		}
 #endif
 #if CFG_SUPPORT_NCHO
-		{
-			struct BSS_INFO *prBssInfo;
-
-			prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter,
-				prSwRfb->prStaRec->ucBssIndex);
-			if (prBssInfo->eNetworkType == NETWORK_TYPE_AIS) {
-				if (prAdapter->rNchoInfo.fgECHOEnabled == TRUE
-				    && prAdapter->rNchoInfo.u4WesMode == TRUE) {
-					aisFuncValidateRxActionFrame(prAdapter,
-						prSwRfb);
-					DBGLOG(INIT, INFO,
-					       "NCHO CATEGORY_VENDOR_SPECIFIC_ACTION\n");
-				}
+		if (prBssInfo && prBssInfo->eNetworkType == NETWORK_TYPE_AIS) {
+			if (prAdapter->rNchoInfo.fgNCHOEnabled == TRUE
+			    && prAdapter->rNchoInfo.u4WesMode == TRUE) {
+				aisFuncValidateRxActionFrame(prAdapter,
+					prSwRfb);
+				DBGLOG(INIT, INFO,
+				       "NCHO CATEGORY_VENDOR_SPECIFIC_ACTION\n");
 			}
 		}
 #endif

@@ -302,7 +302,7 @@ void nic_txd_v2_compose(
 	struct BSS_INFO *prBssInfo;
 	u_int8_t ucEtherTypeOffsetInWord;
 	u_int32_t u4TxDescAndPaddingLength;
-	u_int8_t ucTarQueue;
+	u_int8_t ucTarQueue, ucTarPort;
 #if ((CFG_SISO_SW_DEVELOP == 1) || (CFG_SUPPORT_SPE_IDX_CONTROL == 1))
 	enum ENUM_WF_PATH_FAVOR_T eWfPathFavor;
 #endif
@@ -330,8 +330,15 @@ void nic_txd_v2_compose(
 		prTxDesc,
 		ucEtherTypeOffsetInWord);
 
-	ucTarQueue = nicTxGetTxDestQIdxByTc(prMsduInfo->ucTC);
-	ucTarQueue += (prBssInfo->ucWmmQueSet * WMM_AC_INDEX_NUM);
+	ucTarPort = nicTxGetTxDestPortIdxByTc(prMsduInfo->ucTC);
+	if (ucTarPort == PORT_INDEX_MCU &&
+		prMsduInfo->ucControlFlag & MSDU_CONTROL_FLAG_FORCE_TX) {
+		/* To MCU packet with always tx flag */
+		ucTarQueue = MAC_TXQ_ALTX_0_INDEX;
+	} else {
+		ucTarQueue = nicTxGetTxDestQIdxByTc(prMsduInfo->ucTC);
+		ucTarQueue += (prBssInfo->ucWmmQueSet * WMM_AC_INDEX_NUM);
+	}
 
 #if (CFG_SUPPORT_DMASHDL_SYSDVT)
 	if (prMsduInfo->ucPktType == ENUM_PKT_ICMP) {
@@ -406,14 +413,14 @@ void nic_txd_v2_compose(
 				nicTxConfigPktOption(
 					prMsduInfo,
 					MSDU_OPT_PROTECTED_FRAME, FALSE);
-				DBGLOG_LIMITED(RSN, LOUD,
+				DBGLOG(RSN, LOUD,
 					"Pairwise EAPoL not protect!\n");
 			}
 		} else if (prMsduInfo->ucStaRecIndex
 				== STA_REC_INDEX_BMCAST) {/* BMC packet */
 			nicTxConfigPktOption(
 				prMsduInfo, MSDU_OPT_PROTECTED_FRAME, TRUE);
-			DBGLOG_LIMITED(RSN, LOUD, "Protect BMC frame!\n");
+			DBGLOG(RSN, LOUD, "Protect BMC frame!\n");
 		}
 	}
 #if (UNIFIED_MAC_TX_FORMAT == 1)

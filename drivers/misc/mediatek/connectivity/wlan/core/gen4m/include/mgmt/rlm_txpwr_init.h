@@ -1282,7 +1282,6 @@ struct COUNTRY_POWER_LIMIT_TABLE_CONFIGURATION_HE
 	}
 };
 
-
 struct COUNTRY_POWER_LIMIT_TABLE_CONFIGURATION
 	g_rRlmPowerLimitConfiguration[] = {
 

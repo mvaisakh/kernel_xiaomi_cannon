@@ -734,7 +734,7 @@ static s_int32 hqa_get_antswap_capability(
 	struct service_test *serv_test, struct hqa_frame *hqa_frame)
 {
 	s_int32 ret = SERV_STATUS_SUCCESS;
-	u_int32 antswap_support;
+	u_int32 antswap_support = 0;
 
 	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_ERROR, ("%s\n", __func__));
 
@@ -756,7 +756,7 @@ static s_int32 hqa_set_antswap(
 {
 	s_int32 ret = SERV_STATUS_SUCCESS;
 	u_char *data = hqa_frame->data;
-	u_int32 band, ant;
+	u_int32 band, ant = 0;
 
 	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE, ("%s\n", __func__));
 
@@ -1477,7 +1477,7 @@ static s_int32 hqa_set_cfg_on_off(
 {
 	s_int32 ret = SERV_STATUS_SUCCESS;
 	u_char *data = hqa_frame->data;
-	u_int32 type, enable, band_idx;
+	u_int32 type, enable = 0, band_idx = 0;
 
 	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE, ("%s\n", __func__));
 
@@ -1534,6 +1534,8 @@ static s_int32 hqa_dbdc_tx_tone(
 	u_char *data = hqa_frame->data;
 
 	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE, ("%s\n", __func__));
+
+	sys_ad_zero_mem(&param, sizeof(param));
 
 	/* Request format type */
 	get_param_and_shift_buf(TRUE, sizeof(param.band_idx),
@@ -1607,6 +1609,8 @@ static s_int32 hqa_dbdc_continuous_tx(
 	u_char *data = hqa_frame->data;
 
 	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE, ("%s\n", __func__));
+
+	sys_ad_zero_mem(&param, sizeof(param));
 
 	get_param_and_shift_buf(TRUE, sizeof(param.band_idx),
 				&data, (u_char *) &param.band_idx);
@@ -2465,7 +2469,7 @@ static s_int32 hqa_mps_set_seq_data(
 	struct test_mps_setting *mps_setting = NULL;
 	u_char *data = hqa_frame->data;
 	u_int32 *param = NULL;
-	u_int32 band_idx, idx, value;
+	u_int32 band_idx, idx, value = 0;
 	u_int16 len;
 
 	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE, ("%s\n", __func__));
@@ -2540,7 +2544,7 @@ static s_int32 hqa_mps_set_payload_length(
 	struct test_mps_setting *mps_setting = NULL;
 	u_char *data = hqa_frame->data;
 	u_int32 *param = NULL;
-	u_int32 band_idx, idx, value;
+	u_int32 band_idx, idx, value = 0;
 	u_int16 len;
 
 	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE, ("%s\n", __func__));
@@ -2618,7 +2622,7 @@ static s_int32 hqa_mps_set_packet_count(
 	struct test_mps_setting *mps_setting = NULL;
 	u_char *data = hqa_frame->data;
 	u_int32 *param = NULL;
-	u_int32 band_idx, idx, value;
+	u_int32 band_idx, idx, value = 0;
 	u_int16 len;
 
 	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE, ("%s\n", __func__));
@@ -2691,7 +2695,7 @@ static s_int32 hqa_mps_set_power_gain(
 	struct test_mps_setting *mps_setting = NULL;
 	u_char *data = hqa_frame->data;
 	u_int32 *param = NULL;
-	u_int32 band_idx, idx, value;
+	u_int32 band_idx, idx, value = 0;
 	u_int16 len;
 
 	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE, ("%s\n", __func__));
@@ -3002,7 +3006,7 @@ static s_int32 hqa_mps_set_nss(
 	struct test_mps_setting *mps_setting = NULL;
 	u_char *data = hqa_frame->data;
 	u_int32 *param = NULL;
-	u_int32 band_idx, idx, value;
+	u_int32 band_idx, idx, value = 0;
 	u_int16 len;
 
 	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE, ("%s\n", __func__));
@@ -3075,7 +3079,7 @@ static s_int32 hqa_mps_set_per_packet_bw(
 	struct test_mps_setting *mps_setting = NULL;
 	u_char *data = hqa_frame->data;
 	u_int32 *param = NULL;
-	u_int32 band_idx, idx, value;
+	u_int32 band_idx, idx, value = 0;
 	u_int16 len;
 
 	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE, ("%s\n", __func__));
@@ -3695,7 +3699,8 @@ static s_int32 hqa_set_ru_info(
 	struct test_ru_allocatoin *ru_allocation = NULL;
 	struct test_ru_info *ru_info = NULL;
 
-	len = SERV_OS_NTOHS(hqa_frame->length);
+	len = hqa_frame->length;
+
 	get_param_and_shift_buf(TRUE,
 				   sizeof(u_int32),
 				   &data,
@@ -3715,10 +3720,10 @@ static s_int32 hqa_set_ru_info(
 
 	len /= (seg_sta_cnt[0]+seg_sta_cnt[1]);	/* per ru length */
 	param_cnt = len/sizeof(u_int32);	/* param count */
-	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_ERROR,
+	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE,
 		 ("%s: Band:%d [ru_segment 0]:%d, [ru_segment 1]:%d\n",
 		 __func__, band_idx, seg_sta_cnt[0], seg_sta_cnt[1]));
-	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_ERROR,
+	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE,
 		 ("\t\tparameters count:%d\n", param_cnt));
 
 	mpdu_length = CONFIG_GET_PARAM(serv_test, tx_len, band_idx);
@@ -3810,7 +3815,8 @@ static s_int32 hqa_set_ru_info(
 						   (u_char *)&value);
 			param_loop--;
 			ru_info[sta_seq].alpha = value;
-		}
+		} else
+			ru_info[sta_seq].alpha = 1; /* default value */
 
 		if (param_loop) {
 			get_param_and_shift_buf(TRUE,
@@ -3819,25 +3825,26 @@ static s_int32 hqa_set_ru_info(
 						   (u_char *)&value);
 			param_loop--;
 			ru_info[sta_seq].ru_mu_nss = value;
-		}
+		} else
+			ru_info[sta_seq].ru_mu_nss = 1; /* default value */
 
-		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_OFF,
+		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE,
 			 ("%s: ru_segment[%d][0x%x]: ru_idx:%d\n",
 			 __func__, segment_idx,
 			 ru_info[sta_seq].allocation,
 			 ru_info[sta_seq].ru_index >> 1));
-		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_OFF,
+		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE,
 			 ("\t\t\t\trate:%x, ldpc:%d\n",
 			 ru_info[sta_seq].rate,
 			 ru_info[sta_seq].ldpc));
-		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_OFF,
+		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE,
 			 ("\t\t\t\tnss:%d, mimo nss:%d\n",
 			 ru_info[sta_seq].nss,
 			 ru_info[sta_seq].ru_mu_nss));
-		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_OFF,
+		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE,
 			 ("\t\t\t\t start spatial stream:%d,\n",
 			 ru_info[sta_seq].start_sp_st));
-		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_OFF,
+		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE,
 			 ("\t\t\t\tmpdu length=%d, alpha:%d\n",
 			 ru_info[sta_seq].mpdu_length,
 			 ru_info[sta_seq].alpha));
@@ -3912,6 +3919,8 @@ static s_int32 hqa_set_channel_ext(
 
 	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE, ("%s\n", __func__));
 
+	sys_ad_zero_mem(&param, sizeof(param));
+
 	get_param_and_shift_buf(TRUE, sizeof(param.ext_id),
 				&data, (u_char *)&param.ext_id);
 	get_param_and_shift_buf(TRUE, sizeof(param.num_param),
@@ -3984,6 +3993,8 @@ static s_int32 hqa_set_txcontent_ext(
 	boolean enable = FALSE;
 
 	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE, ("%s\n", __func__));
+
+	sys_ad_zero_mem(&param, sizeof(param));
 
 	get_param_and_shift_buf(TRUE, sizeof(param.ext_id),
 				&data, (u_char *)&param.ext_id);
@@ -4109,6 +4120,8 @@ static s_int32 hqa_start_tx_ext(
 	u_char ant_idx = 0;
 
 	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_TRACE, ("%s\n", __func__));
+
+	sys_ad_zero_mem(&param, sizeof(param));
 
 	get_param_and_shift_buf(TRUE, sizeof(param.ext_id),
 				&data, (u_char *)&param.ext_id);

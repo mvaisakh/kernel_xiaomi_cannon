@@ -479,7 +479,8 @@ INT32 stp_dbg_soc_core_dump(INT32 dump_sink)
 {
 	INT32 ret = 0;
 
-	if (dump_sink == 0 || chip_reset_only == 1) {
+	if (stp_dbg_read_memdump_mode(1) == STP_DBG_MEMDUMP_NO_LOG || dump_sink == 0 ||
+		chip_reset_only == 1) {
 		if (chip_reset_only) {
 			STP_DBG_PR_INFO("Chip reset only\n");
 			chip_reset_only = 0;
@@ -499,12 +500,39 @@ INT32 stp_dbg_soc_core_dump(INT32 dump_sink)
 
 PUINT8 stp_dbg_soc_id_to_task(UINT32 id)
 {
+	P_WMT_PATCH_INFO p_patch_info;
+	PUINT8 patch_name;
+	UINT32 temp_id;
+
 	if (id >= STP_DBG_TASK_ID_MAX) {
 		STP_DBG_PR_ERR("task id(%d) overflow(%d)\n", id, STP_DBG_TASK_ID_MAX);
 		return NULL;
 	}
 
-	return soc_task_str[id];
+	p_patch_info = wmt_lib_get_patch_info();
+	patch_name = p_patch_info->patchName;
+
+	if (patch_name == NULL) {
+		STP_DBG_PR_INFO("patch_name is null\n");
+		/* For projects without patch download */
+		return soc_task_str[id];
+	}
+
+	if (osal_strncmp(patch_name, ROM_V2_PATCH, strlen(ROM_V2_PATCH)) == 0) {
+		temp_id = soc_gen_two_task_id_adapter[id];
+		STP_DBG_PR_INFO("id = %d, gen two task_id = %d\n", id, temp_id);
+	} else if (osal_strncmp(patch_name, ROM_V3_PATCH, strlen(ROM_V3_PATCH)) == 0) {
+		temp_id = soc_gen_three_task_id_adapter[id];
+		STP_DBG_PR_INFO("id = %d, gen three task_id = %d\n", id, temp_id);
+	} else if (osal_strncmp(patch_name, ROM_V4_PATCH, strlen(ROM_V4_PATCH)) == 0) {
+		temp_id = soc_gen_three_task_id_adapter[id];
+		STP_DBG_PR_INFO("id = %d, gen three (ROMv4) task_id = %d\n", id, temp_id);
+	} else {
+		temp_id = id;
+		STP_DBG_PR_INFO("id = %d, CONNAC project task_id = %d\n", id, temp_id);
+	}
+
+	return soc_task_str[temp_id];
 }
 
 UINT32 stp_dbg_soc_read_debug_crs(ENUM_CONNSYS_DEBUG_CR cr)
@@ -527,7 +555,7 @@ UINT32 stp_dbg_soc_read_debug_crs(ENUM_CONNSYS_DEBUG_CR cr)
 
 	if (chip_id == 0x6765 || chip_id == 0x3967 || chip_id == 0x6761
 			|| chip_id == 0x6779 || chip_id == 0x6768 || chip_id == 0x6785
-			|| chip_id == 0x6873)
+			|| chip_id == 0x6873 || chip_id == 0x8168 || chip_id == 0x6853)
 		return 0;
 
 	if (conn_reg.mcu_base) {

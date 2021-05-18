@@ -116,13 +116,21 @@ char *g_au1TxPwrOperationLabel[] = {
 #if CFG_SUPPORT_DYNAMIC_PWR_LIMIT
 /* dynamic tx power control */
 char *g_au1TxPwrDefaultSetting[] = {
+#if (CFG_SUPPORT_DYNA_TX_PWR_CTRL_OFDM_SETTING == 1)
+	"_SAR_PwrLevel;1;2;1;[2G4,,,,,,,,,,,][5G,,,,,,,,,,,]",
+	"_G_Scenario;1;2;1;[ALL,,,,,,,,,,,]",
+	"_G_Scenario;2;2;1;[ALL,,,,,,,,,,,]",
+	"_G_Scenario;3;2;1;[ALL,,,,,,,,,,,]",
+	"_G_Scenario;4;2;1;[ALL,,,,,,,,,,,]",
+	"_G_Scenario;5;2;1;[ALL,,,,,,,,,,,]",
+#else
 	"_SAR_PwrLevel;1;2;1;[2G4,,,,,,,,,][5G,,,,,,,,,]",
-	"_SAR_PwrOffset;1;2;2;[2G4,,,,,,,,,][5G,,,,,,,,,]",
-	"_G_Scenario;1;2;1;[ALL,1]",
-	"_G_Scenario;2;2;1;[ALL,2]",
-	"_G_Scenario;3;2;1;[ALL,3]",
-	"_G_Scenario;4;2;1;[ALL,4]",
-	"_G_Scenario;5;2;1;[ALL,5]",
+	"_G_Scenario;1;2;1;[ALL,,,,,,,,,]",
+	"_G_Scenario;2;2;1;[ALL,,,,,,,,,]",
+	"_G_Scenario;3;2;1;[ALL,,,,,,,,,]",
+	"_G_Scenario;4;2;1;[ALL,,,,,,,,,]",
+	"_G_Scenario;5;2;1;[ALL,,,,,,,,,]",
+#endif /* CFG_SUPPORT_DYNA_TX_PWR_CTRL_OFDM_SETTING */
 };
 #endif
 /* The following country or domain shall be set from host driver.
@@ -133,122 +141,128 @@ char *g_au1TxPwrDefaultSetting[] = {
 
 /* Define mapping tables between country code and its channel set
  */
-static const uint16_t g_u2CountryGroup0[] = { COUNTRY_CODE_JP };
-
+static const uint16_t g_u2CountryGroup0[] = {
+	COUNTRY_CODE_AD, COUNTRY_CODE_AL, COUNTRY_CODE_AO, COUNTRY_CODE_AT,
+	COUNTRY_CODE_AZ, COUNTRY_CODE_BA, COUNTRY_CODE_BE, COUNTRY_CODE_BG,
+	COUNTRY_CODE_BJ, COUNTRY_CODE_CF, COUNTRY_CODE_CH, COUNTRY_CODE_CM,
+	COUNTRY_CODE_CV, COUNTRY_CODE_CY, COUNTRY_CODE_CZ, COUNTRY_CODE_DE,
+	COUNTRY_CODE_DK, COUNTRY_CODE_EE, COUNTRY_CODE_ES, COUNTRY_CODE_FI,
+	COUNTRY_CODE_FO, COUNTRY_CODE_FR, COUNTRY_CODE_GA, COUNTRY_CODE_GE,
+	COUNTRY_CODE_GF, COUNTRY_CODE_GG, COUNTRY_CODE_GI, COUNTRY_CODE_GL,
+	COUNTRY_CODE_GR, COUNTRY_CODE_HR, COUNTRY_CODE_HU, COUNTRY_CODE_IE,
+	COUNTRY_CODE_IQ, COUNTRY_CODE_IS, COUNTRY_CODE_IT, COUNTRY_CODE_KE,
+	COUNTRY_CODE_KW, COUNTRY_CODE_LI, COUNTRY_CODE_LT, COUNTRY_CODE_LU,
+	COUNTRY_CODE_LV, COUNTRY_CODE_LY, COUNTRY_CODE_MC, COUNTRY_CODE_MD,
+	COUNTRY_CODE_ME, COUNTRY_CODE_MK, COUNTRY_CODE_ML, COUNTRY_CODE_MQ,
+	COUNTRY_CODE_MT, COUNTRY_CODE_MZ, COUNTRY_CODE_NL, COUNTRY_CODE_NO,
+	COUNTRY_CODE_PF, COUNTRY_CODE_PL, COUNTRY_CODE_PT, COUNTRY_CODE_RE,
+	COUNTRY_CODE_RO, COUNTRY_CODE_RS, COUNTRY_CODE_SE, COUNTRY_CODE_SI,
+	COUNTRY_CODE_SK, COUNTRY_CODE_SM, COUNTRY_CODE_SZ, COUNTRY_CODE_TD,
+	COUNTRY_CODE_TF, COUNTRY_CODE_TG, COUNTRY_CODE_TR, COUNTRY_CODE_TZ,
+	COUNTRY_CODE_VA, COUNTRY_CODE_WF, COUNTRY_CODE_XK, COUNTRY_CODE_YT
+};
 static const uint16_t g_u2CountryGroup1[] = {
-	COUNTRY_CODE_AS, COUNTRY_CODE_AI, COUNTRY_CODE_BM, COUNTRY_CODE_KY,
-	COUNTRY_CODE_GU, COUNTRY_CODE_FM, COUNTRY_CODE_PR, COUNTRY_CODE_VI,
-	COUNTRY_CODE_AZ, COUNTRY_CODE_BW, COUNTRY_CODE_KH, COUNTRY_CODE_CX,
-	COUNTRY_CODE_CO, COUNTRY_CODE_CR, COUNTRY_CODE_GD, COUNTRY_CODE_GT,
-	COUNTRY_CODE_KI, COUNTRY_CODE_LB, COUNTRY_CODE_LR, COUNTRY_CODE_MN,
-	COUNTRY_CODE_AN, COUNTRY_CODE_NI, COUNTRY_CODE_PW, COUNTRY_CODE_WS,
-	COUNTRY_CODE_LK, COUNTRY_CODE_TT, COUNTRY_CODE_MM
+	COUNTRY_CODE_AE, COUNTRY_CODE_AG, COUNTRY_CODE_AN, COUNTRY_CODE_AQ,
+	COUNTRY_CODE_AW, COUNTRY_CODE_AX, COUNTRY_CODE_BR, COUNTRY_CODE_BV,
+	COUNTRY_CODE_BZ, COUNTRY_CODE_CK, COUNTRY_CODE_CL, COUNTRY_CODE_CO,
+	COUNTRY_CODE_CR, COUNTRY_CODE_DO, COUNTRY_CODE_EC, COUNTRY_CODE_GB,
+	COUNTRY_CODE_GS, COUNTRY_CODE_HK, COUNTRY_CODE_IL, COUNTRY_CODE_IN,
+	COUNTRY_CODE_IO, COUNTRY_CODE_IR, COUNTRY_CODE_KH, COUNTRY_CODE_KP,
+	COUNTRY_CODE_KR, COUNTRY_CODE_LA, COUNTRY_CODE_LB, COUNTRY_CODE_LK,
+	COUNTRY_CODE_LR, COUNTRY_CODE_MH, COUNTRY_CODE_MN, COUNTRY_CODE_MO,
+	COUNTRY_CODE_MS, COUNTRY_CODE_MW, COUNTRY_CODE_NA, COUNTRY_CODE_NI,
+	COUNTRY_CODE_NU, COUNTRY_CODE_NZ, COUNTRY_CODE_PA, COUNTRY_CODE_PE,
+	COUNTRY_CODE_PG, COUNTRY_CODE_PH, COUNTRY_CODE_PS, COUNTRY_CODE_PW,
+	COUNTRY_CODE_PY, COUNTRY_CODE_QA, COUNTRY_CODE_SC, COUNTRY_CODE_SD,
+	COUNTRY_CODE_SG, COUNTRY_CODE_SH, COUNTRY_CODE_SJ, COUNTRY_CODE_SS,
+	COUNTRY_CODE_SV, COUNTRY_CODE_SY, COUNTRY_CODE_TC, COUNTRY_CODE_TH,
+	COUNTRY_CODE_TK, COUNTRY_CODE_TL, COUNTRY_CODE_TT, COUNTRY_CODE_VG,
+	COUNTRY_CODE_VN, COUNTRY_CODE_VU, COUNTRY_CODE_YE, COUNTRY_CODE_ZA,
+	COUNTRY_CODE_ZM
 };
-
 static const uint16_t g_u2CountryGroup2[] = {
-	COUNTRY_CODE_AW, COUNTRY_CODE_LA, COUNTRY_CODE_AE, COUNTRY_CODE_UG
+	COUNTRY_CODE_AF, COUNTRY_CODE_BF, COUNTRY_CODE_BI, COUNTRY_CODE_BT,
+	COUNTRY_CODE_BW, COUNTRY_CODE_CD, COUNTRY_CODE_CG, COUNTRY_CODE_CI,
+	COUNTRY_CODE_ET, COUNTRY_CODE_EU, COUNTRY_CODE_FK, COUNTRY_CODE_GH,
+	COUNTRY_CODE_GM, COUNTRY_CODE_GN, COUNTRY_CODE_GP, COUNTRY_CODE_GQ,
+	COUNTRY_CODE_GW, COUNTRY_CODE_IM, COUNTRY_CODE_JE, COUNTRY_CODE_KG,
+	COUNTRY_CODE_KM, COUNTRY_CODE_LS, COUNTRY_CODE_MF, COUNTRY_CODE_MG,
+	COUNTRY_CODE_MM, COUNTRY_CODE_MR, COUNTRY_CODE_MU, COUNTRY_CODE_NC,
+	COUNTRY_CODE_NE, COUNTRY_CODE_NR, COUNTRY_CODE_OM, COUNTRY_CODE_PM,
+	COUNTRY_CODE_PN, COUNTRY_CODE_RW, COUNTRY_CODE_SL, COUNTRY_CODE_SR,
+	COUNTRY_CODE_ST, COUNTRY_CODE_TJ, COUNTRY_CODE_TM, COUNTRY_CODE_ZW
 };
-
 static const uint16_t g_u2CountryGroup3[] = {
-	COUNTRY_CODE_AR, COUNTRY_CODE_BR, COUNTRY_CODE_HK, COUNTRY_CODE_OM,
-	COUNTRY_CODE_PH, COUNTRY_CODE_SA, COUNTRY_CODE_SG, COUNTRY_CODE_ZA,
-	COUNTRY_CODE_VN, COUNTRY_CODE_KR, COUNTRY_CODE_DO, COUNTRY_CODE_FK,
-	COUNTRY_CODE_KZ, COUNTRY_CODE_MZ, COUNTRY_CODE_NA, COUNTRY_CODE_LC,
-	COUNTRY_CODE_VC, COUNTRY_CODE_UA, COUNTRY_CODE_UZ, COUNTRY_CODE_ZW,
-	COUNTRY_CODE_MP
+	COUNTRY_CODE_AI, COUNTRY_CODE_AS, COUNTRY_CODE_BM, COUNTRY_CODE_BS,
+	COUNTRY_CODE_CU, COUNTRY_CODE_DM, COUNTRY_CODE_FM, COUNTRY_CODE_GD,
+	COUNTRY_CODE_GT, COUNTRY_CODE_GU, COUNTRY_CODE_HN, COUNTRY_CODE_HT,
+	COUNTRY_CODE_KN, COUNTRY_CODE_KY, COUNTRY_CODE_LC, COUNTRY_CODE_MP,
+	COUNTRY_CODE_PR, COUNTRY_CODE_SX, COUNTRY_CODE_TW, COUNTRY_CODE_UM,
+	COUNTRY_CODE_US, COUNTRY_CODE_VC, COUNTRY_CODE_VI
 };
-
 static const uint16_t g_u2CountryGroup4[] = {
-	COUNTRY_CODE_AT, COUNTRY_CODE_BE, COUNTRY_CODE_BG, COUNTRY_CODE_HR,
-	COUNTRY_CODE_CZ, COUNTRY_CODE_DK, COUNTRY_CODE_FI, COUNTRY_CODE_FR,
-	COUNTRY_CODE_GR, COUNTRY_CODE_HU, COUNTRY_CODE_IS, COUNTRY_CODE_IE,
-	COUNTRY_CODE_IT, COUNTRY_CODE_LU, COUNTRY_CODE_NL, COUNTRY_CODE_NO,
-	COUNTRY_CODE_PL, COUNTRY_CODE_PT, COUNTRY_CODE_RO, COUNTRY_CODE_SK,
-	COUNTRY_CODE_SI, COUNTRY_CODE_ES, COUNTRY_CODE_SE, COUNTRY_CODE_CH,
-	COUNTRY_CODE_GB, COUNTRY_CODE_AL, COUNTRY_CODE_AD, COUNTRY_CODE_BY,
-	COUNTRY_CODE_BA, COUNTRY_CODE_VG, COUNTRY_CODE_CV, COUNTRY_CODE_CY,
-	COUNTRY_CODE_EE, COUNTRY_CODE_ET, COUNTRY_CODE_GF, COUNTRY_CODE_PF,
-	COUNTRY_CODE_TF, COUNTRY_CODE_GE, COUNTRY_CODE_DE, COUNTRY_CODE_GH,
-	COUNTRY_CODE_GP, COUNTRY_CODE_IQ, COUNTRY_CODE_KE, COUNTRY_CODE_LV,
-	COUNTRY_CODE_LS, COUNTRY_CODE_LI, COUNTRY_CODE_LT, COUNTRY_CODE_MK,
-	COUNTRY_CODE_MT, COUNTRY_CODE_MQ, COUNTRY_CODE_MR, COUNTRY_CODE_MU,
-	COUNTRY_CODE_YT, COUNTRY_CODE_MD, COUNTRY_CODE_MC, COUNTRY_CODE_ME,
-	COUNTRY_CODE_MS, COUNTRY_CODE_RE, COUNTRY_CODE_MF, COUNTRY_CODE_SM,
-	COUNTRY_CODE_SN, COUNTRY_CODE_RS, COUNTRY_CODE_TR, COUNTRY_CODE_TC,
-	COUNTRY_CODE_VA, COUNTRY_CODE_EU, COUNTRY_CODE_DZ
+	COUNTRY_CODE_AM, COUNTRY_CODE_KZ
 };
-
 static const uint16_t g_u2CountryGroup5[] = {
-	COUNTRY_CODE_AU, COUNTRY_CODE_NZ, COUNTRY_CODE_EC, COUNTRY_CODE_PY,
-	COUNTRY_CODE_PE, COUNTRY_CODE_TH, COUNTRY_CODE_UY
+	COUNTRY_CODE_AR, COUNTRY_CODE_AU, COUNTRY_CODE_CC, COUNTRY_CODE_CX,
+	COUNTRY_CODE_FJ, COUNTRY_CODE_HM, COUNTRY_CODE_KI, COUNTRY_CODE_MX,
+	COUNTRY_CODE_NF
 };
-
-static const uint16_t g_u2CountryGroup6[] = { COUNTRY_CODE_RU };
-
+static const uint16_t g_u2CountryGroup6[] = {
+	COUNTRY_CODE_BB, COUNTRY_CODE_BH, COUNTRY_CODE_BN, COUNTRY_CODE_CN,
+	COUNTRY_CODE_MV, COUNTRY_CODE_UY, COUNTRY_CODE_VE
+};
 static const uint16_t g_u2CountryGroup7[] = {
-	COUNTRY_CODE_CL, COUNTRY_CODE_EG, COUNTRY_CODE_IN, COUNTRY_CODE_AG,
-	COUNTRY_CODE_BS, COUNTRY_CODE_BH, COUNTRY_CODE_BB, COUNTRY_CODE_BN,
-	COUNTRY_CODE_MV, COUNTRY_CODE_PA, COUNTRY_CODE_ZM, COUNTRY_CODE_CN
+	COUNTRY_CODE_BD, COUNTRY_CODE_GY, COUNTRY_CODE_JM, COUNTRY_CODE_PK
 };
-
-static const uint16_t g_u2CountryGroup8[] = { COUNTRY_CODE_MY };
-
-static const uint16_t g_u2CountryGroup9[] = { COUNTRY_CODE_NP };
-
+static const uint16_t g_u2CountryGroup8[] = {
+	COUNTRY_CODE_BO, COUNTRY_CODE_NG
+};
+static const uint16_t g_u2CountryGroup9[] = {
+	COUNTRY_CODE_BY
+};
 static const uint16_t g_u2CountryGroup10[] = {
-	COUNTRY_CODE_IL, COUNTRY_CODE_AM, COUNTRY_CODE_KW, COUNTRY_CODE_MA,
-	COUNTRY_CODE_NE, COUNTRY_CODE_TN
+	COUNTRY_CODE_CA
 };
-
 static const uint16_t g_u2CountryGroup11[] = {
-	COUNTRY_CODE_JO, COUNTRY_CODE_PG
+	COUNTRY_CODE_DJ, COUNTRY_CODE_ER, COUNTRY_CODE_RKS, COUNTRY_CODE_SB,
+	COUNTRY_CODE_SO, COUNTRY_CODE_TO, COUNTRY_CODE_TV
 };
-
-static const uint16_t g_u2CountryGroup12[] = { COUNTRY_CODE_AF };
-
-static const uint16_t g_u2CountryGroup13[] = { COUNTRY_CODE_NG };
-
+static const uint16_t g_u2CountryGroup12[] = {
+	COUNTRY_CODE_DZ
+};
+static const uint16_t g_u2CountryGroup13[] = {
+	COUNTRY_CODE_EG, COUNTRY_CODE_EH, COUNTRY_CODE_MA, COUNTRY_CODE_SN,
+	COUNTRY_CODE_UZ
+};
 static const uint16_t g_u2CountryGroup14[] = {
-	COUNTRY_CODE_PK, COUNTRY_CODE_QA, COUNTRY_CODE_BF, COUNTRY_CODE_GY,
-	COUNTRY_CODE_HT, COUNTRY_CODE_JM, COUNTRY_CODE_MO, COUNTRY_CODE_MW,
-	COUNTRY_CODE_RW, COUNTRY_CODE_KN, COUNTRY_CODE_TZ, COUNTRY_CODE_BD
+	COUNTRY_CODE_JO
 };
-
-static const uint16_t g_u2CountryGroup15[] = { COUNTRY_CODE_ID };
-
+static const uint16_t g_u2CountryGroup15[] = {
+	COUNTRY_CODE_JP
+};
 static const uint16_t g_u2CountryGroup16[] = {
-	COUNTRY_CODE_AO, COUNTRY_CODE_BZ, COUNTRY_CODE_BJ, COUNTRY_CODE_BT,
-	COUNTRY_CODE_BO, COUNTRY_CODE_BI, COUNTRY_CODE_CM, COUNTRY_CODE_CF,
-	COUNTRY_CODE_TD, COUNTRY_CODE_KM, COUNTRY_CODE_CD, COUNTRY_CODE_CG,
-	COUNTRY_CODE_CI, COUNTRY_CODE_DJ, COUNTRY_CODE_GQ, COUNTRY_CODE_ER,
-	COUNTRY_CODE_FJ, COUNTRY_CODE_GA, COUNTRY_CODE_GM, COUNTRY_CODE_GN,
-	COUNTRY_CODE_GW, COUNTRY_CODE_RKS, COUNTRY_CODE_KG, COUNTRY_CODE_LY,
-	COUNTRY_CODE_MG, COUNTRY_CODE_ML, COUNTRY_CODE_NR, COUNTRY_CODE_NC,
-	COUNTRY_CODE_ST, COUNTRY_CODE_SC, COUNTRY_CODE_SL, COUNTRY_CODE_SB,
-	COUNTRY_CODE_SO, COUNTRY_CODE_SR, COUNTRY_CODE_SZ, COUNTRY_CODE_TJ,
-	COUNTRY_CODE_TG, COUNTRY_CODE_TO, COUNTRY_CODE_TM, COUNTRY_CODE_TV,
-	COUNTRY_CODE_VU, COUNTRY_CODE_YE
+	COUNTRY_CODE_MY
 };
-
 static const uint16_t g_u2CountryGroup17[] = {
-	COUNTRY_CODE_US, COUNTRY_CODE_CA, COUNTRY_CODE_TW
+	COUNTRY_CODE_NP, COUNTRY_CODE_ID
 };
-
 static const uint16_t g_u2CountryGroup18[] = {
-	COUNTRY_CODE_DM, COUNTRY_CODE_SV, COUNTRY_CODE_HN
+	COUNTRY_CODE_RU
 };
-
 static const uint16_t g_u2CountryGroup19[] = {
-	COUNTRY_CODE_MX, COUNTRY_CODE_VE
+	COUNTRY_CODE_SA, COUNTRY_CODE_UG
+};
+static const uint16_t g_u2CountryGroup20[] = {
+	COUNTRY_CODE_TN
+};
+static const uint16_t g_u2CountryGroup21[] = {
+	COUNTRY_CODE_WS
+};
+static const uint16_t g_u2CountryGroup22[] = {
+	COUNTRY_CODE_UA
 };
 
-static const uint16_t g_u2CountryGroup20[] = {
-	COUNTRY_CODE_CK, COUNTRY_CODE_CU, COUNTRY_CODE_TL, COUNTRY_CODE_FO,
-	COUNTRY_CODE_GI, COUNTRY_CODE_GG, COUNTRY_CODE_IR, COUNTRY_CODE_IM,
-	COUNTRY_CODE_JE, COUNTRY_CODE_KP, COUNTRY_CODE_MH, COUNTRY_CODE_NU,
-	COUNTRY_CODE_NF, COUNTRY_CODE_PS, COUNTRY_CODE_PN, COUNTRY_CODE_PM,
-	COUNTRY_CODE_SS, COUNTRY_CODE_SD, COUNTRY_CODE_SY
-};
 
 #if (CFG_SUPPORT_SINGLE_SKU == 1)
 struct mtk_regd_control g_mtk_regd_control = {
@@ -342,18 +356,15 @@ struct DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 		(uint16_t *) g_u2CountryGroup0, sizeof(g_u2CountryGroup0) / 2,
 		{
 			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
-
-			{82, BAND_2G4, CHNL_SPAN_5, 14, 1, FALSE}
-			,			/* CH_SET_2G4_14_14 */
+			,	/*CH_SET_2G4_1_13 */
 			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
-			,			/* CH_SET_UNII_LOW_36_48 */
+			,	/*CH_SET_UNII_LOW_36_48 */
 			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
-			,			/* CH_SET_UNII_MID_52_64 */
+			,	/*CH_SET_UNII_MID_52_64 */
 			{121, BAND_5G, CHNL_SPAN_20, 100, 11, TRUE}
-			,			/* CH_SET_UNII_WW_100_140 */
-			{125, BAND_NULL, 0, 0, 0, FALSE}
-				/* CH_SET_UNII_UPPER_NA */
+			,	/*CH_SET_UNII_MID_100_140 */
+			{125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
+				/*CH_SET_UNII_UPPER_149_165 */
 		}
 	}
 	,
@@ -361,17 +372,15 @@ struct DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 		(uint16_t *) g_u2CountryGroup1, sizeof(g_u2CountryGroup1) / 2,
 		{
 			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
-
+			,	/*CH_SET_2G4_1_13 */
 			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
-			,			/* CH_SET_UNII_LOW_36_48 */
+			,	/*CH_SET_UNII_LOW_36_48 */
 			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
-			,			/* CH_SET_UNII_MID_52_64 */
+			,	/*CH_SET_UNII_MID_52_64 */
 			{121, BAND_5G, CHNL_SPAN_20, 100, 12, TRUE}
-			,			/* CH_SET_UNII_WW_100_144 */
+			,	/*CH_SET_UNII_MID_100_144 */
 			{125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
-			,			/* CH_SET_UNII_UPPER_149_165 */
-			{0, BAND_NULL, 0, 0, 0, FALSE}
+				/*CH_SET_UNII_UPPER_149_165 */
 		}
 	}
 	,
@@ -379,35 +388,31 @@ struct DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 		(uint16_t *) g_u2CountryGroup2, sizeof(g_u2CountryGroup2) / 2,
 		{
 			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
-
+			,	/*CH_SET_2G4_1_13 */
 			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
-			,			/* CH_SET_UNII_LOW_36_48 */
+			,	/*CH_SET_UNII_LOW_36_48 */
 			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
-			,			/* CH_SET_UNII_MID_52_64 */
-			{121, BAND_5G, CHNL_SPAN_20, 100, 12, TRUE}
-			,			/* CH_SET_UNII_WW_100_144 */
-			{125, BAND_5G, CHNL_SPAN_20, 149, 4, FALSE}
-			,			/* CH_SET_UNII_UPPER_149_161 */
-			{0, BAND_NULL, 0, 0, 0, FALSE}
+			,	/*CH_SET_UNII_MID_52_64 */
+			{121, BAND_5G, CHNL_SPAN_20, 100, 11, TRUE}
+			,	/*CH_SET_UNII_MID_100_140 */
+			{125, BAND_NULL, 0, 0, 0, FALSE}
+				/*CH_SET_UNII_UPPER_NA */
 		}
 	}
 	,
 	{
 		(uint16_t *) g_u2CountryGroup3, sizeof(g_u2CountryGroup3) / 2,
 		{
-			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
-
+			{81, BAND_2G4, CHNL_SPAN_5, 1, 11, FALSE}
+			,	/*CH_SET_2G4_1_11 */
 			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
-			,			/* CH_SET_UNII_LOW_36_48 */
+			,	/*CH_SET_UNII_LOW_36_48 */
 			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
-			,			/* CH_SET_UNII_MID_52_64 */
-			{121, BAND_5G, CHNL_SPAN_20, 100, 11, TRUE}
-			,			/* CH_SET_UNII_WW_100_140 */
+			,	/*CH_SET_UNII_MID_52_64 */
+			{121, BAND_5G, CHNL_SPAN_20, 100, 12, TRUE}
+			,	/*CH_SET_UNII_MID_100_144 */
 			{125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
-			,			/* CH_SET_UNII_UPPER_149_165 */
-			{0, BAND_NULL, 0, 0, 0, FALSE}
+				/*CH_SET_UNII_UPPER_149_165 */
 		}
 	}
 	,
@@ -415,17 +420,15 @@ struct DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 		(uint16_t *) g_u2CountryGroup4, sizeof(g_u2CountryGroup4) / 2,
 		{
 			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
-
-			{115, BAND_5G, CHNL_SPAN_20, 36, 4, TRUE}
-			,			/* CH_SET_UNII_LOW_36_48 */
+			,	/*CH_SET_2G4_1_13 */
+			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
+			,	/*CH_SET_UNII_LOW_36_48 */
 			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
-			,			/* CH_SET_UNII_MID_52_64 */
-			{121, BAND_5G, CHNL_SPAN_20, 100, 11, TRUE}
-			,			/* CH_SET_UNII_WW_100_140 */
+			,	/*CH_SET_UNII_MID_52_64 */
+			{121, BAND_5G, CHNL_SPAN_20, 100, 12, TRUE}
+			,	/*CH_SET_UNII_MID_100_144 */
 			{125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
-			,			/* CH_SET_UNII_UPPER_149_165 */
-			{0, BAND_NULL, 0, 0, 0, FALSE}
+				/*CH_SET_UNII_UPPER_149_165 */
 		}
 	}
 	,
@@ -433,18 +436,17 @@ struct DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 		(uint16_t *) g_u2CountryGroup5, sizeof(g_u2CountryGroup5) / 2,
 		{
 			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
-
+			,	/*CH_SET_2G4_1_13 */
 			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
-			,			/* CH_SET_UNII_LOW_36_48 */
+			,	/*CH_SET_UNII_LOW_36_48 */
 			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
-			,			/* CH_SET_UNII_MID_52_64 */
+			,	/*CH_SET_UNII_MID_52_64 */
 			{121, BAND_5G, CHNL_SPAN_20, 100, 5, TRUE}
-			,			/* CH_SET_UNII_WW_100_116 */
-			{121, BAND_5G, CHNL_SPAN_20, 132, 3, TRUE}
-			,			/* CH_SET_UNII_WW_132_140 */
+			,	/*CH_SET_UNII_MID_100_116 */
+			{121, BAND_5G, CHNL_SPAN_20, 132, 4, TRUE}
+			,	/*CH_SET_UNII_MID_132_144 */
 			{125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
-				/* CH_SET_UNII_UPPER_149_165 */
+				/*CH_SET_UNII_UPPER_149_5 */
 		}
 	}
 	,
@@ -452,17 +454,15 @@ struct DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 		(uint16_t *) g_u2CountryGroup6, sizeof(g_u2CountryGroup6) / 2,
 		{
 			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
-
+			,	/*CH_SET_2G4_1_13 */
 			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
-			,			/* CH_SET_UNII_LOW_36_48 */
+			,	/*CH_SET_UNII_LOW_36_48 */
 			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
-			,			/* CH_SET_UNII_MID_52_64 */
-			{121, BAND_5G, CHNL_SPAN_20, 132, 3, TRUE}
-			,			/* CH_SET_UNII_WW_132_140 */
+			,	/*CH_SET_UNII_MID_52_64 */
+			{121, BAND_NULL, 0, 0, 0, FALSE}
+			,	/*CH_SET_UNII_WW_NA */
 			{125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
-			,			/* CH_SET_UNII_UPPER_149_165 */
-			{0, BAND_NULL, 0, 0, 0, FALSE}
+				/*CH_SET_UNII_UPPER_149_165 */
 		}
 	}
 	,
@@ -470,17 +470,15 @@ struct DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 		(uint16_t *) g_u2CountryGroup7, sizeof(g_u2CountryGroup7) / 2,
 		{
 			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
-
-			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
-			,			/* CH_SET_UNII_LOW_36_48 */
-			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
-			,			/* CH_SET_UNII_MID_52_64 */
+			,	/*CH_SET_2G4_1_13 */
+			{115, BAND_NULL, 0, 0, 0, FALSE}
+			,	/*CH_SET_UNII_LOW_NA */
+			{118, BAND_NULL, 0, 0, 0, FALSE}
+			,	/*CH_SET_UNII_MID_NA */
 			{121, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_WW_NA */
+			,	/*CH_SET_UNII_WW_NA */
 			{125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
-			,			/* CH_SET_UNII_UPPER_149_165 */
-			{0, BAND_NULL, 0, 0, 0, FALSE}
+				/*CH_SET_UNII_UPPER_149_165 */
 		}
 	}
 	,
@@ -488,17 +486,15 @@ struct DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 		(uint16_t *) g_u2CountryGroup8, sizeof(g_u2CountryGroup8) / 2,
 		{
 			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
-
-			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
-			,			/* CH_SET_UNII_LOW_36_48 */
+			,	/*CH_SET_2G4_1_13 */
+			{115, BAND_NULL, 0, 0, 0, FALSE}
+			,	/*CH_SET_UNII_LOW_NA */
 			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
-			,			/* CH_SET_UNII_MID_52_64 */
-			{121, BAND_5G, CHNL_SPAN_20, 100, 8, TRUE}
-			,			/* CH_SET_UNII_WW_100_128 */
+			,	/*CH_SET_UNII_MID_52_64 */
+			{121, BAND_NULL, 0, 0, 0, FALSE}
+			,	/*CH_SET_UNII_WW_NA */
 			{125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
-			,			/* CH_SET_UNII_UPPER_149_165 */
-			{0, BAND_NULL, 0, 0, 0, FALSE}
+				/*CH_SET_UNII_UPPER_149_165 */
 		}
 	}
 	,
@@ -506,35 +502,33 @@ struct DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 		(uint16_t *) g_u2CountryGroup9, sizeof(g_u2CountryGroup9) / 2,
 		{
 			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
-
+			,	/*CH_SET_2G4_1_13 */
 			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
-			,			/* CH_SET_UNII_LOW_36_48 */
+			,	/*CH_SET_UNII_LOW_36_4 */
 			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
-			,			/* CH_SET_UNII_MID_52_64 */
-			{121, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_WW_NA */
-			{125, BAND_5G, CHNL_SPAN_20, 149, 4, FALSE}
-			,			/* CH_SET_UNII_UPPER_149_161 */
-			{0, BAND_NULL, 0, 0, 0, FALSE}
+			,	/*CH_SET_UNII_MID_52_4 */
+			{121, BAND_5G, CHNL_SPAN_20, 132, 3, TRUE}
+			,	/*CH_SET_UNII_MID_132_140 */
+			{125, BAND_NULL, 0, 0, 0, FALSE}
+					/*CH_SET_UNII_UPPER_NA */
 		}
 	}
 	,
 	{
 		(uint16_t *) g_u2CountryGroup10, sizeof(g_u2CountryGroup10) / 2,
 		{
-			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
-
+			{81, BAND_2G4, CHNL_SPAN_5, 1, 11, FALSE}
+			,	/*CH_SET_2G4_1_11 */
 			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
-			,			/* CH_SET_UNII_LOW_36_48 */
+			,	/*CH_SET_UNII_LOW_36_48 */
 			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
-			,			/* CH_SET_UNII_MID_52_64 */
-			{121, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_WW_NA */
-			{125, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_UPPER_NA */
-			{0, BAND_NULL, 0, 0, 0, FALSE}
+			,	/*CH_SET_UNII_MID_52_64 */
+			{121, BAND_5G, CHNL_SPAN_20, 100, 5, TRUE}
+			,	/*CH_SET_UNII_MID_100_116 */
+			{121, BAND_5G, CHNL_SPAN_20, 132, 4, TRUE}
+			,	/*CH_SET_UNII_MID_132_144 */
+			{125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
+				/*CH_SET_UNII_UPPER_149_165 */
 		}
 	}
 	,
@@ -542,17 +536,15 @@ struct DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 		(uint16_t *) g_u2CountryGroup11, sizeof(g_u2CountryGroup11) / 2,
 		{
 			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
-
-			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
-			,			/* CH_SET_UNII_LOW_36_48 */
+			,	/*CH_SET_2G4_1_13 */
+			{115, BAND_NULL, 0, 0, 0, FALSE}
+			,	/*CH_SET_UNII_LOW_NA */
 			{118, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_MID_NA */
+			,	/*CH_SET_UNII_MID_NA */
 			{121, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_WW_NA */
-			{125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
-			,			/* CH_SET_UNII_UPPER_149_165 */
-			{0, BAND_NULL, 0, 0, 0, FALSE}
+			,	/*CH_SET_UNII_WW_NA */
+			{125, BAND_NULL, 0, 0, 0, FALSE}
+				/*CH_SET_UNII_UPPER_NA */
 		}
 	}
 	,
@@ -560,17 +552,15 @@ struct DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 		(uint16_t *) g_u2CountryGroup12, sizeof(g_u2CountryGroup12) / 2,
 		{
 			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
-
+			,	/*CH_SET_2G4_1_13 */
 			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
-			,			/* CH_SET_UNII_LOW_36_48 */
-			{118, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_MID_NA */
-			{121, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_WW_NA */
+			,	/*CH_SET_UNII_LOW_36_48 */
+			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
+			,	/*CH_SET_UNII_MID_52_64 */
+			{121, BAND_5G, CHNL_SPAN_20, 100, 9, TRUE}
+			,	/*CH_SET_UNII_MID_100_132 */
 			{125, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_UPPER_NA */
-			{0, BAND_NULL, 0, 0, 0, FALSE}
+				/*CH_SET_UNII_UPPER_NA */
 		}
 	}
 	,
@@ -578,17 +568,15 @@ struct DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 		(uint16_t *) g_u2CountryGroup13, sizeof(g_u2CountryGroup13) / 2,
 		{
 			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
-
-			{115, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_LOW_NA */
+			,	/*CH_SET_2G4_1_13 */
+			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
+			,	/*CH_SET_UNII_LOW_36_4 */
 			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
-			,			/* CH_SET_UNII_MID_52_64 */
-			{121, BAND_5G, CHNL_SPAN_20, 100, 11, TRUE}
-			,			/* CH_SET_UNII_WW_100_140 */
-			{125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
-			,			/* CH_SET_UNII_UPPER_149_165 */
-			{0, BAND_NULL, 0, 0, 0, FALSE}
+			,	/*CH_SET_UNII_MID_52_4 */
+			{121, BAND_NULL, 0, 0, 0, FALSE}
+			,	/*CH_SET_UNII_WW_NA */
+			{125, BAND_NULL, 0, 0, 0, FALSE}
+					/*CH_SET_UNII_UPPER_NA */
 		}
 	}
 	,
@@ -596,17 +584,15 @@ struct DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 		(uint16_t *) g_u2CountryGroup14, sizeof(g_u2CountryGroup14) / 2,
 		{
 			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
-
-			{115, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_LOW_NA */
+			,	/*CH_SET_2G4_1_13 */
+			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
+			,	/*CH_SET_UNII_LOW_36_48 */
 			{118, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_MID_NA */
+			,	/*CH_SET_UNII_MID_NA */
 			{121, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_WW_NA */
+			,	/*CH_SET_UNII_WW_NA */
 			{125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
-			,			/* CH_SET_UNII_UPPER_149_165 */
-			{0, BAND_NULL, 0, 0, 0, FALSE}
+				/*CH_SET_UNII_UPPER_149_165 */
 		}
 	}
 	,
@@ -614,16 +600,17 @@ struct DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 		(uint16_t *) g_u2CountryGroup15, sizeof(g_u2CountryGroup15) / 2,
 		{
 			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
-			{115, BAND_5G, CHNL_SPAN_20, 36, 4, TRUE}
-			,			/* CH_SET_UNII_LOW_36_48 */
+			,	/*CH_SET_2G4_1_13 */
+			{82, BAND_2G4, CHNL_SPAN_5, 14, 1, FALSE}
+			,	/*CH_SET_2G4_14_1 */
+			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
+			,	/*CH_SET_UNII_LOW_36_48 */
 			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
-			,			/* CH_SET_UNII_MID_52_64 */
-			{121, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_WW_NA */
-			{125, BAND_5G, CHNL_SPAN_20, 149, 4, FALSE}
-			,			/* CH_SET_UNII_UPPER_149_161 */
-			{0, BAND_NULL, 0, 0, 0, FALSE}
+			,	/*CH_SET_UNII_MID_52_64 */
+			{121, BAND_5G, CHNL_SPAN_20, 100, 12, TRUE}
+			,	/*CH_SET_UNII_MID_100_144 */
+			{125, BAND_NULL, 0, 0, 0, FALSE}
+				/*CH_SET_UNII_UPPER_NA */
 		}
 	}
 	,
@@ -631,67 +618,63 @@ struct DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 		(uint16_t *) g_u2CountryGroup16, sizeof(g_u2CountryGroup16) / 2,
 		{
 			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
-			{115, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_LOW_NA */
-			{118, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_MID_NA */
-			{121, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_WW_NA */
-			{125, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_UPPER_NA */
-			{0, BAND_NULL, 0, 0, 0, FALSE}
+			,	/*CH_SET_2G4_1_13 */
+			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
+			,	/*CH_SET_UNII_LOW_36_48 */
+			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
+			,	/*CH_SET_UNII_MID_52_64 */
+			{121, BAND_5G, CHNL_SPAN_20, 100, 8, TRUE}
+			,	/*CH_SET_UNII_MID_100_128 */
+			{125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
+				/*CH_SET_UNII_UPPER_149_165 */
 		}
 	}
 	,
 	{
 		(uint16_t *) g_u2CountryGroup17, sizeof(g_u2CountryGroup17) / 2,
 		{
-			{81, BAND_2G4, CHNL_SPAN_5, 1, 11, FALSE}
-			,			/* CH_SET_2G4_1_11 */
+			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
+			,	/*CH_SET_2G4_1_13 */
 			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
-			,			/* CH_SET_UNII_LOW_36_48 */
+			,	/*CH_SET_UNII_LOW_36_48 */
 			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
-			,			/* CH_SET_UNII_MID_52_64 */
-			{121, BAND_5G, CHNL_SPAN_20, 100, 12, TRUE}
-			,			/* CH_SET_UNII_WW_100_144 */
-			{125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
-					/* CH_SET_UNII_UPPER_149_165 */
+			,	/*CH_SET_UNII_MID_52_64 */
+			{121, BAND_NULL, 0, 0, 0, FALSE}
+			,	/*CH_SET_UNII_WW_NA */
+			{125, BAND_5G, CHNL_SPAN_20, 149, 4, FALSE}
+				/*CH_SET_UNII_UPPER_149_161 */
 		}
 	}
 	,
 	{
 		(uint16_t *) g_u2CountryGroup18, sizeof(g_u2CountryGroup18) / 2,
 		{
-			{81, BAND_2G4, CHNL_SPAN_5, 1, 11, FALSE}
-			,			/* CH_SET_2G4_1_11 */
+			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
+			,	/*CH_SET_2G4_1_13 */
 			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
-			,			/* CH_SET_UNII_LOW_36_48 */
+			,	/*CH_SET_UNII_LOW_36_48 */
 			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
-			,			/* CH_SET_UNII_MID_52_64 */
-			{121, BAND_5G, CHNL_SPAN_20, 100, 5, TRUE}
-			,			/* CH_SET_UNII_WW_100_116 */
-			{121, BAND_5G, CHNL_SPAN_20, 132, 3, TRUE}
-			,			/* CH_SET_UNII_WW_132_140 */
+			,	/*CH_SET_UNII_MID_52_64 */
+			{121, BAND_5G, CHNL_SPAN_20, 132, 4, TRUE}
+			,	/*CH_SET_UNII_MID_132_144 */
 			{125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
-						/* CH_SET_UNII_UPPER_149_165 */
+				/*CH_SET_UNII_UPPER_149_165 */
 		}
 	}
 	,
 	{
 		(uint16_t *) g_u2CountryGroup19, sizeof(g_u2CountryGroup19) / 2,
 		{
-			{81, BAND_2G4, CHNL_SPAN_5, 1, 11, FALSE}
-			,			/* CH_SET_2G4_1_11 */
+			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
+			,	/*CH_SET_2G4_1_13 */
 			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
-			,			/* CH_SET_UNII_LOW_36_48 */
+			,	/*CH_SET_UNII_LOW_36_48 */
 			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
-			,			/* CH_SET_UNII_MID_52_64 */
-			{121, BAND_NULL, 0, 0, 0, FALSE}
-			,			/* CH_SET_UNII_WW_NA */
-			{125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
-			,			/* CH_SET_UNII_UPPER_149_165 */
-			{0, BAND_NULL, 0, 0, 0, FALSE}
+			,	/*CH_SET_UNII_MID_52_64 */
+			{121, BAND_5G, CHNL_SPAN_20, 100, 12, TRUE}
+			,	/*CH_SET_UNII_MID_100_144 */
+			{125, BAND_5G, CHNL_SPAN_20, 149, 4, FALSE}
+				/*CH_SET_UNII_UPPER_149_161 */
 		}
 	}
 	,
@@ -699,16 +682,47 @@ struct DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 		(uint16_t *) g_u2CountryGroup20, sizeof(g_u2CountryGroup20) / 2,
 		{
 			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
-			,			/* CH_SET_2G4_1_13 */
+			,	/*CH_SET_2G4_1_13 */
 			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
-			,			/* CH_SET_UNII_LOW_36_48 */
+			,	/*CH_SET_UNII_LOW_36_48 */
 			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
-			,			/* CH_SET_UNII_MID_52_64 */
+			,	/*CH_SET_UNII_MID_52_64 */
+			{121, BAND_5G, CHNL_SPAN_20, 100, 5, TRUE}
+			,	/*CH_SET_UNII_MID_100_116 */
+			{125, BAND_NULL, 0, 0, 0, FALSE}
+				/*CH_SET_UNII_UPPER_NA */
+		}
+	}
+	,
+	{
+		(uint16_t *) g_u2CountryGroup21, sizeof(g_u2CountryGroup21) / 2,
+		{
+			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
+			,	/*CH_SET_2G4_1_13 */
+			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
+			,	/*CH_SET_UNII_LOW_36_48 */
+			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
+			,	/*CH_SET_UNII_MID_52_64 */
 			{121, BAND_5G, CHNL_SPAN_20, 100, 12, TRUE}
-			,			/* CH_SET_UNII_WW_100_144 */
+			,	/*CH_SET_UNII_MID_100_144 */
+			{125, BAND_5G, CHNL_SPAN_20, 149, 3, FALSE}
+				/*CH_SET_UNII_UPPER_149_157 */
+		}
+	}
+	,
+	{
+		(uint16_t *) g_u2CountryGroup22, sizeof(g_u2CountryGroup22) / 2,
+		{
+			{81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
+			,	/*CH_SET_2G4_1_13 */
+			{115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
+			,	/*CH_SET_UNII_LOW_36_48 */
+			{118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
+			,	/*CH_SET_UNII_MID_52_64 */
+			{121, BAND_5G, CHNL_SPAN_20, 100, 12, TRUE}
+			,	/*CH_SET_UNII_MID_100_144 */
 			{125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
-			,			/* CH_SET_UNII_UPPER_149_165 */
-			{0, BAND_NULL, 0, 0, 0, FALSE}
+				/*CH_SET_UNII_UPPER_149_165 */
 		}
 	}
 	,
@@ -835,10 +849,12 @@ struct DOMAIN_INFO_ENTRY *rlmDomainGetDomainInfo(struct ADAPTER *prAdapter)
 
 	ASSERT(prAdapter);
 
-	if (prAdapter->prDomainInfo)
-		return prAdapter->prDomainInfo;
-
 	prRegInfo = &prAdapter->prGlueInfo->rRegInfo;
+
+	if (prRegInfo->eRegChannelListMap == REG_CH_MAP_BLOCK_INDOOR)
+		return &prAdapter->rBlockedDomainInfo;
+	else if (prAdapter->prDomainInfo)
+		return prAdapter->prDomainInfo;
 
 	DBGLOG(RLM, TRACE, "eRegChannelListMap=%d, u2CountryCode=0x%04x\n",
 			   prRegInfo->eRegChannelListMap,
@@ -1076,6 +1092,60 @@ rlmDomainGetChnlList(struct ADAPTER *prAdapter,
 	}
 
 	*pucNumOfChannel = ucNum;
+}
+
+/*----------------------------------------------------------------------------*/
+/*!
+ * \brief Retrieve the supported channel list of specified ucRegClass
+ *
+ * \param[in/out] ucOpClass:            specified ucRegClass
+ *                pucChannelListNum:    pointer to returned channel number
+ *                paucChannelList:      pointer to returned channel list array
+ *
+ * \return none
+ */
+/*----------------------------------------------------------------------------*/
+void rlmDomainGetChnlListFromOpClass(struct ADAPTER *prAdapter,
+	uint8_t ucOpClass, struct RF_CHANNEL_INFO *paucChannelList,
+	uint8_t *pucChannelListNum)
+{
+	uint8_t i, j, ucNum = 0, ucCh;
+	struct DOMAIN_SUBBAND_INFO *prSubband;
+	struct DOMAIN_INFO_ENTRY *prDomainInfo;
+
+	prDomainInfo = rlmDomainGetDomainInfo(prAdapter);
+	ASSERT(prDomainInfo);
+
+	for (i = 0; i < MAX_SUBBAND_NUM; i++) {
+		prSubband = &prDomainInfo->rSubBand[i];
+
+		if (prSubband->ucBand == BAND_NULL ||
+		    prSubband->ucBand >= BAND_NUM ||
+		    (prSubband->ucBand == BAND_5G &&
+		     !prAdapter->fgEnable5GBand))
+			continue;
+
+		if (ucOpClass == prSubband->ucRegClass) {
+			for (j = 0; j < prSubband->ucNumChannels; j++) {
+
+				ucCh = prSubband->ucFirstChannelNum +
+				     j * prSubband->ucChannelSpan;
+				if (!rlmIsValidChnl(prAdapter, ucCh,
+						prSubband->ucBand)) {
+					DBGLOG(RLM, INFO,
+					       "Not support ch%d!\n", ucCh);
+					continue;
+				}
+				paucChannelList[ucNum].eBand =
+							prSubband->ucBand;
+				paucChannelList[ucNum].ucChannelNum = ucCh;
+				paucChannelList[ucNum].eDFS = prSubband->fgDfs;
+				ucNum++;
+			}
+		}
+	}
+
+	*pucChannelListNum = ucNum;
 }
 
 /*----------------------------------------------------------------------------*/
@@ -2791,6 +2861,10 @@ rlmDomainBuildCmdByDefaultTable(struct CMD_SET_COUNTRY_CHANNEL_POWER_LIMIT
 				} else {
 					/* BW20 */
 					prPwrLimit->cPwrLimitCCK = cLmtBand;
+#if (CFG_SUPPORT_DYNA_TX_PWR_CTRL_OFDM_SETTING == 1)
+					prPwrLimit->cPwrLimitOFDM_L = cLmtBand;
+					prPwrLimit->cPwrLimitOFDM_H = cLmtBand;
+#endif /* CFG_SUPPORT_DYNA_TX_PWR_CTRL_OFDM_SETTING */
 					prPwrLimit->cPwrLimit20L = cLmtBand;
 					prPwrLimit->cPwrLimit20H = cLmtBand;
 				}
@@ -2829,10 +2903,12 @@ rlmDomainBuildCmdByDefaultTable(struct CMD_SET_COUNTRY_CHANNEL_POWER_LIMIT
 				cLmtBand += 6;
 				if (cLmtBand > MAX_TX_POWER)
 					cLmtBand = MAX_TX_POWER;
-				prPwrLimit->cPwrLimit160L = cLmtBand;
-				prPwrLimit->cPwrLimit160H = cLmtBand;
-
-
+				if (eType == PWR_LIMIT_TYPE_COMP_11AX) {
+					/* prPwrLmtHE do nothing */
+				} else {
+					prPwrLimit->cPwrLimit160L = cLmtBand;
+					prPwrLimit->cPwrLimit160H = cLmtBand;
+				}
 
 			}
 				/* save to power limit array per
@@ -2844,8 +2920,11 @@ rlmDomainBuildCmdByDefaultTable(struct CMD_SET_COUNTRY_CHANNEL_POWER_LIMIT
 				prPwrLimit++;
 
 			prCmd->ucNum++;
-		}
 
+			if (prCmd->ucNum >= MAX_CMD_SUPPORT_CHANNEL_NUM)
+				DBGLOG(RLM, WARN, "out of MAX CH Num\n");
+
+		}
 	}
 
 	DBGLOG(RLM, STATE, "Build Default Limit(%c%c)ChNum=%d,typde=%d\n",
@@ -2857,6 +2936,30 @@ rlmDomainBuildCmdByDefaultTable(struct CMD_SET_COUNTRY_CHANNEL_POWER_LIMIT
 				eType);
 
 }
+
+void rlmDomainCopyFromConfigTable(struct CMD_CHANNEL_POWER_LIMIT *prCmdPwrLimit,
+	struct COUNTRY_POWER_LIMIT_TABLE_CONFIGURATION *prPwrLimitConfig)
+{
+
+
+#if (CFG_SUPPORT_DYNA_TX_PWR_CTRL_OFDM_SETTING == 1)
+	/*remapping from old setting to new setting*/
+	prCmdPwrLimit->cPwrLimitCCK =
+				prPwrLimitConfig->aucPwrLimit[PWR_LIMIT_CCK];
+	prCmdPwrLimit->cPwrLimitOFDM_L =
+				prPwrLimitConfig->aucPwrLimit[PWR_LIMIT_OFDM_L];
+	prCmdPwrLimit->cPwrLimitOFDM_H =
+				prPwrLimitConfig->aucPwrLimit[PWR_LIMIT_OFDM_H];
+	kalMemCopy(&prCmdPwrLimit->cPwrLimit20L,
+		   &prPwrLimitConfig->aucPwrLimit[PWR_LIMIT_OFDM_L],
+		   PWR_LIMIT_NUM - 5);
+#else
+	kalMemCopy(&prCmdPwrLimit->cPwrLimitCCK,
+		   &prPwrLimitConfig->aucPwrLimit[0],
+		   PWR_LIMIT_NUM);
+#endif /* CFG_SUPPORT_DYNA_TX_PWR_CTRL_OFDM_SETTING */
+}
+
 
 /*----------------------------------------------------------------------------*/
 /*!
@@ -2873,7 +2976,6 @@ void rlmDomainBuildCmdByConfigTable(struct ADAPTER *prAdapter,
 {
 #define PwrLmtConf g_rRlmPowerLimitConfiguration
 #define PwrLmtConfHE g_rRlmPowerLimitConfigurationHE
-
 	uint16_t i, k;
 	uint16_t u2CountryCodeTable = COUNTRY_CODE_NULL;
 	enum ENUM_PWR_LIMIT_TYPE eType;
@@ -2891,6 +2993,11 @@ void rlmDomainBuildCmdByConfigTable(struct ADAPTER *prAdapter,
 	/*Build power limit cmd by configuration table information */
 
 	for (k = 0; k < prCmd->ucNum; k++) {
+
+		if (k >= MAX_CMD_SUPPORT_CHANNEL_NUM) {
+			DBGLOG(RLM, ERROR, "out of MAX CH Num\n");
+			return;
+		}
 
 		if (eType == PWR_LIMIT_TYPE_COMP_11AX) {
 			prCmdPwrLimtHE = &prCmd->u.rChPwrLimtHE[k];
@@ -2970,10 +3077,10 @@ void rlmDomainBuildCmdByConfigTable(struct ADAPTER *prAdapter,
 				 * Cmd final setting --> ch1 =
 				 *      22dBm, ch2~14 = 20dBm
 				 */
-
-				kalMemCopy(&prCmdPwrLimit->cPwrLimitCCK,
-					   &PwrLmtConf[i].aucPwrLimit,
-					   PWR_LIMIT_NUM);
+				rlmDomainCopyFromConfigTable(
+					prCmdPwrLimit,
+					&PwrLmtConf[i]
+				);
 			}
 		}
 	}
@@ -3687,9 +3794,7 @@ uint32_t txPwrArbitrator(enum ENUM_TX_POWER_CTRL_TYPE eCtrlType,
 
 	}
 
-
 	return 0;
-
 }
 
 uint32_t txPwrApplyOneSetting(struct CMD_SET_COUNTRY_CHANNEL_POWER_LIMIT *prCmd,
@@ -3864,6 +3969,10 @@ struct TX_PWR_CTRL_ELEMENT *txPwrCtrlStringToStruct(char *pcContent,
 
 	char *pacParsePwrAC[PWR_CFG_PRAM_NUM_AC] = {
 		"CCK",
+#if (CFG_SUPPORT_DYNA_TX_PWR_CTRL_OFDM_SETTING == 1)
+		"OFDML",
+		"OFDMH",
+#endif
 		"HT20L",
 		"HT20H",
 		"HT40L",
@@ -4113,6 +4222,11 @@ skipLabel:
 		else {
 			pcContCur2 = pcContOld;
 			pcContTmp = txPwrGetString(&pcContCur2, "-");
+			if (!pcContTmp) {
+				DBGLOG(RLM, ERROR,
+					"parse channel range error: %s\n");
+				goto clearLabel;
+			}
 			if (pcContCur2 == NULL) { /* case: normal channel */
 				if (kalkStrtou8(pcContOld, 0, &value) != 0) {
 					DBGLOG(RLM, ERROR,
@@ -4283,7 +4397,9 @@ void txPwrCtrlShowList(struct ADAPTER *prAdapter, uint8_t filterType,
 		&prAdapter->rTxPwr_DynamicList
 	};
 	uint8_t ucAppliedWay, ucOperation;
-	int i, j, count = 0;
+	int i, j, k, count = 0;
+	char msgLimit[PWR_BUF_LEN];
+	int msgOfs = 0;
 
 	if (filterType == 1)
 		DBGLOG(RLM, TRACE, "Tx Power Ctrl List=[%s], Size=[%d]",
@@ -4339,35 +4455,52 @@ void txPwrCtrlShowList(struct ADAPTER *prAdapter, uint8_t filterType,
 			       ucOperation,
 			       g_au1TxPwrOperationLabel[ucOperation - 1],
 			       prCurElement->settingCount);
-			prChlSettingList = &(prCurElement->rChlSettingList[0]);
+
 			for (j = 0; j < prCurElement->settingCount; j++) {
-				DBGLOG(RLM, TRACE,
-				       "              Setting-%u:[%s:%u,%u],[%u,%d],[%u,%d],[%u,%d],[%u,%d],[%u,%d],[%u,%d],[%u,%d],[%u,%d],[%u,%d]\n",
-				       (j + 1),
-				       g_au1TxPwrChlTypeLabel[
-						prChlSettingList->eChnlType],
-				       prChlSettingList->channelParam[0],
-				       prChlSettingList->channelParam[1],
-				       prChlSettingList->op[0],
-				       prChlSettingList->i8PwrLimit[0],
-				       prChlSettingList->op[1],
-				       prChlSettingList->i8PwrLimit[1],
-				       prChlSettingList->op[2],
-				       prChlSettingList->i8PwrLimit[2],
-				       prChlSettingList->op[3],
-				       prChlSettingList->i8PwrLimit[3],
-				       prChlSettingList->op[4],
-				       prChlSettingList->i8PwrLimit[4],
-				       prChlSettingList->op[5],
-				       prChlSettingList->i8PwrLimit[5],
-				       prChlSettingList->op[6],
-				       prChlSettingList->i8PwrLimit[6],
-				       prChlSettingList->op[7],
-				       prChlSettingList->i8PwrLimit[7],
-				       prChlSettingList->op[8],
-				       prChlSettingList->i8PwrLimit[8]
-				);
-				prChlSettingList++;
+				prChlSettingList =
+					&(prCurElement->rChlSettingList[j]);
+				msgOfs = 0;
+
+				/*Coverity check*/
+				if (prChlSettingList->eChnlType < 0)
+					prChlSettingList->eChnlType = 0;
+
+				/*message head*/
+				msgOfs += snprintf(msgLimit + msgOfs,
+					PWR_BUF_LEN - msgOfs,
+					"Setting-%u:[%s:%u,%u],Legcy:",
+					(j + 1),
+					g_au1TxPwrChlTypeLabel[
+					prChlSettingList->eChnlType],
+					prChlSettingList->channelParam[0],
+					prChlSettingList->channelParam[1]);
+
+				/*print legacy cfg*/
+				for (k = 0; k < PWR_LIMIT_NUM ; k++)
+					msgOfs += snprintf(msgLimit + msgOfs,
+						PWR_BUF_LEN - msgOfs,
+						"[%u,%d]",
+						prChlSettingList->op[k],
+					    prChlSettingList->i8PwrLimit[k]);
+
+				/*print HE cfg*/
+				msgOfs += snprintf(msgLimit + msgOfs,
+					PWR_BUF_LEN - msgOfs,
+					"HE:");
+				for (k = 0; k < PWR_LIMIT_HE_NUM ; k++)
+					msgOfs += snprintf(msgLimit + msgOfs,
+						PWR_BUF_LEN - msgOfs,
+						"[%u,%d]",
+						prChlSettingList->opHE[k],
+					    prChlSettingList->i8PwrLimitHE[k]);
+
+				/*message tail*/
+				if (msgOfs > 0)
+					msgLimit[msgOfs-1] = '\0';
+				else
+					msgLimit[0] = '\0';
+
+				DBGLOG(RLM, TRACE, "%s\n", msgLimit);
 			}
 		}
 	}
@@ -4400,17 +4533,15 @@ void _txPwrCtrlDeleteElement(struct ADAPTER *prAdapter,
 			else if (prCurElement->index == index)
 				fgFind = TRUE;
 			if (fgFind) {
+				ucSettingCount =
+					prCurElement->settingCount;
+					u4MemSize2 = u4MemSize +
+					((ucSettingCount == 1) ? 0 :
+					(ucSettingCount - 1) *
+					u4SettingSize);
+				kalMemFree(prCurElement, VIR_MEM_TYPE,
+					u4MemSize2);
 				linkDel(prCur);
-				if (prCurElement != NULL) {
-					ucSettingCount =
-						prCurElement->settingCount;
-						u4MemSize2 = u4MemSize +
-						((ucSettingCount == 1) ? 0 :
-						(ucSettingCount - 1) *
-						u4SettingSize);
-					kalMemFree(prCurElement, VIR_MEM_TYPE,
-						u4MemSize2);
-				}
 			}
 		}
 	}
@@ -4439,6 +4570,7 @@ struct TX_PWR_CTRL_ELEMENT *_txPwrCtrlFindElement(struct ADAPTER *prAdapter,
 {
 	struct LINK_ENTRY *prCur, *prNext;
 	struct TX_PWR_CTRL_ELEMENT *prCurElement = NULL;
+
 
 	LINK_FOR_EACH_SAFE(prCur, prNext, prTxPwrCtrlList) {
 		u_int8_t fgFind = FALSE;
@@ -4593,9 +4725,10 @@ void txPwrCtrlCfgFileToList(struct ADAPTER *prAdapter)
 			/* ToDo:: Nothing */
 		}
 
-		if (pucConfigBuf[0] != '\0' && u4ConfigReadLen > 0)
+		if (pucConfigBuf[0] != '\0' && u4ConfigReadLen > 0) {
+			pucConfigBuf[u4ConfigReadLen] = 0;
 			txPwrCtrlFileBufToList(prAdapter, pucConfigBuf);
-		else
+		} else
 			DBGLOG(RLM, INFO,
 			       "no txpowerctrl.cfg or file is empty\n");
 
@@ -4676,6 +4809,11 @@ void rlmDomainShowPwrLimitPerCh(char *message,
 
 	for (i = 0; i < prCmd->ucNum; i++) {
 
+		if (i >= MAX_CMD_SUPPORT_CHANNEL_NUM) {
+			DBGLOG(RLM, ERROR, "out of MAX CH Num\n");
+			return;
+		}
+
 		kalMemZero(msgLimit, sizeof(char)*PWR_BUF_LEN);
 		msgOfs = 0;
 		if (eType == PWR_LIMIT_TYPE_COMP_11AX) {
@@ -4694,9 +4832,11 @@ void rlmDomainShowPwrLimitPerCh(char *message,
 					PWR_BUF_LEN - msgOfs,
 					"%d,",
 					*(prcRatePwr + j));
-
 			/*message tail*/
-			msgLimit[msgOfs-1] = '\0';
+			if (msgOfs >= 1)
+				msgLimit[msgOfs-1] = '\0';
+			else
+				msgLimit[0] = '\0';
 
 			DBGLOG(RLM, TRACE, "%s:%s\n", message, msgLimit);
 
@@ -4718,7 +4858,10 @@ void rlmDomainShowPwrLimitPerCh(char *message,
 					*(prcRatePwr + j));
 
 			/*message tail*/
-			msgLimit[msgOfs-1] = '\0';
+			if (msgOfs > 0)
+				msgLimit[msgOfs-1] = '\0';
+			else
+				msgLimit[0] = '\0';
 
 			DBGLOG(RLM, TRACE, "%s:%s\n", message, msgLimit);
 		}
@@ -4751,22 +4894,24 @@ void rlmDomainSendPwrLimitCmd(struct ADAPTER *prAdapter)
 
 
 	u4SetCmdTableMaxSize =
-	    sizeof(struct CMD_SET_COUNTRY_CHANNEL_POWER_LIMIT) +
-	    MAX_CMD_SUPPORT_CHANNEL_NUM *
-	    sizeof(struct CMD_CHANNEL_POWER_LIMIT);
+	    sizeof(struct CMD_SET_COUNTRY_CHANNEL_POWER_LIMIT);
 
 	u4SetCmdTableMaxSizeHE =
-	    sizeof(struct CMD_SET_COUNTRY_CHANNEL_POWER_LIMIT) +
-	    MAX_CMD_SUPPORT_CHANNEL_NUM *
-	    sizeof(struct CMD_CHANNEL_POWER_LIMIT_HE);
+	    sizeof(struct CMD_SET_COUNTRY_CHANNEL_POWER_LIMIT);
 
 
 	prCmd = cnmMemAlloc(prAdapter, RAM_TYPE_BUF, u4SetCmdTableMaxSize);
+
+	if (!prCmd) {
+		DBGLOG(RLM, ERROR, "Domain: Alloc cmd buffer failed\n");
+		goto err;
+	}
+
 	prCmdHE = cnmMemAlloc(prAdapter, RAM_TYPE_BUF, u4SetCmdTableMaxSizeHE);
 
-	if (!prCmd || !prCmdHE) {
+	if (!prCmdHE) {
 		DBGLOG(RLM, ERROR, "Domain: Alloc cmd buffer failed\n");
-		return;
+		goto err;
 	}
 
 	kalMemZero(prCmd, u4SetCmdTableMaxSize);
@@ -4779,7 +4924,7 @@ void rlmDomainSendPwrLimitCmd(struct ADAPTER *prAdapter)
 	if (u2DefaultTableIndex == POWER_LIMIT_TABLE_NULL) {
 		DBGLOG(RLM, ERROR,
 					   "Can't find any table index!\n");
-		return;
+		goto err;
 	}
 
 	WLAN_GET_FIELD_BE16(&g_rRlmPowerLimitDefault
@@ -4794,7 +4939,6 @@ void rlmDomainSendPwrLimitCmd(struct ADAPTER *prAdapter)
 	if (prCmd->u2CountryCode == COUNTRY_CODE_NULL)
 		DBGLOG(RLM, WARN,
 			   "CC={0x00,0x00},Power Limit use Default setting!");
-
 
 
 	/* Initialize channel number */
@@ -4818,6 +4962,7 @@ void rlmDomainSendPwrLimitCmd(struct ADAPTER *prAdapter)
 	rlmDomainBuildCmdByConfigTable(prAdapter,
 	prCmd);
 
+#if (CFG_SUPPORT_PWR_LIMIT_HE == 1)
 	/*<1>Command - default table information,
 	 *fill all subband
 	 */
@@ -4829,34 +4974,39 @@ void rlmDomainSendPwrLimitCmd(struct ADAPTER *prAdapter)
 	 */
 	rlmDomainBuildCmdByConfigTable(prAdapter,
 	prCmdHE);
-
-
-	DBGLOG(RLM, INFO,
-	       "Domain: ValidCC=%c%c, PwrLimitCC=%c%c, PwrLimitChNum=%d\n",
-	       (prAdapter->rWifiVar.u2CountryCode & 0xff00) >> 8,
-	       (prAdapter->rWifiVar.u2CountryCode & 0x00ff),
-	       ((prCmd->u2CountryCode & 0xff00) >> 8),
-	       (prCmd->u2CountryCode & 0x00ff),
-	       prCmd->ucNum);
+#endif
+	if (prAdapter->rWifiVar.u2CountryCode != (uint16_t)NULL) {
+		DBGLOG(RLM, INFO,
+		       "Domain: ValidCC=%c%c, PwrLimitCC=%c%c, PwrLimitChNum=%d\n",
+		       (prAdapter->rWifiVar.u2CountryCode & 0xff00) >> 8,
+		       (prAdapter->rWifiVar.u2CountryCode & 0x00ff),
+		       ((prCmd->u2CountryCode & 0xff00) >> 8),
+		       (prCmd->u2CountryCode & 0x00ff),
+		       prCmd->ucNum);
+	} else {
+		DBGLOG(RLM, INFO, "Domain: CountryCode is NULL!!");
+	}
 
 #if CFG_SUPPORT_DYNAMIC_PWR_LIMIT
 	rlmDomainShowPwrLimitPerCh("Old", prCmd);
-	rlmDomainShowPwrLimitPerCh("Old", prCmdHE);
 	/* apply each setting into country channel power table */
 	txPwrCtrlApplySettings(prAdapter, prCmd, bandedgeParam);
-	txPwrCtrlApplySettings(prAdapter, prCmdHE, bandedgeParam);
-#endif
 	/* show tx power table after applying setting */
 	rlmDomainShowPwrLimitPerCh("Final", prCmd);
+
+#if (CFG_SUPPORT_PWR_LIMIT_HE == 1)
+	rlmDomainShowPwrLimitPerCh("Old", prCmdHE);
+	txPwrCtrlApplySettings(prAdapter, prCmdHE, bandedgeParam);
 	rlmDomainShowPwrLimitPerCh("Final", prCmdHE);
+#endif /*#if (CFG_SUPPORT_PWR_LIMIT_HE == 1)*/
+#endif
+
 
 	u4SetQueryInfoLen =
-		(sizeof(struct CMD_SET_COUNTRY_CHANNEL_POWER_LIMIT) +
-		(prCmd->ucNum) * sizeof(struct CMD_CHANNEL_POWER_LIMIT));
+		sizeof(struct CMD_SET_COUNTRY_CHANNEL_POWER_LIMIT);
 
 	u4SetQueryInfoLenHE =
-		(sizeof(struct CMD_SET_COUNTRY_CHANNEL_POWER_LIMIT) +
-		(prCmd->ucNum) * sizeof(struct CMD_CHANNEL_POWER_LIMIT_HE));
+		sizeof(struct CMD_SET_COUNTRY_CHANNEL_POWER_LIMIT);
 
 
 	/* Update domain info to chip */
@@ -4892,7 +5042,7 @@ void rlmDomainSendPwrLimitCmd(struct ADAPTER *prAdapter)
 	}
 
 	/* ASSERT(rStatus == WLAN_STATUS_PENDING); */
-
+err:
 	cnmMemFree(prAdapter, prCmd);
 	cnmMemFree(prAdapter, prCmdHE);
 
@@ -5150,7 +5300,7 @@ void rlmDomainParsingChannel(IN struct wiphy *pWiphy)
 	/* Retrieve connected channel */
 	prGlueInfo = rlmDomainGetGlueInfo();
 	if (prGlueInfo && kalGetMediaStateIndicated(prGlueInfo) ==
-	    PARAM_MEDIA_STATE_CONNECTED) {
+	    MEDIA_STATE_CONNECTED) {
 		ucChannelNum =
 			wlanGetChannelNumberByNetwork(prGlueInfo->prAdapter,
 			   prGlueInfo->prAdapter->prAisBssInfo->ucBssIndex);

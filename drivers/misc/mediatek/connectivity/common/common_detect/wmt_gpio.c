@@ -13,6 +13,9 @@
 */
 
 #include "wmt_gpio.h"
+#if (LINUX_VERSION_CODE >> 8) == 0x40E
+#include <wmt_build_in_adapter.h>
+#endif
 
 /*******************************************************************************
 *                         C O M P I L E R   F L A G S
@@ -324,6 +327,9 @@ INT32 wmt_gpio_init(struct platform_device *pdev)
 					} else
 						gpio_ctrl_info.gpio_ctrl_state[i].gpio_state[j] = NULL;
 				}
+			} else {
+				for (j = 0; j < GPIO_STATE_MAX; j++)
+					gpio_ctrl_info.gpio_ctrl_state[i].gpio_state[j] = NULL;
 			}
 		}
 
@@ -420,6 +426,10 @@ INT32 wmt_gpio_init(struct platform_device *pdev)
 		pr_err("wmt_gpio:can't find pinctrl dev!\n");
 		iret = -1;
 	}
+
+#if (LINUX_VERSION_CODE >> 8) == 0x40E
+	KERNEL_mtk_wcn_cmb_sdio_request_eirq();
+#endif
 err:
 	return iret;
 }

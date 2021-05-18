@@ -433,7 +433,6 @@ void glSetHifInfo(struct GLUE_INFO *prGlueInfo, unsigned long ulCookie)
 	prMemOps->copyEvent = pcieCopyEvent;
 	prMemOps->copyTxData = pcieCopyTxData;
 	prMemOps->copyRxData = pcieCopyRxData;
-	prMemOps->flushCache = NULL;
 	prMemOps->mapTxBuf = pcieMapTxBuf;
 	prMemOps->mapRxBuf = pcieMapRxBuf;
 	prMemOps->unmapTxBuf = pcieUnmapTxBuf;

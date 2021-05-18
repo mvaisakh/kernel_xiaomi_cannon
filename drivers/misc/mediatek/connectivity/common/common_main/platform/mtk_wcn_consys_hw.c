@@ -47,6 +47,15 @@
 #include <connectivity_build_in_adapter.h>
 #include "wmt_lib.h"
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0))
+#include <linux/regulator/consumer.h>
+#include <linux/mfd/mt6397/core.h>
+#include <linux/of.h>
+#include <linux/of_platform.h>
+#include <linux/regmap.h>
+#define ALLOCATE_CONNSYS_EMI_FROM_KO 1
+#endif
+
 /*******************************************************************************
 *                              C O N S T A N T S
 ********************************************************************************
@@ -76,6 +85,13 @@ P_WMT_CONSYS_IC_OPS wmt_consys_ic_ops;
 
 struct platform_device *g_pdev;
 
+#ifdef ALLOCATE_CONNSYS_EMI_FROM_KO
+phys_addr_t gConEmiPhyBase;
+EXPORT_SYMBOL(gConEmiPhyBase);
+unsigned long long gConEmiSize;
+EXPORT_SYMBOL(gConEmiSize);
+#endif
+
 UINT32 gps_lna_pin_num = 0xffffffff;
 
 INT32 chip_reset_status = -1;
@@ -86,6 +102,8 @@ static OSAL_SLEEPABLE_LOCK g_adie_chipid_lock;
 
 static atomic64_t g_sleep_counter_enable = ATOMIC64_INIT(1);
 static OSAL_UNSLEEPABLE_LOCK g_sleep_counter_spinlock;
+
+static atomic_t g_probe_called = ATOMIC_INIT(0);
 
 #ifdef CONFIG_OF
 const struct of_device_id apwmt_of_ids[] = {
@@ -112,6 +130,7 @@ const struct of_device_id apwmt_of_ids[] = {
 	{.compatible = "mediatek,mt6785-consys",},
 	{.compatible = "mediatek,mt6853-consys",},
 	{.compatible = "mediatek,mt6873-consys",},
+	{.compatible = "mediatek,mt8168-consys",},
 	{}
 };
 struct CONSYS_BASE_ADDRESS conn_reg;
@@ -139,6 +158,10 @@ struct pinctrl *consys_pinctrl;
 
 struct work_struct plt_resume_worker;
 static void plat_resume_handler(struct work_struct *work);
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0))
+struct regmap *g_regmap;
+#endif
 
 /*******************************************************************************
 *                           P R I V A T E   D A T A
@@ -177,13 +200,72 @@ P_WMT_CONSYS_IC_OPS __weak mtk_wcn_get_consys_ic_ops(VOID)
 	return NULL;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0))
+static VOID mtk_wcn_get_regmap(struct platform_device *pdev)
+{
+	struct device_node *pmic_node;
+	struct platform_device *pmic_pdev;
+	struct mt6397_chip *chip;
+
+	pmic_node = of_parse_phandle(pdev->dev.of_node, "pmic", 0);
+	if (!pmic_node) {
+		WMT_PLAT_PR_INFO("get pmic_node fail\n");
+		return;
+	}
+
+	pmic_pdev = of_find_device_by_node(pmic_node);
+	if (!pmic_pdev) {
+		WMT_PLAT_PR_INFO("get pmic_pdev fail\n");
+		return;
+	}
+
+	chip = dev_get_drvdata(&(pmic_pdev->dev));
+	if (!chip) {
+		WMT_PLAT_PR_INFO("get chip fail\n");
+		return;
+	}
+
+	g_regmap = chip->regmap;
+	if (IS_ERR_VALUE(g_regmap)) {
+		g_regmap = NULL;
+		WMT_PLAT_PR_INFO("get regmap fail\n");
+	}
+}
+#endif
+
+static INT32 wmt_allocate_connsys_emi(struct platform_device *pdev)
+{
+#ifdef ALLOCATE_CONNSYS_EMI_FROM_KO
+	struct device_node *np;
+	struct reserved_mem *rmem;
+
+	np = of_parse_phandle(pdev->dev.of_node, "memory-region", 0);
+	if (!np) {
+		WMT_PLAT_PR_INFO("no memory-region, np is NULL\n");
+		return -1;
+	}
+
+	rmem = of_reserved_mem_lookup(np);
+	of_node_put(np);
+
+	if (!rmem) {
+		WMT_PLAT_PR_INFO("no memory-region\n");
+		return -1;
+	}
+
+	gConEmiPhyBase = rmem->base;
+	gConEmiSize = rmem->size;
+#endif
+	return 0;
+}
+
 static INT32 mtk_wmt_probe(struct platform_device *pdev)
 {
 	INT32 iRet = -1;
 	INT32 pin_ret = 0;
 	UINT32 pinmux = 0;
-	struct device_node *pinctl_node, *pins_node;
-	UINT8 __iomem *pConnsysEmiStart;
+	struct device_node *pinctl_node = NULL, *pins_node = NULL;
+	UINT8 __iomem *pConnsysEmiStart = NULL;
 
 	if (pdev)
 		g_pdev = pdev;
@@ -191,6 +273,8 @@ static INT32 mtk_wmt_probe(struct platform_device *pdev)
 		WMT_PLAT_PR_ERR("pdev is NULL\n");
 		return -1;
 	}
+
+	wmt_allocate_connsys_emi(pdev);
 
 	if (wmt_consys_ic_ops->consys_ic_need_store_pdev) {
 		if (wmt_consys_ic_ops->consys_ic_need_store_pdev() == MTK_WCN_BOOL_TRUE) {
@@ -230,8 +314,10 @@ static INT32 mtk_wmt_probe(struct platform_device *pdev)
 			wmt_consys_ic_ops->consys_ic_emi_set_remapping_reg();
 		if (wmt_consys_ic_ops->consys_ic_emi_coredump_remapping)
 			wmt_consys_ic_ops->consys_ic_emi_coredump_remapping(&pEmibaseaddr, 1);
+#ifdef CONFIG_MTK_CONNSYS_DEDICATED_LOG_PATH
 		if (wmt_consys_ic_ops->consys_ic_dedicated_log_path_init)
 			wmt_consys_ic_ops->consys_ic_dedicated_log_path_init(pdev);
+#endif
 	} else {
 		WMT_PLAT_PR_ERR("consys emi memory address gConEmiPhyBase invalid\n");
 	}
@@ -244,7 +330,9 @@ static INT32 mtk_wmt_probe(struct platform_device *pdev)
 	if (wmt_consys_ic_ops->ic_bt_wifi_share_v33_spin_lock_init)
 		wmt_consys_ic_ops->ic_bt_wifi_share_v33_spin_lock_init();
 
-
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0))
+	mtk_wcn_get_regmap(pdev);
+#endif
 	if (wmt_consys_ic_ops->consys_ic_pmic_get_from_dts)
 		wmt_consys_ic_ops->consys_ic_pmic_get_from_dts(pdev);
 
@@ -284,6 +372,8 @@ static INT32 mtk_wmt_probe(struct platform_device *pdev)
 
 	INIT_WORK(&plt_resume_worker, plat_resume_handler);
 
+	atomic_set(&g_probe_called, 1);
+
 	return 0;
 }
 
@@ -294,8 +384,10 @@ static INT32 mtk_wmt_remove(struct platform_device *pdev)
 			pm_runtime_disable(&pdev->dev);
 	}
 
+#ifdef CONFIG_MTK_CONNSYS_DEDICATED_LOG_PATH
 	if (wmt_consys_ic_ops->consys_ic_dedicated_log_path_deinit)
 		wmt_consys_ic_ops->consys_ic_dedicated_log_path_deinit();
+#endif
 	if (wmt_consys_ic_ops->consys_ic_emi_coredump_remapping)
 		wmt_consys_ic_ops->consys_ic_emi_coredump_remapping(&pEmibaseaddr, 0);
 
@@ -305,6 +397,7 @@ static INT32 mtk_wmt_remove(struct platform_device *pdev)
 	osal_unsleepable_lock_deinit(&g_sleep_counter_spinlock);
 	osal_sleepable_lock_deinit(&g_adie_chipid_lock);
 
+	atomic_set(&g_probe_called, 0);
 	return 0;
 }
 
@@ -514,8 +607,6 @@ INT32 mtk_wcn_consys_hw_reg_ctrl(UINT32 on, UINT32 co_clock_type)
 			wmt_consys_ic_ops->polling_consys_ic_chipid() < 0)
 			return -1;
 
-		if (wmt_consys_ic_ops->consys_ic_hw_vcn_ctrl_after_idle)
-			wmt_consys_ic_ops->consys_ic_hw_vcn_ctrl_after_idle();
 		if (wmt_consys_ic_ops->consys_ic_set_access_emi_hw_mode)
 			wmt_consys_ic_ops->consys_ic_set_access_emi_hw_mode();
 		if (wmt_consys_ic_ops->update_consys_rom_desel_value)
@@ -536,6 +627,8 @@ INT32 mtk_wcn_consys_hw_reg_ctrl(UINT32 on, UINT32 co_clock_type)
 			wmt_consys_ic_ops->consys_ic_bus_timeout_config();
 		if (wmt_consys_ic_ops->consys_ic_hw_reset_bit_set)
 			wmt_consys_ic_ops->consys_ic_hw_reset_bit_set(DISABLE);
+		if (wmt_consys_ic_ops->consys_ic_hw_vcn_ctrl_after_idle)
+			wmt_consys_ic_ops->consys_ic_hw_vcn_ctrl_after_idle();
 
 		msleep(20);
 
@@ -808,7 +901,7 @@ INT32 mtk_wcn_consys_hw_restore(struct device *device)
 
 INT32 mtk_wcn_consys_hw_init(VOID)
 {
-	INT32 iRet = -1;
+	INT32 iRet = -1, retry = 0;
 
 	if (wmt_consys_ic_ops == NULL)
 		wmt_consys_ic_ops = mtk_wcn_get_consys_ic_ops();
@@ -816,8 +909,14 @@ INT32 mtk_wcn_consys_hw_init(VOID)
 	iRet = platform_driver_register(&mtk_wmt_dev_drv);
 	if (iRet)
 		WMT_PLAT_PR_ERR("WMT platform driver registered failed(%d)\n", iRet);
-
-	register_syscore_ops(&wmt_dbg_syscore_ops);
+	else {
+		while (atomic_read(&g_probe_called) == 0 && retry < 100) {
+			osal_sleep_ms(50);
+			retry++;
+			WMT_PLAT_PR_INFO("g_probe_called = 0, retry = %d\n", retry);
+		}
+		register_syscore_ops(&wmt_dbg_syscore_ops);
+	}
 
 	return iRet;
 
@@ -946,32 +1045,39 @@ UINT32 mtk_consys_get_gps_lna_pin_num(VOID)
 INT32 mtk_wcn_consys_reg_ctrl(UINT32 is_write, enum CONSYS_BASE_ADDRESS_INDEX index, UINT32 offset,
 		PUINT32 value)
 {
-	UINT32 reg_info[index*4 + 4];
+	INT32 iRet = -1;
+	PUINT32 reg_info = NULL;
+	UINT32 reg_info_size = index * 4 + 4;
 	struct device_node *node;
 	PVOID remap_addr = NULL;
 
+	reg_info = osal_malloc(reg_info_size * sizeof(UINT32));
+	if (!reg_info) {
+		WMT_PLAT_PR_ERR("reg_info osal_malloc fail\n");
+		goto fail;
+	}
 
 	node = g_pdev->dev.of_node;
 	if (node) {
-		if (of_property_read_u32_array(node, "reg", reg_info, ARRAY_SIZE(reg_info))) {
+		if (of_property_read_u32_array(node, "reg", reg_info, reg_info_size)) {
 			WMT_PLAT_PR_ERR("get reg from DTS fail!!\n");
-			return -1;
+			goto fail;
 		}
 	} else {
 		WMT_PLAT_PR_ERR("[%s] can't find CONSYS compatible node\n", __func__);
-		return -1;
+		goto fail;
 	}
 
 	if (reg_info[index*4 + 3] < offset) {
 		WMT_PLAT_PR_ERR("Access overflow of address(0x%x), offset(0x%x)!\n",
 				reg_info[index*4 + 1], reg_info[index*4 + 3]);
-		return -1;
+		goto fail;
 	}
 
 	remap_addr = ioremap(reg_info[index*4 + 1] + offset, 0x4);
 	if (remap_addr == NULL) {
 		WMT_PLAT_PR_ERR("ioremap fail!\n");
-		return -1;
+		goto fail;
 	}
 
 	if (is_write)
@@ -982,9 +1088,13 @@ INT32 mtk_wcn_consys_reg_ctrl(UINT32 is_write, enum CONSYS_BASE_ADDRESS_INDEX in
 	if (remap_addr)
 		iounmap(remap_addr);
 
-	return 0;
-}
+	iRet = 0;
 
+fail:
+	if (reg_info)
+		osal_free(reg_info);
+	return iRet;
+}
 
 /* Who call this?
  *	- wmt_step
@@ -1077,4 +1187,14 @@ INT32 mtk_wcn_consys_dump_gating_state(P_CONSYS_STATE state)
 		return wmt_consys_ic_ops->consys_ic_dump_gating_state(state);
 
 	return MTK_WCN_BOOL_FALSE;
+}
+
+UINT64 mtk_wcn_consys_get_options(VOID)
+{
+	if (wmt_consys_ic_ops->consys_ic_get_options)
+		return wmt_consys_ic_ops->consys_ic_get_options();
+
+	WMT_PLAT_PR_INFO("Please implement consys_ic_get_options!");
+	wmt_lib_trigger_assert(WMTDRV_TYPE_WMT, 45);
+	return 0;
 }

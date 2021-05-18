@@ -193,6 +193,7 @@ enum WIFI_VENDOR_EVENT {
 	WIFI_EVENT_RSSI_MONITOR,
 	WIFI_EVENT_DRIVER_ERROR,
 	WIFI_EVENT_ACS,
+	WIFI_EVENT_GENERIC_RESPONSE,
 	WIFI_EVENT_BIGDATA_PIP
 	/* Always add at the end.*/
 };
@@ -647,6 +648,58 @@ struct PARAM_BSS_MAC_OUI {
 	uint8_t ucBssIndex;
 	uint8_t ucMacOui[MAC_OUI_LEN];
 };
+
+#ifdef CFG_TC10_FEATURE
+
+enum PARAM_GENERIC_RESPONSE_ID {
+	GRID_MANAGE_CHANNEL_LIST,			/* 0 */
+	GRID_HANG_INFO,					/* 1 */
+	GRID_SWPIS_BCN_INFO,				/* 2 */
+	GRID_SWPIS_BCN_INFO_ABORT,			/* 3 */
+};
+
+struct PARAM_MANAGE_CHANNEL_LIST {
+	uint8_t id;
+	uint8_t len;
+	uint8_t ssid[ELEM_MAX_LEN_SSID + 1];
+	uint8_t num;
+	uint8_t channels[0];
+};
+
+struct PARAM_HANG_INFO {
+	uint8_t id;
+	uint8_t len;
+	uint8_t fwVer[30];
+	uint8_t driverVer[30];
+	uint8_t cidInfo[30];
+	uint32_t hangType;
+	uint8_t rawData[512];
+};
+#endif
+
+struct PARAM_SWPIS_BCN_INFO {
+	uint8_t id;
+	uint8_t len;
+	uint8_t ssid[ELEM_MAX_LEN_SSID + 1];
+	uint8_t bssid[PARAM_MAC_ADDR_LEN];
+	uint8_t channel;
+	uint16_t bcnInterval;
+	uint32_t timeStamp[2];
+	uint64_t sysTime;
+} __KAL_ATTRIB_PACKED__;
+
+enum SWPIS_ABORT_REASON {
+	SWPIS_ABORT_SCAN_STARTS = 1,
+	SWPIS_ABORT_CONNECT_STARTS,
+	SWPIS_ABORT_DISCONNECT,
+};
+
+struct PARAM_SWPIS_BCN_INFO_ABORT {
+	uint8_t id;
+	uint8_t len;
+	uint8_t abort;
+};
+
 /*******************************************************************************
  *                                 M A C R O S
  *******************************************************************************
@@ -760,6 +813,10 @@ int mtk_cfg80211_vendor_packet_keep_alive_stop(
 int mtk_cfg80211_vendor_get_version(struct wiphy *wiphy,
 				    struct wireless_dev *wdev,
 				    const void *data, int data_len);
+
+int mtk_cfg80211_vendor_event_generic_response(
+	struct wiphy *wiphy, struct wireless_dev *wdev,
+	uint32_t len, uint8_t *data);
 
 int mtk_cfg80211_vendor_get_supported_feature_set(
 	struct wiphy *wiphy, struct wireless_dev *wdev,

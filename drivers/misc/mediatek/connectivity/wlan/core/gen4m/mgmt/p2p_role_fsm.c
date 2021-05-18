@@ -68,6 +68,15 @@ static uint8_t *apucDebugP2pRoleState[P2P_ROLE_STATE_NUM] = {
 #endif
 };
 
+uint8_t *
+	p2pRoleFsmGetFsmState(
+	IN enum ENUM_P2P_ROLE_STATE eCurrentState) {
+	if (eCurrentState >= 0 && eCurrentState < P2P_ROLE_STATE_NUM)
+		return apucDebugP2pRoleState[eCurrentState];
+
+	return (uint8_t *) DISP_STRING("UNKNOWN");
+}
+
 /*lint -restore */
 #endif /* DBG */
 
@@ -437,9 +446,9 @@ p2pRoleFsmStateTransition(IN struct ADAPTER *prAdapter,
 					"[P2P_ROLE][%d]TRANSITION(Bss%d): [%s] -> [%s]\n",
 					prP2pRoleFsmInfo->ucRoleIndex,
 					prP2pRoleFsmInfo->ucBssIndex,
-					apucDebugP2pRoleState
-					[prP2pRoleFsmInfo->eCurrentState],
-					apucDebugP2pRoleState[eNextState]);
+					p2pRoleFsmGetFsmState
+					(prP2pRoleFsmInfo->eCurrentState),
+					p2pRoleFsmGetFsmState(eNextState));
 
 			/* Transition into current state. */
 			prP2pRoleFsmInfo->eCurrentState = eNextState;
@@ -1525,7 +1534,8 @@ void p2pRoleFsmRunEventStopAP(IN struct ADAPTER *prAdapter,
 
 		LINK_FOR_EACH_ENTRY(prCurrStaRec,
 			prClientList, rLinkEntry, struct STA_RECORD) {
-			ASSERT(prCurrStaRec);
+			if (!prCurrStaRec)
+				break;
 			/* Do not restart timer if the timer is pending, */
 			/* (start in p2pRoleFsmRunEventConnectionAbort()) */
 			if (!timerPendingTimer(
@@ -1696,7 +1706,7 @@ void p2pRoleFsmRunEventRadarDet(IN struct ADAPTER *prAdapter,
 			"Wrong prP2pRoleFsmInfo->eCurrentState \"%s\"!",
 			(prP2pRoleFsmInfo->eCurrentState < P2P_ROLE_STATE_NUM
 			? (const char *)
-			apucDebugP2pRoleState[prP2pRoleFsmInfo->eCurrentState]
+			p2pRoleFsmGetFsmState(prP2pRoleFsmInfo->eCurrentState)
 			: ""));
 		goto error;
 	}
@@ -1747,6 +1757,13 @@ void p2pRoleFsmRunEventSetNewChannel(IN struct ADAPTER *prAdapter,
 		P2P_ROLE_INDEX_2_ROLE_FSM_INFO(prAdapter,
 			prMsgP2pSetNewChannelMsg->ucRoleIdx);
 
+	if (!prP2pRoleFsmInfo) {
+		DBGLOG(P2P, ERROR,
+			"Corresponding P2P Role FSM empty: %d.\n",
+			prMsgP2pSetNewChannelMsg->ucRoleIdx);
+		goto error;
+	}
+
 	prP2pRoleFsmInfo->rChnlReqInfo.ucReqChnlNum =
 		prP2pRoleFsmInfo->rConnReqInfo.rChannelInfo.ucChannelNum;
 	prP2pRoleFsmInfo->rChnlReqInfo.eBand =
@@ -1760,6 +1777,7 @@ void p2pRoleFsmRunEventSetNewChannel(IN struct ADAPTER *prAdapter,
 
 	prP2pRoleFsmInfo->rChnlReqInfo.ucCenterFreqS2 = 0;
 
+error:
 	cnmMemFree(prAdapter, prMsgHdr);
 }				/*p2pRoleFsmRunEventSetNewChannel*/
 
@@ -1792,19 +1810,40 @@ void p2pRoleFsmRunEventCsaDone(IN struct ADAPTER *prAdapter,
 	if (prP2PInfo)
 		prP2PInfo->eChnlSwitchPolicy = CHNL_SWITCH_POLICY_NONE;
 
-	prGlueInfo = prAdapter->prGlueInfo;
-	role_idx = prP2pRoleFsmInfo->ucRoleIndex;
-	/* Skip channel request/abort for STA+SAP/MCC concurrent case */
-	if (prAisBssInfo &&
-		(prAisBssInfo->ucPrimaryChannel !=
-		prP2pBssInfo->ucPrimaryChannel)) {
-		p2pFuncDfsSwitchCh(prAdapter,
-			prP2pBssInfo,
-			prP2pRoleFsmInfo->rChnlReqInfo);
-	} else {
+	if (prAdapter->rWifiVar.eDbdcMode != ENUM_DBDC_MODE_DISABLED &&
+		prP2pBssInfo->eBand != prP2pRoleFsmInfo->rChnlReqInfo.eBand) {
+		nicDeactivateNetwork(prAdapter, prP2pBssInfo->ucBssIndex);
+		nicUpdateBss(prAdapter, prP2pBssInfo->ucBssIndex);
+		nicActivateNetwork(prAdapter, prP2pBssInfo->ucBssIndex);
+
+#if CFG_SUPPORT_DBDC
+		cnmDbdcPreConnectionEnableDecision(prAdapter,
+			prP2pBssInfo->ucBssIndex,
+			prP2pRoleFsmInfo->rChnlReqInfo.eBand,
+			prP2pRoleFsmInfo->rChnlReqInfo.ucReqChnlNum,
+			prP2pBssInfo->ucWmmQueSet);
+#endif /*CFG_SUPPORT_DBDC*/
+
 		p2pRoleFsmStateTransition(prAdapter,
 			prP2pRoleFsmInfo,
 			P2P_ROLE_STATE_SWITCH_CHANNEL);
+	} else {
+		prGlueInfo = prAdapter->prGlueInfo;
+		role_idx = prP2pRoleFsmInfo->ucRoleIndex;
+		/* Skip channel request/abort for STA+SAP/MCC concurrent case */
+		if (prAisBssInfo &&
+			(prAisBssInfo->ucPrimaryChannel !=
+			prP2pBssInfo->ucPrimaryChannel) &&
+			(prAisBssInfo->eConnectionState ==
+			MEDIA_STATE_CONNECTED)) {
+			p2pFuncDfsSwitchCh(prAdapter,
+				prP2pBssInfo,
+				prP2pRoleFsmInfo->rChnlReqInfo);
+		} else {
+			p2pRoleFsmStateTransition(prAdapter,
+				prP2pRoleFsmInfo,
+				P2P_ROLE_STATE_SWITCH_CHANNEL);
+		}
 	}
 
 	cnmMemFree(prAdapter, prMsgHdr);
@@ -2376,15 +2415,19 @@ void p2pRoleFsmRunEventJoinComplete(IN struct ADAPTER *prAdapter,
 
 				struct BSS_DESC *prBssDesc;
 
-				/* Increase Failure Count */
-				prStaRec->ucJoinFailureCount++;
-
 				prBssDesc = prJoinInfo->prTargetBssDesc;
 
-				ASSERT(prBssDesc);
-				ASSERT(prBssDesc->fgIsConnecting);
+				if (!prBssDesc) {
+					DBGLOG(P2P, WARN,
+						"prTargetBssDesc is NULL! Skip retry join\n");
+					goto error;
+				}
 
+				ASSERT(prBssDesc->fgIsConnecting);
 				prBssDesc->fgIsConnecting = FALSE;
+
+				/* Increase Failure Count */
+				prStaRec->ucJoinFailureCount++;
 
 				if (prStaRec->ucJoinFailureCount >=
 						P2P_SAA_RETRY_COUNT) {
@@ -2876,6 +2919,8 @@ void p2pRoleUpdateACLEntry(IN struct ADAPTER *prAdapter, IN uint8_t ucBssIdx)
 
 	LINK_FOR_EACH_ENTRY_SAFE(prCurrStaRec,
 		prNextStaRec, prClientList, rLinkEntry, struct STA_RECORD) {
+		if (!prCurrStaRec)
+			break;
 		bMatchACL = FALSE;
 		for (i = 0; i < prP2pBssInfo->rACL.u4Num; i++) {
 			if (EQUAL_MAC_ADDR(prCurrStaRec->aucMacAddr,
@@ -3378,6 +3423,8 @@ p2pRoleFsmGetStaStatistics(IN struct ADAPTER *prAdapter,
 			}
 			LINK_FOR_EACH_ENTRY(prCurrStaRec,
 				prClientList, rLinkEntry, struct STA_RECORD) {
+				if (!prCurrStaRec)
+					break;
 				COPY_MAC_ADDR(
 					prQueryStaStatistics->aucMacAddr,
 					prCurrStaRec->aucMacAddr);
@@ -3645,8 +3692,8 @@ p2pRoleHandleOffchnlTxReq(IN struct ADAPTER *prAdapter,
 		break;
 	default:
 		DBGLOG(P2P, WARN, "Unknown state (%s) for offchannel-tx.\n",
-				apucDebugP2pRoleState[
-				prP2pRoleFsmInfo->eCurrentState]);
+				p2pRoleFsmGetFsmState(
+				prP2pRoleFsmInfo->eCurrentState));
 		goto error;
 	}
 
@@ -3922,6 +3969,22 @@ void p2pRoleFsmRunEventAcs(IN struct ADAPTER *prAdapter,
 	p2pRoleFsmAbortCurrentAcsReq(prAdapter, prMsgAcsRequest);
 
 	initAcsParams(prAdapter, prMsgAcsRequest, prAcsReqInfo);
+
+#if CFG_HOTSPOT_SUPPORT_FORCE_ACS_SCC
+	if (prAdapter->rWifiVar.eDbdcMode == ENUM_DBDC_MODE_DISABLED) {
+		struct BSS_INFO *prAisBssInfo;
+
+		DBGLOG(P2P, INFO, "Report SCC channel\n");
+
+		prAisBssInfo = aisGetConnectedBssInfo(prAdapter);
+		if (prAisBssInfo) {
+			/* Force SCC, indicate channel directly */
+			indicateAcsResultByAisCh(prAdapter, prAcsReqInfo,
+			prAisBssInfo);
+			goto exit;
+		}
+	}
+#endif
 
 	if (prAcsReqInfo->eHwMode == P2P_VENDOR_ACS_HW_MODE_11ANY) {
 		struct BSS_INFO *prAisBssInfo;

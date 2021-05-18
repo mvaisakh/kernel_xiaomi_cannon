@@ -556,7 +556,7 @@ static int p2pInit(struct net_device *prDev)
 	prNetDevPrivate->napi.dev = prDev;
 	netif_napi_add(prNetDevPrivate->napi.dev,
 		&prNetDevPrivate->napi, p2p_napi_poll, 64);
-	DBGLOG(INIT, INFO,
+	DBGLOG(INIT, TRACE,
 		"GRO interface added successfully:%p\n", prDev);
 #endif
 	return 0;		/* success */
@@ -1071,7 +1071,8 @@ u_int8_t p2pNetUnregister(struct GLUE_INFO *prGlueInfo,
 		/* Here are the functions which need rtnl_lock */
 		if ((prRoleDev) && (prP2PInfo->prDevHandler != prRoleDev)) {
 			DBGLOG(INIT, INFO, "unregister p2p[%d]\n", ucRoleIdx);
-			unregister_netdev(prRoleDev);
+			if (prRoleDev->reg_state == NETREG_REGISTERED)
+				unregister_netdev(prRoleDev);
 
 			/* This ndev is created in mtk_p2p_cfg80211_add_iface(),
 			 * and unregister_netdev will also free the ndev.
@@ -1079,7 +1080,8 @@ u_int8_t p2pNetUnregister(struct GLUE_INFO *prGlueInfo,
 		}
 
 		DBGLOG(INIT, INFO, "unregister p2pdev[%d]\n", ucRoleIdx);
-		unregister_netdev(prP2PInfo->prDevHandler);
+		if (prP2PInfo->prDevHandler->reg_state == NETREG_REGISTERED)
+			unregister_netdev(prP2PInfo->prDevHandler);
 
 		if (fgRollbackRtnlLock)
 			rtnl_lock();
@@ -1106,7 +1108,7 @@ u_int8_t p2pNetUnregister(struct GLUE_INFO *prGlueInfo,
  */
 /*---------------------------------------------------------------------------*/
 int glSetupP2P(struct GLUE_INFO *prGlueInfo, struct wireless_dev *prP2pWdev,
-		struct net_device *prP2pDev, int u4Idx, u_int8_t fgIsApMode)
+		struct net_device *prP2pDev, uint8_t u4Idx, u_int8_t fgIsApMode)
 {
 	struct ADAPTER *prAdapter = NULL;
 	struct GL_P2P_INFO *prP2PInfo = NULL;
@@ -1134,7 +1136,7 @@ int glSetupP2P(struct GLUE_INFO *prGlueInfo, struct wireless_dev *prP2pWdev,
 	}
 
 	/* FIXME: check KAL_P2P_NUM in trunk? */
-	if (u4Idx >= KAL_P2P_NUM) {
+	if (u4Idx < 0 || u4Idx >= KAL_P2P_NUM) {
 		DBGLOG(INIT, ERROR, "u4Idx(%d) is out of range!!\n", u4Idx);
 		return -1;
 	}
@@ -1216,15 +1218,14 @@ int glSetupP2P(struct GLUE_INFO *prGlueInfo, struct wireless_dev *prP2pWdev,
 	prP2PInfo->prDevHandler = prP2pDev;
 
 	/* XXX: All the P2P/AP devices do p2pDevFsmInit in the original code */
-	wlanBindBssIdxToNetInterface(prGlueInfo, p2pDevFsmInit(prAdapter),
-					(void *) prP2PInfo->prDevHandler);
+	p2pDevFsmInit(prAdapter);
 	prP2PInfo->aprRoleHandler = prP2PInfo->prDevHandler;
 
 	DBGLOG(P2P, INFO,
 		"check prDevHandler = %p, aprRoleHandler = %p\n",
 		prP2PInfo->prDevHandler, prP2PInfo->aprRoleHandler);
 
-	prNetDevPriv->ucBssIdx = p2pRoleFsmInit(prAdapter, u4Idx);
+	prNetDevPriv->ucBssIdx = p2pRoleFsmInit(prAdapter, (uint8_t) u4Idx);
 	init_completion(&prP2PInfo->rStopApComp);
 	/* Currently wpasupplicant can't support create interface. */
 	/* so initial the corresponding data structure here. */
@@ -1410,7 +1411,7 @@ u_int8_t glP2pCreateWirelessDevice(struct GLUE_INFO *prGlueInfo)
 	prWdev->wiphy = prWiphy;
 
 	gprP2pRoleWdev[i] = prWdev;
-	DBGLOG(INIT, INFO, "glP2pCreateWirelessDevice (%p)\n",
+	DBGLOG(INIT, TRACE, "glP2pCreateWirelessDevice (%p)\n",
 			gprP2pRoleWdev[i]->wiphy);
 
 	return TRUE;

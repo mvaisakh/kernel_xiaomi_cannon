@@ -460,10 +460,10 @@ int mtk_cfg80211_vendor_get_roaming_capabilities(struct wiphy *wiphy,
 		return -ENOMEM;
 	}
 
-	if (unlikely(nla_put(skb, WIFI_ATTRIBUTE_ROAMING_CAPABILITIES,
+	if (unlikely(nla_put(skb, WIFI_ATTRIBUTE_ROAMING_BLACKLIST_NUM,
 				sizeof(uint32_t), &maxNumOfList[0]) < 0))
 		goto nla_put_failure;
-	if (unlikely(nla_put(skb, WIFI_ATTRIBUTE_ROAMING_CAPABILITIES,
+	if (unlikely(nla_put(skb, WIFI_ATTRIBUTE_ROAMING_WHITELIST_NUM,
 				sizeof(uint32_t), &maxNumOfList[1]) < 0))
 		goto nla_put_failure;
 
@@ -1203,7 +1203,8 @@ int mtk_cfg80211_vendor_get_version(struct wiphy *wiphy,
 	kalMemZero(aucVersionBuf, 256);
 	attrlist = (struct nlattr *)((uint8_t *) data);
 	if (attrlist->nla_type == LOGGER_ATTRIBUTE_DRIVER_VER) {
-		char aucDriverVersionStr[] = STR(NIC_DRIVER_MAJOR_VERSION) "_"
+		char aucDriverVersionStr[] = "MTK_"
+					     STR(NIC_DRIVER_MAJOR_VERSION) "_"
 					     STR(NIC_DRIVER_MINOR_VERSION) "_"
 					     STR(NIC_DRIVER_SERIAL_VERSION) "-"
 					     STR(DRIVER_BUILD_DATE);
@@ -1252,6 +1253,38 @@ int mtk_cfg80211_vendor_get_version(struct wiphy *wiphy,
 nla_put_failure:
 	kfree_skb(skb);
 	return -EFAULT;
+}
+
+int mtk_cfg80211_vendor_event_generic_response(
+	struct wiphy *wiphy, struct wireless_dev *wdev,
+	uint32_t len, uint8_t *data)
+{
+	struct sk_buff *skb;
+
+	if (!wiphy || !wdev || !data || len <= 0) {
+		DBGLOG(REQ, ERROR, "%s wrong input parameters\n", __func__);
+		return -EINVAL;
+	}
+
+	skb = cfg80211_vendor_event_alloc(wiphy,
+#if KERNEL_VERSION(4, 4, 0) <= CFG80211_VERSION_CODE
+			wdev,
+#endif
+			len, WIFI_EVENT_GENERIC_RESPONSE, GFP_KERNEL);
+	if (!skb) {
+		DBGLOG(REQ, ERROR, "%s allocate skb failed\n", __func__);
+		return -ENOMEM;
+	}
+
+	/* Do not use nla_put_nohdr because it aligns buffer
+	 *
+	 * if (unlikely(nla_put_nohdr(skb, len, data) < 0))
+	 *	goto nla_put_failure;
+	 */
+	kalMemCopy(skb_put(skb, len), data, len);
+
+	cfg80211_vendor_event(skb, GFP_KERNEL);
+	return 0;
 }
 
 int mtk_cfg80211_vendor_get_supported_feature_set(struct wiphy *wiphy,
@@ -1628,6 +1661,11 @@ int mtk_cfg80211_vendor_acs(struct wiphy *wiphy,
 
 		ch_list_count = nla_len(tb[WIFI_VENDOR_ATTR_ACS_CH_LIST]);
 		if (ch_list_count) {
+			if (ch_list_count > MAX_CHN_NUM) {
+				DBGLOG(REQ, ERROR, "Invalid channel count.\n");
+				rStatus = -EINVAL;
+				goto exit;
+			}
 			ch_list = kalMemAlloc(sizeof(uint8_t) * ch_list_count,
 					VIR_MEM_TYPE);
 			if (ch_list == NULL) {
@@ -1645,6 +1683,11 @@ int mtk_cfg80211_vendor_acs(struct wiphy *wiphy,
 		ch_list_count = nla_len(tb[WIFI_VENDOR_ATTR_ACS_FREQ_LIST]) /
 				sizeof(uint32_t);
 		if (ch_list_count) {
+			if (ch_list_count > MAX_CHN_NUM) {
+				DBGLOG(REQ, ERROR, "Invalid freq count.\n");
+				rStatus = -EINVAL;
+				goto exit;
+			}
 			ch_list = kalMemAlloc(sizeof(uint8_t) * ch_list_count,
 					VIR_MEM_TYPE);
 			if (ch_list == NULL) {
@@ -1852,7 +1895,7 @@ int mtk_cfg80211_vendor_driver_memory_dump(struct wiphy *wiphy,
 	struct WIFI_LINK_QUALITY_INFO rLinkQualityInfo;
 	struct GLUE_INFO *prGlueInfo;
 #endif
-	struct sk_buff *skb;
+	struct sk_buff *skb = NULL;
 	uint32_t *puBuffer = NULL;
 	int32_t i4Status = -EINVAL;
 	uint32_t u4BufLen;
@@ -1926,9 +1969,10 @@ int mtk_cfg80211_vendor_driver_memory_dump(struct wiphy *wiphy,
 		goto err_handle_label;
 	}
 
-	i4Status = cfg80211_vendor_cmd_reply(skb);
+	return cfg80211_vendor_cmd_reply(skb);
 
 err_handle_label:
+	kfree_skb(skb);
 	return i4Status;
 }
 

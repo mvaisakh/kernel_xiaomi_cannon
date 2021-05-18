@@ -31,13 +31,6 @@
 */
 
 
-#ifdef CONFIG_PM_WAKELOCKS
-/* #include <linux/pm_wakeup.h> */
-#else
-#include <linux/wakelock.h>
-#endif
-#define CFG_WMT_WAKELOCK_SUPPORT 1
-
 #ifdef DFT_TAG
 #undef DFT_TAG
 #endif

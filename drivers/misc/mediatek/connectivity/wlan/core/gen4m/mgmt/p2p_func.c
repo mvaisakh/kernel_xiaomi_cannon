@@ -87,11 +87,18 @@ struct APPEND_VAR_IE_ENTRY txProbeRspIETable[] = {
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_VHT_OP_MODE_NOTIFICATION), NULL,
 			rlmRspGenerateVhtOpNotificationIE}	/*199 */
 #endif
+#if CFG_SUPPORT_802_11AX
+	, {0, heRlmCalculateHeCapIELen,
+			heRlmRspGenerateHeCapIE}    /* 255, EXT 35 */
+	, {0, heRlmCalculateHeOpIELen,
+			heRlmRspGenerateHeOpIE}     /* 255, EXT 36 */
+#endif
 #if CFG_SUPPORT_MTK_SYNERGY
 	, {(ELEM_HDR_LEN + ELEM_MIN_LEN_MTK_OUI), NULL,
 			rlmGenerateMTKOuiIE}	/* 221 */
 #endif
-
+	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_WPA), NULL,
+			rsnGenerateWPAIE}	/* 221 */
 };
 
 #if (CFG_SUPPORT_DFS_MASTER == 1)
@@ -983,6 +990,7 @@ p2pFuncTxMgmtFrame(IN struct ADAPTER *prAdapter,
 	struct BSS_INFO *prBssInfo;
 	uint64_t *pu8GlCookie = (uint64_t *) NULL;
 	uint64_t u8GlCookie;
+	enum ENUM_P2P_CONNECT_STATE eConnState = P2P_CNN_NORMAL;
 
 	do {
 		ASSERT_BREAK(prAdapter != NULL);
@@ -1089,6 +1097,12 @@ p2pFuncTxMgmtFrame(IN struct ADAPTER *prAdapter,
 
 		nicTxSetPktRetryLimit(prMgmtTxMsdu, ucRetryLimit);
 
+		eConnState = p2pFuncTagMgmtFrame(prMgmtTxMsdu, u8GlCookie);
+
+		if (p2pFuncNeedWaitRsp(prAdapter,
+				prAdapter->prP2pInfo->eConnState))
+			prAdapter->prP2pInfo->eConnState = eConnState;
+
 		/* Bufferable MMPDUs are suggested to be queued */
 		/* when GC is sleeping according to SPEC, */
 		/* instead of being sent to ALTX Q. */
@@ -1096,16 +1110,10 @@ p2pFuncTxMgmtFrame(IN struct ADAPTER *prAdapter,
 		/* GO discoverability REQ needs to be sent to GC */
 		/* when GC is awake due to P2P-6.1.10 cert fail */
 
-		if (!p2pFuncIsBufferableMMPDU(prMgmtTxMsdu))
+		if (!p2pFuncIsBufferableMMPDU(prAdapter,
+			eConnState, prMgmtTxMsdu))
 			nicTxConfigPktControlFlag(prMgmtTxMsdu,
 				MSDU_CONTROL_FLAG_FORCE_TX, TRUE);
-
-		if (p2pFuncNeedWaitRsp(prAdapter,
-				prAdapter->prP2pInfo->eConnState))
-			prAdapter->prP2pInfo->eConnState =
-				p2pFuncTagMgmtFrame(prMgmtTxMsdu, u8GlCookie);
-		else
-			p2pFuncTagMgmtFrame(prMgmtTxMsdu, u8GlCookie);
 
 		nicTxEnqueueMsdu(prAdapter, prMgmtTxMsdu);
 
@@ -1842,6 +1850,7 @@ void p2pFuncDfsSwitchCh(IN struct ADAPTER *prAdapter,
 		(struct P2P_ROLE_FSM_INFO *) NULL;
 	struct CMD_RDD_ON_OFF_CTRL *prCmdRddOnOffCtrl;
 	uint8_t role_idx = 0;
+	u_int8_t fgIsCrossBand = FALSE;
 
 	DEBUGFUNC("p2pFuncDfsSwitchCh()");
 
@@ -1849,6 +1858,9 @@ void p2pFuncDfsSwitchCh(IN struct ADAPTER *prAdapter,
 		DBGLOG(P2P, ERROR, "prBssInfo shouldn't be NULL!\n");
 		return;
 	}
+
+	if (prBssInfo->eBand != rP2pChnlReqInfo.eBand)
+		fgIsCrossBand = TRUE;
 
 	/*  Setup Channel, Band */
 	prBssInfo->ucPrimaryChannel = rP2pChnlReqInfo.ucReqChnlNum;
@@ -1900,6 +1912,10 @@ void p2pFuncDfsSwitchCh(IN struct ADAPTER *prAdapter,
 
 	/* Reset HW TSF Update Mode and Beacon Mode */
 	nicUpdateBss(prAdapter, prBssInfo->ucBssIndex);
+
+	if (fgIsCrossBand)
+		nicPmIndicateBssCreated(prAdapter,
+			prBssInfo->ucBssIndex);
 
 	prCmdRddOnOffCtrl = (struct CMD_RDD_ON_OFF_CTRL *)
 		cnmMemAlloc(prAdapter, RAM_TYPE_MSG,
@@ -2835,7 +2851,8 @@ p2pFuncDissolve(IN struct ADAPTER *prAdapter,
 				break;
 			LINK_FOR_EACH_ENTRY_SAFE(prCurrStaRec, prStaRecNext,
 				prClientList, rLinkEntry, struct STA_RECORD) {
-				ASSERT(prCurrStaRec);
+				if (!prCurrStaRec)
+					break;
 				p2pFuncDisconnect(prAdapter,
 					prP2pBssInfo, prCurrStaRec,
 					TRUE, u2ReasonCode);
@@ -2901,6 +2918,10 @@ p2pFuncDisconnect(IN struct ADAPTER *prAdapter,
 			    P2P_ROLE_INDEX_2_ROLE_FSM_INFO(prAdapter,
 					prP2pBssInfo->u4PrivateData);
 
+#if CFG_TC10_FEATURE
+			/* Store last sta deauth reason */
+			prP2pBssInfo->u2DeauthReason = u2ReasonCode;
+#endif
 			kalP2PGOStationUpdate(prAdapter->prGlueInfo,
 				prP2pRoleFsmInfo->ucRoleIndex, prStaRec, FALSE);
 		} else {
@@ -3711,6 +3732,8 @@ p2pFuncParseBeaconContent(IN struct ADAPTER *prAdapter,
 			prAdapter->rWifiVar.prP2pSpecificBssInfo
 				[prP2pBssInfo->u4PrivateData];
 		prP2pSpecificBssInfo->u2AttributeLen = 0;
+		prP2pSpecificBssInfo->u2WpaIeLen = 0;
+		prP2pSpecificBssInfo->u2RsnIeLen = 0;
 
 		ASSERT_BREAK(pucIEInfo != NULL);
 
@@ -3941,7 +3964,15 @@ p2pFuncParseBeaconContent(IN struct ADAPTER *prAdapter,
 				kalP2PSetCipher(prAdapter->prGlueInfo,
 					IW_AUTH_CIPHER_CCMP,
 					(uint8_t) prP2pBssInfo->u4PrivateData);
-
+				if (IE_LEN(pucIE) > ELEM_MAX_LEN_RSN) {
+					DBGLOG(P2P, ERROR,
+						"RSN IE length is unexpected !!\n");
+					return;
+				}
+				kalMemCopy(prP2pSpecificBssInfo->aucRsnIeBuffer,
+					pucIE, IE_SIZE(pucIE));
+				prP2pSpecificBssInfo->u2RsnIeLen
+					= IE_SIZE(pucIE);
 				if (rsnParseRsnIE(prAdapter,
 					RSN_IE(pucIE), &rRsnIe)) {
 					prP2pBssInfo->u4RsnSelectedGroupCipher =
@@ -4149,6 +4180,13 @@ p2pFuncParseBeaconContent(IN struct ADAPTER *prAdapter,
 				prP2pBssInfo->ucPhyTypeSet |=
 						PHY_TYPE_SET_802_11AC;
 				break;
+#if (CFG_SUPPORT_802_11AX == 1)
+			case ELEM_ID_RESERVED:
+				if (IE_ID_EXT(pucIE) == ELEM_EXT_ID_HE_CAP)
+					prP2pBssInfo->ucPhyTypeSet |=
+						PHY_TYPE_SET_802_11AX;
+				break;
+#endif
 			default:
 				DBGLOG(P2P, TRACE,
 					"Unprocessed element ID:%d\n",
@@ -4180,6 +4218,11 @@ p2pFuncParseBeaconVenderId(IN struct ADAPTER *prAdapter,
 					kalP2PSetCipher(prAdapter->prGlueInfo,
 						IW_AUTH_CIPHER_TKIP,
 						ucRoleIndex);
+				if (IE_LEN(pucIE) > ELEM_MAX_LEN_WPA) {
+					DBGLOG(P2P, ERROR,
+						"WPA IE length is unexpected !!\n");
+					return;
+				}
 				kalMemCopy(
 					prP2pSpecificBssInfo
 						->aucWpaIeBuffer,
@@ -4713,7 +4756,7 @@ struct MSDU_INFO *p2pFuncProcessP2pProbeRsp(IN struct ADAPTER *prAdapter,
 		pucIEBuf = prProbeRspFrame->aucInfoElem;
 		u2IELength = prMgmtTxMsdu->u2FrameLength - u2ProbeRspHdrLen;
 
-#if CFG_SUPPORT_WFD
+#if 0 /*CFG_SUPPORT_WFD*/
 		/* Reset in each time ?? */
 		prAdapter->prGlueInfo
 			->prP2PInfo[prP2pBssInfo->u4PrivateData]
@@ -5054,18 +5097,10 @@ p2pFuncProcessP2pProbeRspAction(IN struct ADAPTER *prAdapter,
 				DBGLOG(P2P, INFO,
 				       "WFD IE is found in probe resp (supp). Len %u\n",
 				       IE_SIZE(pucIEBuf));
-				if ((sizeof(
-				prAdapter->prGlueInfo
-				->prP2PInfo
-				[((struct BSS_INFO *)*prP2pBssInfo)
-				->u4PrivateData]
-				->aucWFDIE)
-				>=
-				(prAdapter->prGlueInfo
-				->prP2PInfo
-				[((struct BSS_INFO *)*prP2pBssInfo)
-				->u4PrivateData]->u2WFDIELen +
-				IE_SIZE(pucIEBuf)))) {
+				if ((sizeof(prAdapter->prGlueInfo->prP2PInfo
+					[((struct BSS_INFO *)*prP2pBssInfo)
+					->u4PrivateData]->aucWFDIE)
+					>= IE_SIZE(pucIEBuf))) {
 					*fgIsWFDIE = TRUE;
 					kalMemCopy(prAdapter->prGlueInfo
 						->prP2PInfo
@@ -5077,7 +5112,7 @@ p2pFuncProcessP2pProbeRspAction(IN struct ADAPTER *prAdapter,
 						->prP2PInfo
 						[((struct BSS_INFO *)
 						*prP2pBssInfo)
-						->u4PrivateData]->u2WFDIELen +=
+						->u4PrivateData]->u2WFDIELen =
 						IE_SIZE(pucIEBuf);
 				}
 			}	/*  VENDOR_OUI_TYPE_WFD */
@@ -5922,25 +5957,26 @@ uint32_t wfdFuncCalculateWfdIELenForAssocRsp(IN struct ADAPTER *prAdapter,
 
 #if CFG_SUPPORT_WFD_COMPOSE_IE
 	uint16_t u2EstimatedExtraIELen = 0;
+	struct BSS_INFO *prBssInfo = (struct BSS_INFO *) NULL;
 	struct WFD_CFG_SETTINGS *prWfdCfgSettings =
 		(struct WFD_CFG_SETTINGS *) NULL;
-	struct BSS_INFO *prBssInfo = (struct BSS_INFO *) NULL;
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
+	prWfdCfgSettings = &(prAdapter->rWifiVar.rWfdConfigureSettings);
 
 	if (prBssInfo->eNetworkType != NETWORK_TYPE_P2P)
 		return 0;
 
-	prWfdCfgSettings = &(prAdapter->rWifiVar.rWfdConfigureSettings);
+	if (!IS_STA_P2P_TYPE(prStaRec) || !prWfdCfgSettings->ucWfdEnable)
+		return 0;
 
-	if (IS_STA_P2P_TYPE(prStaRec) && (prWfdCfgSettings->ucWfdEnable > 0)) {
+	u2EstimatedExtraIELen = prAdapter->prGlueInfo->
+		prP2PInfo[prBssInfo->u4PrivateData]->u2WFDIELen;
 
-		u2EstimatedExtraIELen =
-			prAdapter->prGlueInfo->prP2PInfo[0]->u2WFDIELen;
-		ASSERT(u2EstimatedExtraIELen < 128);
-	}
-	return u2EstimatedExtraIELen;
-
+	if (u2EstimatedExtraIELen < VENDOR_SPECIFIC_IE_LENGTH)
+		return u2EstimatedExtraIELen;
+	else
+		return 0;
 #else
 	return 0;
 #endif
@@ -5951,62 +5987,47 @@ void wfdFuncGenerateWfdIEForAssocRsp(IN struct ADAPTER *prAdapter,
 {
 
 #if CFG_SUPPORT_WFD_COMPOSE_IE
-	struct WFD_CFG_SETTINGS *prWfdCfgSettings =
-		(struct WFD_CFG_SETTINGS *) NULL;
 	struct STA_RECORD *prStaRec;
 	uint16_t u2EstimatedExtraIELen;
 	struct BSS_INFO *prP2pBssInfo = (struct BSS_INFO *) NULL;
+	struct GLUE_INFO *prGlueInfo;
+	struct GL_P2P_INFO *prP2PInfo;
+	struct WFD_CFG_SETTINGS *prWfdCfgSettings =
+		(struct WFD_CFG_SETTINGS *) NULL;
+
+	if (!prAdapter || !prMsduInfo)
+		return;
+
+	prGlueInfo = prAdapter->prGlueInfo;
+	if (!prGlueInfo)
+		return;
+
+	prStaRec = cnmGetStaRecByIndex(prAdapter, prMsduInfo->ucStaRecIndex);
+	if (!prStaRec)
+		return;
+
+	if (!IS_STA_P2P_TYPE(prStaRec))
+		return;
 
 	prP2pBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prMsduInfo->ucBssIndex);
+	if (!prP2pBssInfo)
+		return;
+
+	prP2PInfo = prGlueInfo->prP2PInfo[prP2pBssInfo->u4PrivateData];
+	if (!prP2PInfo)
+		return;
 
 	prWfdCfgSettings = &(prAdapter->rWifiVar.rWfdConfigureSettings);
+	if (!prWfdCfgSettings->ucWfdEnable)
+		return;
 
-	do {
-		ASSERT_BREAK((prMsduInfo != NULL) && (prAdapter != NULL));
-
-		prStaRec = cnmGetStaRecByIndex(prAdapter,
-			prMsduInfo->ucStaRecIndex);
-
-		if (prStaRec) {
-			if (IS_STA_P2P_TYPE(prStaRec)) {
-
-				if (prWfdCfgSettings->ucWfdEnable > 0) {
-					u2EstimatedExtraIELen =
-						prAdapter->prGlueInfo
-						->prP2PInfo[prP2pBssInfo
-						->u4PrivateData]->u2WFDIELen;
-					if (u2EstimatedExtraIELen > 0) {
-						ASSERT(
-							u2EstimatedExtraIELen
-							< 128);
-						ASSERT(sizeof
-							(prAdapter->prGlueInfo
-							->prP2PInfo
-							[prP2pBssInfo
-							->u4PrivateData]
-							->aucWFDIE) >=
-							prAdapter->prGlueInfo
-							->prP2PInfo[prP2pBssInfo
-							->u4PrivateData]
-							->u2WFDIELen);
-						kalMemCopy(
-							(prMsduInfo->prPacket +
-							prMsduInfo
-							->u2FrameLength),
-							prAdapter->prGlueInfo
-							->prP2PInfo
-							[prP2pBssInfo
-							->u4PrivateData]
-							->aucWFDIE,
-							u2EstimatedExtraIELen);
-						prMsduInfo->u2FrameLength +=
-							u2EstimatedExtraIELen;
-					}
-				}
-			}	/* IS_STA_P2P_TYPE */
-		} else {
-		}
-	} while (FALSE);
+	u2EstimatedExtraIELen = prP2PInfo->u2WFDIELen;
+	if (u2EstimatedExtraIELen > 0 &&
+		u2EstimatedExtraIELen < VENDOR_SPECIFIC_IE_LENGTH) {
+		kalMemCopy(prMsduInfo->prPacket + prMsduInfo->u2FrameLength,
+			prP2PInfo->aucWFDIE, u2EstimatedExtraIELen);
+		prMsduInfo->u2FrameLength += u2EstimatedExtraIELen;
+	}
 
 	return;
 #else
@@ -6165,6 +6186,49 @@ void p2pFunCleanQueuedMgmtFrame(IN struct ADAPTER *prAdapter,
 	prFrame->prHeader = NULL;
 }
 
+#if CFG_TC1_FEATURE
+static u_int8_t p2pFuncSwitchSapChannelToDbdc(
+	struct ADAPTER *prAdapter,
+	struct BSS_INFO *prP2pBssInfo,
+	uint8_t ucStaChannelNum,
+	uint8_t ucSapChannelNum,
+	enum ENUM_BAND eStaBand,
+	enum ENUM_BAND eSapBand)
+{
+#if CFG_SUPPORT_DBDC
+	if (prAdapter->rWifiVar.eDbdcMode ==
+		ENUM_DBDC_MODE_DISABLED)
+		return FALSE;
+
+	if (eStaBand == eSapBand &&
+		eSapBand == BAND_5G &&
+		ucStaChannelNum != 149) {
+
+		struct RF_CHANNEL_INFO rRfChnlInfo;
+
+		rRfChnlInfo.ucChannelNum = 6;
+		rRfChnlInfo.eBand = BAND_2G4;
+		rRfChnlInfo.ucChnlBw =
+			rlmGetBssOpBwByVhtAndHtOpInfo(prP2pBssInfo);
+
+		DBGLOG(P2P, INFO,
+			"[DBDC] StaCH(%d), SapCH(%d)\n",
+			ucStaChannelNum,
+			ucSapChannelNum);
+
+		cnmSapChannelSwitchReq(prAdapter,
+			&rRfChnlInfo,
+			prP2pBssInfo->u4PrivateData);
+
+		return TRUE;
+
+	}
+#endif
+
+	return FALSE;
+}
+#endif
+
 void p2pFuncSwitchSapChannel(
 		IN struct ADAPTER *prAdapter)
 {
@@ -6208,7 +6272,8 @@ void p2pFuncSwitchSapChannel(
 	} else {
 		/* Get current channel info */
 		ucStaChannelNum = prAisBssInfo->ucPrimaryChannel;
-		eStaBand = prAisBssInfo->eBand;
+		eStaBand = (prAisBssInfo->ucPrimaryChannel <= 14)
+			? BAND_2G4 : BAND_5G;
 #if CFG_SUPPORT_SAP_DFS_CHANNEL
 		/* restore DFS channels table */
 		wlanUpdateDfsChannelTable(prAdapter->prGlueInfo,
@@ -6227,7 +6292,11 @@ void p2pFuncSwitchSapChannel(
 	/* Assume only one sap bss info */
 	prP2pBssInfo = cnmGetSapBssInfo(prAdapter);
 	if (!prP2pBssInfo) {
-		DBGLOG(P2P, WARN, "SAP is not active\n");
+		DBGLOG(P2P, TRACE, "SAP is not active\n");
+		goto exit;
+	}
+	if (prP2pBssInfo->eCurrentOPMode != OP_MODE_ACCESS_POINT) {
+		DBGLOG(P2P, TRACE, "SAP is during initialization\n");
 		goto exit;
 	}
 	prP2pRoleFsmInfo =
@@ -6261,6 +6330,15 @@ void p2pFuncSwitchSapChannel(
 			goto exit;
 		}
 	}
+
+#if CFG_TC1_FEATURE
+	if (p2pFuncSwitchSapChannelToDbdc(
+			prAdapter, prP2pBssInfo,
+			ucStaChannelNum, ucSapChannelNum,
+			eStaBand, eSapBand)) {
+		goto exit;
+	}
+#endif
 
 #if CFG_SUPPORT_DBDC
 	fgDbDcModeEn = prAdapter->rWifiVar.fgDbDcModeEn;
@@ -6520,6 +6598,9 @@ uint8_t p2pFunGetAcsBestCh(IN struct ADAPTER *prAdapter,
 	rPreferChannel.ucChannel = 0;
 	rPreferChannel.u4Dirtiness = 0xFFFFFFFF;
 
+	kalMemZero(aucChannelList,
+			sizeof(struct RF_CHANNEL_INFO) * MAX_CHN_NUM);
+
 	rlmDomainGetChnlList(prAdapter, eBand, TRUE, MAX_CHN_NUM,
 			&ucNumOfChannel, aucChannelList);
 
@@ -6701,6 +6782,9 @@ void p2pFunProcessAcsReport(IN struct ADAPTER *prAdapter,
 		uint8_t i;
 		u_int8_t fgIsMaskValid = FALSE;
 
+		kalMemZero(aucChannelList,
+			sizeof(struct RF_CHANNEL_INFO) * MAX_2G_BAND_CHN_NUM);
+
 		rlmDomainGetChnlList(prAdapter, eBand, TRUE,
 			MAX_2G_BAND_CHN_NUM, &ucNumOfChannel, aucChannelList);
 
@@ -6708,17 +6792,6 @@ void p2pFunProcessAcsReport(IN struct ADAPTER *prAdapter,
 		u4LteSafeChnMask_2G = prLteSafeChnList->au4SafeChannelBitmask[
 			ENUM_SAFE_CH_MASK_BAND_2G4];
 
-#if CFG_TC1_FEATURE
-		/* Restrict 2.4G band channel selection range
-		 * to 1/6/11 per customer's request
-		 */
-		u4LteSafeChnMask_2G &= 0x0842;
-#elif CFG_TC10_FEATURE
-		/* Restrict 2.4G band channel selection range
-		 * to 1~11 per customer's request
-		 */
-		u4LteSafeChnMask_2G &= 0x0FFE;
-#endif
 		prAcsReqInfo->u4LteSafeChnMask_2G &= u4LteSafeChnMask_2G;
 		for (i = 0; i < ucNumOfChannel; i++) {
 			if ((prAcsReqInfo->u4LteSafeChnMask_2G &
@@ -6730,6 +6803,17 @@ void p2pFunProcessAcsReport(IN struct ADAPTER *prAdapter,
 				"All mask invalid, mark all as valid\n");
 			prAcsReqInfo->u4LteSafeChnMask_2G = BITS(1, 14);
 		}
+#if CFG_TC1_FEATURE
+		/* Restrict 2.4G band channel selection range
+		 * to 1/6/11 per customer's request
+		 */
+		prAcsReqInfo->u4LteSafeChnMask_2G &= 0x0842;
+#elif CFG_TC10_FEATURE
+		/* Restrict 2.4G band channel selection range
+		 * to 1~11 per customer's request
+		 */
+		prAcsReqInfo->u4LteSafeChnMask_2G &= 0x0FFE;
+#endif
 	} else if (prLteSafeChnInfo && (eBand == BAND_5G)) {
 		/* Add support for 5G FW mask */
 		struct LTE_SAFE_CHN_INFO *prLteSafeChnList =
@@ -7050,11 +7134,13 @@ p2pFunChnlSwitchNotifyDone(IN struct ADAPTER *prAdapter)
 			MSG_SEND_METHOD_BUF);
 }
 
-uint8_t p2pFuncIsBufferableMMPDU(IN struct MSDU_INFO *prMgmtTxMsdu)
+uint8_t p2pFuncIsBufferableMMPDU(IN struct ADAPTER *prAdapter,
+		IN enum ENUM_P2P_CONNECT_STATE eConnState,
+		IN struct MSDU_INFO *prMgmtTxMsdu)
 {
 	struct WLAN_MAC_HEADER *prWlanHdr = (struct WLAN_MAC_HEADER *) NULL;
 	uint16_t u2TxFrameCtrl;
-	uint8_t fgIsBufferableMMPDU;
+	uint8_t fgIsBufferableMMPDU = FALSE;
 
 	prWlanHdr = (struct WLAN_MAC_HEADER *)
 		((unsigned long) prMgmtTxMsdu->prPacket +
@@ -7068,6 +7154,19 @@ uint8_t p2pFuncIsBufferableMMPDU(IN struct MSDU_INFO *prMgmtTxMsdu)
 
 	switch (u2TxFrameCtrl) {
 	case MAC_FRAME_ACTION:
+		switch (eConnState) {
+		case P2P_CNN_GO_NEG_REQ:
+		case P2P_CNN_GO_NEG_RESP:
+		case P2P_CNN_GO_NEG_CONF:
+		case P2P_CNN_INVITATION_REQ:
+		case P2P_CNN_INVITATION_RESP:
+			fgIsBufferableMMPDU = FALSE;
+			break;
+		default:
+			fgIsBufferableMMPDU = TRUE;
+			break;
+		}
+		break;
 	case MAC_FRAME_DISASSOC:
 	case MAC_FRAME_DEAUTH:
 		fgIsBufferableMMPDU = TRUE;

@@ -151,6 +151,8 @@ void scnInit(IN struct ADAPTER *prAdapter)
 	prScanInfo->fgSchedScanning = FALSE;
 	/*Support AP Selection */
 	prScanInfo->u4ScanUpdateIdx = 0;
+	/* Support beacon report */
+	prScanInfo->fgWipsBcnReport = FALSE;
 }	/* end of scnInit() */
 
 void scnFreeAllPendingScanRquests(IN struct ADAPTER *prAdapter)
@@ -329,22 +331,28 @@ uint32_t scanCountBits(IN uint32_t bitMap[], IN uint32_t bitMapSize)
 void scanSetRequestChannel(IN struct ADAPTER *prAdapter,
 		IN uint32_t u4ScanChannelNum,
 		IN struct RF_CHANNEL_INFO arChannel[],
+		IN uint32_t u4ScanFlags,
 		IN uint8_t fgIsOnlineScan,
 		OUT struct MSG_SCN_SCAN_REQ_V2 *prScanReqMsg)
 {
 	uint32_t i, u4Channel, eBand, u4Index;
 	/*print channel info for debugging */
 	uint32_t au4ChannelBitMap[SCAN_CHANNEL_BITMAP_ARRAY_LEN];
+	struct SCAN_INFO *prScanInfo;
+	bool fgIsLowSpanScan = FALSE;
 #if CFG_SUPPORT_FULL2PARTIAL_SCAN
 	uint8_t fgIsFull2Partial = FALSE;
+	OS_SYSTIME rCurrentTime;
+
+	GET_CURRENT_SYSTIME(&rCurrentTime);
 #endif /* CFG_SUPPORT_FULL2PARTIAL_SCAN */
-	struct SCAN_INFO *prScanInfo;
 
 	ASSERT(u4ScanChannelNum <= MAXIMUM_OPERATION_CHANNEL_LIST);
 
 	prScanInfo = &(prAdapter->rWifiVar.rScanInfo);
 	i = u4Index = 0;
 	kalMemZero(au4ChannelBitMap, sizeof(au4ChannelBitMap));
+	fgIsLowSpanScan = (u4ScanFlags & NL80211_SCAN_FLAG_LOW_SPAN) >> 8;
 
 #if CFG_SUPPORT_FULL2PARTIAL_SCAN
 	/* fgIsCheckingFull2Partial should be true if it's an online scan.
@@ -353,11 +361,13 @@ void scanSetRequestChannel(IN struct ADAPTER *prAdapter,
 	 */
 	if (fgIsOnlineScan && (u4ScanChannelNum == 0 ||
 		u4ScanChannelNum > SCAN_FULL2PARTIAL_CHANNEL_NUM)) {
-		OS_SYSTIME rCurrentTime;
 
-		GET_CURRENT_SYSTIME(&rCurrentTime);
-
-		if (((prScanInfo->u4LastFullScanTime == 0) ||
+		/* Do full scan when
+		 * 1. did not do full scan yet OR
+		 * 2. not APP scan and it's been 60s after last full scan
+		*/
+		if (prScanInfo->u4LastFullScanTime == 0 ||
+			(!fgIsLowSpanScan &&
 			(CHECK_FOR_TIMEOUT(rCurrentTime,
 			prScanInfo->u4LastFullScanTime,
 			SEC_TO_SYSTIME(CFG_SCAN_FULL2PARTIAL_PERIOD))))) {
@@ -367,50 +377,69 @@ void scanSetRequestChannel(IN struct ADAPTER *prAdapter,
 			kalMemZero(prScanInfo->au4ChannelBitMap,
 				sizeof(prScanInfo->au4ChannelBitMap));
 			log_dbg(SCN, INFO,
-				"Full2partial: 1st full scan start\n");
+				"Full2partial: 1st full scan start, low span=%d\n",
+				fgIsLowSpanScan);
 		} else {
 			log_dbg(SCN, INFO,
-				"Full2partial: enable full2partial\n");
+				"Full2partial: enable full2partial, low span=%d\n",
+				fgIsLowSpanScan);
 			fgIsFull2Partial = TRUE;
 		}
 	}
 
-	if (fgIsFull2Partial && u4ScanChannelNum == 0) {
+	if (u4ScanChannelNum == 0) {
 		/* We don't have channel info when u4ScanChannelNum is 0.
 		 * check full2partial bitmap and set scan channels
 		 */
+		uint8_t ucPreferBandExist = FALSE;
 		uint32_t start = 1;
 		uint32_t end = HW_CHNL_NUM_MAX_4G_5G;
 
-		if (prScanReqMsg->eScanChannel == SCAN_CHANNEL_2G4)
+		if (prScanReqMsg->eScanChannel == SCAN_CHANNEL_2G4) {
 			end = HW_CHNL_NUM_MAX_2G4;
-		else if (prScanReqMsg->eScanChannel == SCAN_CHANNEL_5G)
+			ucPreferBandExist = TRUE;
+		} else if (prScanReqMsg->eScanChannel == SCAN_CHANNEL_5G) {
 			start = HW_CHNL_NUM_MAX_2G4 + 1;
+			ucPreferBandExist = TRUE;
+		}
 
 		u4Index = 0;
-		for (u4Channel = start; u4Channel <= end; u4Channel++) {
-			if (scanIsBitSet(u4Channel,
+		/* If partial scan list are too old, do full scan */
+		if (!CHECK_FOR_TIMEOUT(rCurrentTime,
+			prScanInfo->u4LastFullScanTime,
+			SEC_TO_SYSTIME(CFG_SCAN_FULL2PARTIAL_PERIOD))) {
+			for (u4Channel = start; u4Channel <= end; u4Channel++) {
+				if (scanIsBitSet(u4Channel,
 					prScanInfo->au4ChannelBitMap,
 					sizeof(prScanInfo->au4ChannelBitMap))) {
-				eBand = (u4Channel <= HW_CHNL_NUM_MAX_2G4) ?
-					BAND_2G4 : BAND_5G;
-				prScanReqMsg->arChnlInfoList[u4Index].
-					ucChannelNum = u4Channel;
-				prScanReqMsg->arChnlInfoList[u4Index].
-					eBand = eBand;
-				scanSetBit(u4Channel, au4ChannelBitMap,
-					sizeof(au4ChannelBitMap));
-				u4Index++;
+					eBand = (u4Channel <=
+						HW_CHNL_NUM_MAX_2G4) ?
+						BAND_2G4 : BAND_5G;
+					prScanReqMsg->arChnlInfoList[u4Index].
+						ucChannelNum = u4Channel;
+					prScanReqMsg->arChnlInfoList[u4Index].
+						eBand = eBand;
+					scanSetBit(u4Channel, au4ChannelBitMap,
+						sizeof(au4ChannelBitMap));
+					u4Index++;
+				}
 			}
 		}
 
 		prScanReqMsg->ucChannelListNum = u4Index;
-		prScanReqMsg->eScanChannel = SCAN_CHANNEL_SPECIFIED;
+
+		/* No need to change eScanChannel if PreferBand exist */
+		if (!ucPreferBandExist) {
+			if (u4Index == 0) {
+				log_dbg(SCN, WARN, "No channel to scan, set to full scan\n");
+				prScanReqMsg->eScanChannel = SCAN_CHANNEL_FULL;
+			} else
+				prScanReqMsg->eScanChannel =
+						SCAN_CHANNEL_SPECIFIED;
+		}
 	} else
 #endif /* CFG_SUPPORT_FULL2PARTIAL_SCAN */
-	if (u4ScanChannelNum == 0) {
-		prScanReqMsg->ucChannelListNum = 0;
-	} else {
+	{
 		u4Index = 0;
 		for (i = 0; i < u4ScanChannelNum; i++) {
 			u4Channel = arChannel[i].ucChannelNum;
@@ -436,8 +465,9 @@ void scanSetRequestChannel(IN struct ADAPTER *prAdapter,
 			u4Index++;
 		}
 		if (u4Index == 0) {
-			log_dbg(SCN, WARN, "No channel to scan\n");
+			log_dbg(SCN, WARN, "No channel to scan, set to full scan\n");
 			prScanReqMsg->ucChannelListNum = 0;
+			prScanReqMsg->eScanChannel = SCAN_CHANNEL_FULL;
 		} else {
 			prScanReqMsg->ucChannelListNum = u4Index;
 			prScanReqMsg->eScanChannel = SCAN_CHANNEL_SPECIFIED;
@@ -1260,6 +1290,124 @@ struct BSS_DESC *scanAllocateBssDesc(IN struct ADAPTER *prAdapter)
 
 /*----------------------------------------------------------------------------*/
 /*!
+ * @brief This API parses Beacon and update these data to cfg80211 vendor.
+ * <SSID / BSSID / Channel / Beacon Interval / Timestamp / System time>
+ *
+ * @param[in] prAdapter      Pointer to the Adapter structure.
+ * @param[in] prSwRfb        Pointer to the receiving frame buffer.
+ *
+ * @return   N/A
+ */
+/*----------------------------------------------------------------------------*/
+void scanUpdateSWIPSBcn(IN struct ADAPTER *prAdapter,
+			IN struct BSS_DESC *prBss, IN uint8_t ucBssIndex)
+{
+	struct wiphy *wiphy;
+	struct wireless_dev *wdev;
+	struct SCAN_INFO *prScanInfo;
+	struct PARAM_SWPIS_BCN_INFO *bcnInfo;
+	uint8_t size = sizeof(struct PARAM_SWPIS_BCN_INFO);
+	uint8_t i;
+
+	prScanInfo = &(prAdapter->rWifiVar.rScanInfo);
+	if (prScanInfo && !prScanInfo->fgWipsBcnReport) {
+		DBGLOG(AIS, INFO, "[SWIPS] beacon report not started\n");
+		return;
+	}
+
+	if (ucBssIndex >= KAL_AIS_NUM) {
+		DBGLOG(AIS, ERROR, "[SWIPS] Dont update within other BSS\n");
+		return;
+	}
+
+	wiphy = priv_to_wiphy(prAdapter->prGlueInfo);
+	wdev = wlanGetNetDev(prAdapter->prGlueInfo, ucBssIndex)->ieee80211_ptr;
+
+	bcnInfo = kalMemAlloc(size, VIR_MEM_TYPE);
+	if (!bcnInfo) {
+		DBGLOG(AIS, ERROR, "[SWIPS] beacon report event alloc fail\n");
+		return;
+	}
+
+	kalMemZero(bcnInfo, size);
+	bcnInfo->id = GRID_SWPIS_BCN_INFO;
+	bcnInfo->len = size - 2;
+	COPY_SSID(bcnInfo->ssid, i,
+		  prBss->aucSSID, prBss->ucSSIDLen);
+	COPY_MAC_ADDR(bcnInfo->bssid, prBss->aucBSSID);
+	bcnInfo->channel = prBss->ucChannelNum;
+	bcnInfo->bcnInterval = prBss->u2BeaconInterval;
+	bcnInfo->timeStamp[0] = prBss->u8TimeStamp.u.LowPart;
+	bcnInfo->timeStamp[1] = prBss->u8TimeStamp.u.HighPart;
+	bcnInfo->sysTime = prBss->rUpdateTime;
+
+	DBGLOG(INIT, INFO, "[SWIPS] Send[%d:%d] %s:%d (" MACSTR
+	       ") with ch:%d interval:%d tsf:%u %u sys:%lu\n",
+	       bcnInfo->id, bcnInfo->len, bcnInfo->ssid, i,
+	       bcnInfo->bssid, bcnInfo->channel, bcnInfo->bcnInterval,
+	       bcnInfo->timeStamp[0], bcnInfo->timeStamp[1], bcnInfo->sysTime);
+	DBGLOG_MEM8(INIT, TRACE, bcnInfo, size);
+	mtk_cfg80211_vendor_event_generic_response(
+		wiphy, wdev, size, (uint8_t *)bcnInfo);
+	kalMemFree(bcnInfo, VIR_MEM_TYPE, size);
+}
+
+void scanAbortBeaconRecv(IN struct ADAPTER *prAdapter, IN uint8_t ucBssIndex,
+			 IN enum SWPIS_ABORT_REASON abortReason)
+{
+	struct wiphy *wiphy;
+	struct wireless_dev *wdev;
+	struct PARAM_SWPIS_BCN_INFO_ABORT *bcnAbort;
+	uint8_t size = sizeof(struct PARAM_SWPIS_BCN_INFO_ABORT);
+	struct SCAN_INFO *prScanInfo = &(prAdapter->rWifiVar.rScanInfo);
+	struct CMD_SET_REPORT_BEACON_STRUCT beaconRecv;
+
+	if (prScanInfo->fgWipsBcnReport == FALSE) {
+		DBGLOG(AIS, ERROR, "[SWIPS] Dont abort, SWIPS already OFF\n");
+		return;
+	}
+
+	if (ucBssIndex >= KAL_AIS_NUM) {
+		DBGLOG(AIS, ERROR, "[SWIPS] Dont abort within other BSS\n");
+		return;
+	}
+
+	wiphy = priv_to_wiphy(prAdapter->prGlueInfo);
+	wdev = wlanGetNetDev(prAdapter->prGlueInfo, ucBssIndex)->ieee80211_ptr;
+
+	bcnAbort = kalMemAlloc(size, VIR_MEM_TYPE);
+	if (!bcnAbort) {
+		DBGLOG(AIS, ERROR,
+		       "[SWIPS] beacon report abort event alloc fail\n");
+		return;
+	}
+
+	/* Send abort event to supplicant */
+	bcnAbort->id = GRID_SWPIS_BCN_INFO_ABORT;
+	bcnAbort->len = size - 2;
+	bcnAbort->abort = abortReason;
+	DBGLOG(INIT, INFO, "[SWIPS] Abort beacon report with reason: %d\n",
+	       bcnAbort->abort);
+	mtk_cfg80211_vendor_event_generic_response(
+		wiphy, wdev, size, (uint8_t *)bcnAbort);
+	kalMemFree(bcnAbort, VIR_MEM_TYPE, size);
+
+	/* Send stop SWIPS to FW */
+	prScanInfo->fgWipsBcnReport = FALSE;
+	beaconRecv.ucReportBcnEn = FALSE;
+	wlanSendSetQueryCmd(prAdapter,
+			    CMD_ID_SET_REPORT_BEACON,
+			    TRUE,
+			    FALSE,
+			    FALSE,
+			    nicCmdEventSetCommon,
+			    nicOidCmdTimeoutCommon,
+			    sizeof(struct CMD_SET_REPORT_BEACON_STRUCT),
+			    (uint8_t *) &beaconRecv, NULL, 0);
+}
+
+/*----------------------------------------------------------------------------*/
+/*!
  * @brief This API parses Beacon/ProbeResp frame and insert extracted
  *        BSS_DESC structure with IEs into
  *        prAdapter->rWifiVar.rScanInfo.aucScanBuffer
@@ -1947,6 +2095,7 @@ struct BSS_DESC *scanAddToBssDesc(IN struct ADAPTER *prAdapter,
 				}
 			}
 #endif
+			scanCheckAdaptive11rIE(pucIE, prBssDesc);
 			break;
 		}
 #if (CFG_SUPPORT_802_11AX == 1)
@@ -1959,7 +2108,9 @@ struct BSS_DESC *scanAddToBssDesc(IN struct ADAPTER *prAdapter,
 					prBssDesc->ucDCMMaxConRx =
 					HE_GET_PHY_CAP_DCM_MAX_CONSTELLATION_RX(
 						prHeCap->ucHePhyCap);
-					DBGLOG(SCN, INFO, "ER: SSID:%s,rx:%x\n",
+					DBGLOG(SCN, INFO,
+						"ER: BSSID:" MACSTR
+						" SSID:%s,rx:%x\n",
 						MAC2STR(prBssDesc->aucBSSID),
 						prBssDesc->aucSSID,
 						prBssDesc->ucDCMMaxConRx);
@@ -1969,7 +2120,9 @@ struct BSS_DESC *scanAddToBssDesc(IN struct ADAPTER *prAdapter,
 					prBssDesc->fgIsERSUDisable =
 					HE_IS_ER_SU_DISABLE(
 						prHeOp->ucHeOpParams);
-					DBGLOG(SCN, INFO, "ER: SSID:%s,er:%x\n",
+					DBGLOG(SCN, INFO,
+						"ER: BSSID:" MACSTR
+						" SSID:%s,er:%x\n",
 						MAC2STR(prBssDesc->aucBSSID),
 						prBssDesc->aucSSID,
 						prBssDesc->fgIsERSUDisable);
@@ -2338,7 +2491,7 @@ void scanLogEssResult(struct ADAPTER *prAdapter)
 					"%s", strbuf);
 			}
 		}
-		kalStrnCpy(ssid, prEssResult[u4Index].aucSSID, sizeof(ssid) - 1);
+		kalStrnCpy(ssid, prEssResult[u4Index].aucSSID, sizeof(ssid));
 		ssid[sizeof(ssid) - 1] = '\0';
 		pos += kalSnprintf(pos, end - pos, " %s;", ssid);
 	}
@@ -2597,15 +2750,19 @@ uint32_t scanProcessBeaconAndProbeResp(IN struct ADAPTER *prAdapter,
 	prBssDesc = scanAddToBssDesc(prAdapter, prSwRfb);
 	prAdapter->rWlanInfo.u4ScanDbgTimes1++;
 
-	if (prBssDesc) {
-		/* Full2Partial: save channel info for later scan */
-		if (prScanInfo->fgIsScanForFull2Partial) {
-			log_dbg(SCN, TRACE, "Full2Partial: set channel=%d\n",
-					prBssDesc->ucChannelNum);
-			scanSetBit(prBssDesc->ucChannelNum,
-				prScanInfo->au4ChannelBitMap,
-				sizeof(prScanInfo->au4ChannelBitMap));
-		}
+	if (!prBssDesc) {
+		log_dbg(SCN, ERROR, "scanAddToBssDesc return NULL BssDesc\n");
+		return rStatus;
+	}
+
+	/* Full2Partial: save channel info for later scan */
+	if (prScanInfo->fgIsScanForFull2Partial) {
+		log_dbg(SCN, TRACE, "Full2Partial: set channel=%d\n",
+				prBssDesc->ucChannelNum);
+		scanSetBit(prBssDesc->ucChannelNum,
+			prScanInfo->au4ChannelBitMap,
+			sizeof(prScanInfo->au4ChannelBitMap));
+	}
 
 	for (u4Idx = 0; u4Idx < KAL_AIS_NUM; u4Idx++) {
 		struct CONNECTION_SETTINGS *prConnSettings =
@@ -2625,14 +2782,8 @@ uint32_t scanProcessBeaconAndProbeResp(IN struct ADAPTER *prAdapter,
 		    prAisBssInfo->aucBSSID)
 		    && EQUAL_SSID(prBssDesc->aucSSID, prBssDesc->ucSSIDLen,
 		    prAisBssInfo->aucSSID, prAisBssInfo->ucSSIDLen)) {
-#if CFG_SUPPORT_BEACON_CHANGE_DETECTION
-			u_int8_t fgNeedDisconnect = FALSE;
 
-			/* <1.1.2> check if supported rate differs */
-			if (prAisBssInfo->u2OperationalRateSet
-				!= prBssDesc->u2OperationalRateSet)
-				fgNeedDisconnect = TRUE;
-#endif
+#if CFG_SUPPORT_DETECT_SECURITY_MODE_CHANGE
 			if (rsnCheckSecurityModeChanged(prAdapter,
 				prAisBssInfo, prBssDesc)
 #if CFG_SUPPORT_WAPI
@@ -2647,9 +2798,6 @@ uint32_t scanProcessBeaconAndProbeResp(IN struct ADAPTER *prAdapter,
 				log_mem8_dbg(SCN, INFO,
 					prSwRfb->pvHeader,
 					prSwRfb->u2PacketLen);
-#if CFG_SUPPORT_BEACON_CHANGE_DETECTION
-				fgNeedDisconnect = FALSE;
-#endif
 				if (!prConnSettings
 					->fgSecModeChangeStartTimer) {
 					cnmTimerStartTimer(prAdapter,
@@ -2672,14 +2820,6 @@ uint32_t scanProcessBeaconAndProbeResp(IN struct ADAPTER *prAdapter,
 							= FALSE;
 				}
 			}
-
-#if CFG_SUPPORT_BEACON_CHANGE_DETECTION
-			/* <1.1.3> beacon content change detected,
-			 * disconnect immediately
-			 */
-			if (fgNeedDisconnect == TRUE)
-				aisBssBeaconTimeout(prAdapter,
-					u4Idx);
 #endif
 		}
 		/* 4 <1.1> Update AIS_BSS_INFO */
@@ -2696,9 +2836,10 @@ uint32_t scanProcessBeaconAndProbeResp(IN struct ADAPTER *prAdapter,
 				 * hidden SSID, and would have different
 				 * BSS descriptor
 				 */
-				log_dbg(SCN, TRACE, "DTIMPeriod[%u] Present[%u] BSSID["
+				log_dbg(SCN, TRACE, "DTIMPeriod[%u] BCN_Interval[%u] Present[%u] BSSID["
 					MACSTR "]\n",
 				       prAisBssInfo->ucDTIMPeriod,
+				       prAisBssInfo->u2BeaconInterval,
 				       prAisBssInfo->fgTIMPresent,
 				       MAC2STR(prBssDesc->aucBSSID));
 				if ((!prAisBssInfo->ucDTIMPeriod) &&
@@ -2756,54 +2897,54 @@ uint32_t scanProcessBeaconAndProbeResp(IN struct ADAPTER *prAdapter,
 			}
 #endif /* CFG_SUPPORT_ADHOC */
 		}
+		if (EQUAL_MAC_ADDR(prBssDesc->aucBSSID, prAisBssInfo->aucBSSID)
+		    && prAisBssInfo->eConnectionState == MEDIA_STATE_CONNECTED
+		    && (prWlanBeaconFrame->u2FrameCtrl & MASK_FRAME_TYPE) ==
+				MAC_FRAME_BEACON)
+			scanUpdateSWIPSBcn(prAdapter, prBssDesc,
+					   prAisBssInfo->ucBssIndex);
 	}
 
-		rlmProcessBcn(prAdapter,
-			prSwRfb,
-			((struct WLAN_BEACON_FRAME *) (prSwRfb->pvHeader))
-				->aucInfoElem,
-			(prSwRfb->u2PacketLen - prSwRfb->u2HeaderLen) -
-			(uint16_t) (OFFSET_OF(struct WLAN_BEACON_FRAME_BODY,
-				aucInfoElem[0])));
+	rlmProcessBcn(prAdapter, prSwRfb,
+		((struct WLAN_BEACON_FRAME *) prSwRfb->pvHeader)->aucInfoElem,
+		(prSwRfb->u2PacketLen - prSwRfb->u2HeaderLen) -
+		(uint16_t) (OFFSET_OF(struct WLAN_BEACON_FRAME_BODY,
+			aucInfoElem[0])));
 
-		mqmProcessBcn(prAdapter,
-			prSwRfb,
-			((struct WLAN_BEACON_FRAME *) (prSwRfb->pvHeader))
-				->aucInfoElem,
-			(prSwRfb->u2PacketLen - prSwRfb->u2HeaderLen) -
-			(uint16_t) (OFFSET_OF(struct WLAN_BEACON_FRAME_BODY,
-				aucInfoElem[0])));
+	mqmProcessBcn(prAdapter,
+		prSwRfb,
+		((struct WLAN_BEACON_FRAME *) prSwRfb->pvHeader)->aucInfoElem,
+		(prSwRfb->u2PacketLen - prSwRfb->u2HeaderLen) -
+		(uint16_t) (OFFSET_OF(struct WLAN_BEACON_FRAME_BODY,
+			aucInfoElem[0])));
 
-		prAdapter->rWlanInfo.u4ScanDbgTimes2++;
+	prAdapter->rWlanInfo.u4ScanDbgTimes2++;
 
-		/* 4 <3> Send SW_RFB_T to HIF when we perform SCAN for HOST */
-		if (prBssDesc->eBSSType == BSS_TYPE_INFRASTRUCTURE
-			|| prBssDesc->eBSSType == BSS_TYPE_IBSS) {
-			/* for AIS, send to host */
-			prAdapter->rWlanInfo.u4ScanDbgTimes3++;
-			if (prScanInfo->eCurrentState == SCAN_STATE_SCANNING
-				|| prScanInfo->fgSchedScanning) {
-				u_int8_t fgAddToScanResult = FALSE;
+	/* 4 <3> Send SW_RFB_T to HIF when we perform SCAN for HOST */
+	if (prBssDesc->eBSSType == BSS_TYPE_INFRASTRUCTURE ||
+	    prBssDesc->eBSSType == BSS_TYPE_IBSS) {
+		/* for AIS, send to host */
+		prAdapter->rWlanInfo.u4ScanDbgTimes3++;
+		if (prScanInfo->eCurrentState == SCAN_STATE_SCANNING ||
+		    prScanInfo->fgSchedScanning) {
+			u_int8_t fgAddToScanResult = FALSE;
 
-				fgAddToScanResult
-					= scanCheckBssIsLegal(prAdapter,
-						prBssDesc);
-				prAdapter->rWlanInfo.u4ScanDbgTimes4++;
+			fgAddToScanResult
+				= scanCheckBssIsLegal(prAdapter, prBssDesc);
+			prAdapter->rWlanInfo.u4ScanDbgTimes4++;
 
-				if (fgAddToScanResult == TRUE) {
-					rStatus = scanAddScanResult(prAdapter,
-						prBssDesc, prSwRfb);
-				}
+			if (fgAddToScanResult == TRUE) {
+				rStatus = scanAddScanResult(prAdapter,
+					prBssDesc, prSwRfb);
 			}
 		}
-#if CFG_ENABLE_WIFI_DIRECT
-		if (prAdapter->fgIsP2PRegistered) {
-			scanP2pProcessBeaconAndProbeResp(prAdapter, prSwRfb,
-				&rStatus, prBssDesc, prWlanBeaconFrame);
-		}
-#endif
 	}
-
+#if CFG_ENABLE_WIFI_DIRECT
+	if (prAdapter->fgIsP2PRegistered) {
+		scanP2pProcessBeaconAndProbeResp(prAdapter, prSwRfb,
+			&rStatus, prBssDesc, prWlanBeaconFrame);
+	}
+#endif
 	return rStatus;
 }	/* end of scanProcessBeaconAndProbeResp() */
 
@@ -3451,7 +3592,7 @@ SCN_BSS_JOIN_FAIL_RESET_STEP
 				 * than us.
 				 */
 #if CFG_SUPPORT_NCHO
-				if (prAdapter->rNchoInfo.fgECHOEnabled
+				if (prAdapter->rNchoInfo.fgNCHOEnabled
 					== TRUE) {
 					ucRCPIStep = 2 * prAdapter
 						->rNchoInfo.i4RoamDelta;
@@ -3802,7 +3943,7 @@ void scanReqLog(struct CMD_SCAN_REQ_V2 *prCmdScanReq)
 				char ssid[PARAM_MAX_LEN_SSID + 1] = {0};
 
 				kalStrnCpy(ssid,
-					slist[i][j].aucSsid, sizeof(ssid) - 1);
+					slist[i][j].aucSsid, sizeof(ssid));
 				ssid[sizeof(ssid) - 1] = '\0';
 				pos += kalSnprintf(pos, end - pos, " %s", ssid);
 			}
@@ -3835,7 +3976,7 @@ void scanReqLog(struct CMD_SCAN_REQ_V2 *prCmdScanReq)
 		prCmdScanReq->u2ChannelDwellTime,
 		prCmdScanReq->u2ChannelMinDwellTime,
 		prCmdScanReq->ucScnFuncMask,
-		prCmdScanReq->aucRandomMac,
+		MAC2STR(prCmdScanReq->aucRandomMac),
 		strbuf != pos ? strbuf : "");
 #undef TEMP_LOG_TEMPLATE
 	kalMemFree(strbuf, VIR_MEM_TYPE, slen);
@@ -3869,8 +4010,15 @@ void scanLogCacheAddBSS(struct LINK *prList,
 
 	LINK_FOR_EACH_ENTRY(pSavedBss, prList,
 		rLinkEntry, struct SCAN_LOG_ELEM_BSS) {
-		if (EQUAL_MAC_ADDR(pSavedBss->aucBSSID, bssId))
+		if (pSavedBss && bssId) {
+			if (EQUAL_MAC_ADDR(pSavedBss->aucBSSID, bssId))
+				return;
+		} else {
+			scanlog_dbg(prefix, ERROR,
+				"pSavedBss(0x%x) or bssid(0x%x) is NULL\n",
+				pSavedBss, bssId);
 			return;
+		}
 	}
 
 	if (prList->u4NumElem < SCAN_LOG_BUFF_SIZE) {
@@ -3881,7 +4029,7 @@ void scanLogCacheAddBSS(struct LINK *prList,
 			return;
 		}
 	} else {
-		scanlog_dbg(prefix, INFO, "Need more buffer\n");
+		scanlog_dbg(prefix, TRACE, "Need more buffer\n");
 		return;
 	}
 	kalMemZero(pBss, sizeof(struct SCAN_LOG_ELEM_BSS));
@@ -3895,7 +4043,7 @@ void scanLogCacheAddBSS(struct LINK *prList,
 void scanLogCacheFlushBSS(struct LINK *prList, enum ENUM_SCAN_LOG_PREFIX prefix,
 	const uint16_t logBufLen)
 {
-	char logBuf[logBufLen];
+	char *prlogBuf;
 	uint32_t idx = 0;
 	struct SCAN_LOG_ELEM_BSS *pBss = NULL;
 #if CFG_SHOW_FULL_MACADDR
@@ -3913,6 +4061,12 @@ void scanLogCacheFlushBSS(struct LINK *prList, enum ENUM_SCAN_LOG_PREFIX prefix,
 	if (LINK_IS_EMPTY(prList))
 		return;
 
+	prlogBuf = kalMemAlloc(logBufLen, VIR_MEM_TYPE);
+	if (prlogBuf == NULL) {
+		DBGLOG(SCN, WARN, "logBuf is NULL, skip!\n");
+		return;
+	}
+	kalMemZero(prlogBuf, logBufLen);
 	/* The maximum characters of uint32_t could be 10. Thus, the
 	 * mininum size should be 10+3 for the format "%u: ".
 	 */
@@ -3922,15 +4076,16 @@ void scanLogCacheFlushBSS(struct LINK *prList, enum ENUM_SCAN_LOG_PREFIX prefix,
 			LINK_REMOVE_HEAD(prList,
 				pBss, struct SCAN_LOG_ELEM_BSS *);
 		}
+		kalMemFree(prlogBuf, VIR_MEM_TYPE, logBufLen);
 		return;
 	}
-	idx += kalSnprintf(logBuf, sizeof(logBuf), "%u: ", prList->u4NumElem);
+	idx += kalSnprintf(prlogBuf, logBufLen, "%u: ", prList->u4NumElem);
 
 	while (!LINK_IS_EMPTY(prList)) {
 		if (idx+dataLen+1 > logBufLen) {
-			logBuf[idx] = 0; /* terminating null byte */
+			prlogBuf[idx] = 0; /* terminating null byte */
 			if (prefix != LOG_SCAN_D2D)
-				scanlog_dbg(prefix, INFO, "%s\n", logBuf);
+				scanlog_dbg(prefix, INFO, "%s\n", prlogBuf);
 			idx = 0;
 		}
 
@@ -3938,7 +4093,7 @@ void scanLogCacheFlushBSS(struct LINK *prList, enum ENUM_SCAN_LOG_PREFIX prefix,
 			pBss, struct SCAN_LOG_ELEM_BSS *);
 
 #if CFG_SHOW_FULL_MACADDR
-		idx += kalSnprintf(logBuf+idx, dataLen+1,
+		idx += kalSnprintf(prlogBuf+idx, dataLen+1,
 			"%02x%02x%02x%02x%02x%02x",
 			((uint8_t *)pBss->aucBSSID)[0],
 			((uint8_t *)pBss->aucBSSID)[1],
@@ -3947,7 +4102,7 @@ void scanLogCacheFlushBSS(struct LINK *prList, enum ENUM_SCAN_LOG_PREFIX prefix,
 			((uint8_t *)pBss->aucBSSID)[4],
 			((uint8_t *)pBss->aucBSSID)[5]);
 #else
-		idx += kalSnprintf(logBuf+idx, dataLen+1,
+		idx += kalSnprintf(prlogBuf+idx, dataLen+1,
 			"%02x%02x%03x%02x",
 			((uint8_t *)pBss->aucBSSID)[0],
 			((uint8_t *)pBss->aucBSSID)[1],
@@ -3959,11 +4114,12 @@ void scanLogCacheFlushBSS(struct LINK *prList, enum ENUM_SCAN_LOG_PREFIX prefix,
 
 	}
 	if (idx != 0) {
-		logBuf[idx] = 0; /* terminating null byte */
+		prlogBuf[idx] = 0; /* terminating null byte */
 		if (prefix != LOG_SCAN_D2D)
-			scanlog_dbg(prefix, INFO, "%s\n", logBuf);
+			scanlog_dbg(prefix, INFO, "%s\n", prlogBuf);
 		idx = 0;
 	}
+	kalMemFree(prlogBuf, VIR_MEM_TYPE, logBufLen);
 }
 
 void scanLogCacheFlushAll(struct SCAN_LOG_CACHE *prScanLogCache,
@@ -3996,9 +4152,6 @@ void scanRemoveBssDescFromList(IN struct LINK *prBSSDescList,
 		/* Support AP Selection */
 		if (!prBssDesc->prBlack)
 			aisQueryBlackList(prAdapter, prBssDesc);
-		if (prBssDesc->prBlack)
-			prBssDesc->prBlack->u4DisapperTime =
-				(uint32_t)kalGetBootTime();
 
 		/* Remove this BSS Desc from the Ess Desc List */
 		for (j = 0; j < KAL_AIS_NUM; j++) {
@@ -4190,3 +4343,43 @@ void scanParseVHTOpIE(IN uint8_t *pucIE, IN struct BSS_DESC *prBssDesc)
 			   &prBssDesc->ucCenterFreqS2,
 			   (uint8_t *)&prBssDesc->eChannelWidth);
 }
+
+/*----------------------------------------------------------------------------*/
+/*!
+ * @brief Check if Adaptive 11r  IE exists in Vendor Cisco IE.
+ *
+ * @param[in] pucBuf     Pointer to the Vendor IE.
+ * @param[in] prBssDesc  Pointer to the BSS_DESC structure.
+ *
+ * @return (none)
+ */
+/*----------------------------------------------------------------------------*/
+void scanCheckAdaptive11rIE(IN uint8_t *pucBuf, IN struct BSS_DESC *prBssDesc)
+{
+	uint32_t oui;
+	struct IE_VENDOR_ADAPTIVE_11R_IE *ie;
+	uint8_t data;
+	uint16_t len;
+
+	if (pucBuf == NULL || prBssDesc == NULL) {
+		DBGLOG(SCN, WARN, "adp11r pucBuf %p, prBssDesc %p, skip!\n",
+			pucBuf, prBssDesc);
+		return;
+	}
+
+	ie = (struct IE_VENDOR_ADAPTIVE_11R_IE *) pucBuf;
+	len = ie->ucLength;
+	if (len < 5 || len > 8)
+		return;
+
+	WLAN_GET_FIELD_BE24(ie->aucOui, &oui);
+	if (oui != VENDOR_IE_CISCO_OUI ||
+	    *(ie->aucVendorType) != VENDOR_IE_CISCO_TYPE)
+		return;
+
+	data = *(ie->pucData);
+	prBssDesc->ucIsAdaptive11r = data & BIT(0);
+	DBGLOG(SCN, TRACE, "BSSDesc [" MACSTR "] adaptive11r = %d\n",
+		MAC2STR(prBssDesc->aucBSSID), prBssDesc->ucIsAdaptive11r);
+}
+

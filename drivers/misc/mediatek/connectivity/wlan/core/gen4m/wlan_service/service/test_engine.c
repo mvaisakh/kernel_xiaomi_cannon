@@ -1250,6 +1250,15 @@ static s_int32 mt_engine_store_tx_info(
 		goto err_out;
 	}
 
+	if (tx_info == NULL) {
+		ret = -1;
+		SERV_LOG(SERV_DBG_CAT_ENGN, SERV_DBG_LVL_ERROR,
+			("%s: test_tx_info is NULL\n",
+			__func__));
+
+		goto err_out;
+	}
+
 	if (is_mt_engine_stack_full(configs) == FALSE) {
 		if (tx_info) {
 			net_ad_fill_phy_info(virtual_wtbl, tx_info);
@@ -1444,6 +1453,9 @@ static u_int32 mt_engine_add_allocation(
 
 	sub_band_idx = mt_engine_get_sub_band(ru_index) + seg*4;
 
+	if (sub_band_idx > 7)
+		return SERV_STATUS_ENGINE_INVALID_PARAM;
+
 	SERV_LOG(SERV_DBG_CAT_ENGN, SERV_DBG_LVL_TRACE,
 		("%s: ru index:%d (%d), ",
 		__func__, ru_index, sub_band_idx));
@@ -1460,11 +1472,17 @@ static u_int32 mt_engine_add_allocation(
 				/* D3.1, Table 28-24, 0xc8 is 484-tone
 				 * D3.1, Table 28-24, 0x72 is 484-empty-tone
 				 */
+				 if (sub_band_idx > 7)
+					return SERV_STATUS_ENGINE_INVALID_PARAM;
+
 				alloc_info->sub20[sub_band_idx+1] = 0x72;
 			} else if (allocation == 0xd0) {
 				/* D3.1, Table 28-24, 0xd0 is 996-tone
 				 * D3.1, Table 28-24, 0x73 is 484-empty-tone
 				 */
+				if ((sub_band_idx+3) > 7)
+					return SERV_STATUS_ENGINE_INVALID_PARAM;
+
 				alloc_info->sub20[sub_band_idx+1] = 0x73;
 				alloc_info->sub20[sub_band_idx+2] = 0x73;
 				alloc_info->sub20[sub_band_idx+3] = 0x73;
@@ -1494,7 +1512,8 @@ static s_int32 mt_engine_calc_symbol_by_bytes(
 	u_char rate_den, u_int32 apep_length)
 {
 	s_int32 ret = SERV_STATUS_SUCCESS;
-	s_int32 m_stbc = 1, tail = 6, rate = 0;
+	s_int32 m_stbc = 1, tail = 6;
+	u_int32 rate = 0;
 	s_int32 ds = 0, dss = 0;
 
 	ds = mt_engine_map_subcarriers(ru_info->ru_index >> 1,
@@ -1645,7 +1664,8 @@ static s_int32 mt_engine_calc_pe_disamb(
 	struct test_ru_info *ru_info, u_char ltf_gi, u_char max_pe)
 {
 	u_int8 pe_symbol_x5 = 0;
-	s_int32 ret = 0, gi = 0, t_pe = ru_info->afactor_init;
+	s_int32 ret = 0, gi = 0;
+	u_int32 t_pe = ru_info->afactor_init;
 	s_int32 ltf_time = 0;
 	u_int32 nss = engine_max(ru_info->ru_mu_nss, ru_info->nss);
 

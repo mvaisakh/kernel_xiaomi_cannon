@@ -1,32 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
- ***************************************************************************
- * Ralink Tech Inc.
- * 4F, No. 2 Technology 5th Rd.
- * Science-based Industrial Park
- * Hsin-chu, Taiwan, R.O.C.
- *
- * (c) Copyright 2002, Ralink Technology, Inc.
- *
- * All rights reserved. Ralink's source code is an unpublished work and the
- * use of a copyright notice does not imply otherwise. This source code
- * contains confidential trade secret material of Ralink Tech. Any attemp
- * or participation in deciphering, decoding, reverse engineering or in any
- * way altering the source code is stricitly prohibited, unless the prior
- * written consent of Ralink Technology, Inc. is obtained.
- ***************************************************************************
-
-    Module Name:
-    dvt_dmashdl.c
-
-    Abstract:
-    For DMA sheduler DVT.
-    Please refer to DVT plan of DMA SCHEDULER for details
-
-    Revision History:
-    Who         When            What
-    --------    ----------      ----------------------------------------------
-    Kai         2019/01/28      develop this for MT7915 USB(WA)
-*/
+ * Copyright (c) 2020 MediaTek Inc.
+ */
+ 
 #include "precomp.h"
 
 #if (CFG_SUPPORT_DMASHDL_SYSDVT)

@@ -20,7 +20,6 @@
 #ifndef _MTK_WCN_CONSYS_HW_H_
 #define _MTK_WCN_CONSYS_HW_H_
 
-#include <sync_write.h>
 /*#include <mt_reg_base.h>*/
 #include "wmt_plat.h"
 
@@ -33,6 +32,10 @@
 #endif
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0))
+#include <linux/regmap.h>
+#endif
 
 #define ENABLE MTK_WCN_BOOL_TRUE
 #define DISABLE MTK_WCN_BOOL_FALSE
@@ -50,7 +53,10 @@
 	(*(volatile UINT32 *)(REG)) = val;\
 }
 #define CONSYS_REG_READ(addr) (*((volatile UINT32 *)(addr)))
-#define CONSYS_REG_WRITE(addr, data)  mt_reg_sync_writel(data, addr)
+#define CONSYS_REG_WRITE(addr, data) do {\
+	writel(data, (volatile void *)addr); \
+	mb(); \
+} while (0)
 #define CONSYS_REG_WRITE_RANGE(reg, data, end, begin) {\
 	UINT32 val = CONSYS_REG_READ(reg); \
 	SET_BIT_RANGE(&val, data, end, begin); \
@@ -84,6 +90,34 @@
 #define EXP_APMEM_HOST_OUTBAND_ASSERT_MAGIC_W1   (0x19b30bb1)
 
 #define DYNAMIC_DUMP_GROUP_NUM 5
+
+
+#define OPT_POWER_ON_DLM_TABLE			(0x1)
+#define OPT_SET_MCUCLK_TABLE_1_2		(0x1 << 1)
+#define OPT_SET_MCUCLK_TABLE_3_4		(0x1 << 2)
+#define OPT_QUERY_ADIE				(0x1 << 3)
+#define OPT_SET_WIFI_EXT_COMPONENT		(0x1 << 4)
+#define OPT_WIFI_LTE_COEX			(0x1 << 5)
+#define OPT_COEX_TDM_REQ_ANTSEL_NUM		(0x1 << 6)
+#define OPT_BT_TSSI_FROM_WIFI_CONFIG_NEW_OPID	(0x1 << 7)
+#define OPT_INIT_COEX_BEFORE_RF_CALIBRATION	(0x1 << 8)
+#define OPT_INIT_COEX_AFTER_RF_CALIBRATION	(0x1 << 9)
+#define OPT_COEX_CONFIG_ADJUST			(0x1 << 10)
+#define OPT_COEX_CONFIG_ADJUST_NEW_FLAG		(0x1 << 11)
+#define OPT_SET_OSC_TYPE			(0x1 << 12)
+#define OPT_SET_COREDUMP_LEVEL			(0x1 << 13)
+#define OPT_WIFI_5G_PALDO			(0x1 << 14)
+#define OPT_GPS_SYNC				(0x1 << 15)
+#define OPT_WIFI_LTE_COEX_TABLE_0		(0x1 << 16)
+#define OPT_WIFI_LTE_COEX_TABLE_1		(0x1 << 17)
+#define OPT_WIFI_LTE_COEX_TABLE_2		(0x1 << 18)
+#define OPT_WIFI_LTE_COEX_TABLE_3		(0x1 << 19)
+#define OPT_COEX_EXT_ELNA_GAIN_P1_SUPPORT	(0x1 << 20)
+#define OPT_NORMAL_PATCH_DWN_0			(0x1 << 21)
+#define OPT_NORMAL_PATCH_DWN_1			(0x1 << 22)
+#define OPT_NORMAL_PATCH_DWN_2			(0x1 << 23)
+#define OPT_NORMAL_PATCH_DWN_3			(0x1 << 24)
+#define OPT_PATCH_CHECKSUM			(0x1 << 25)
 
 /*******************************************************************************
 *                    E X T E R N A L   R E F E R E N C E S
@@ -224,6 +258,7 @@ typedef INT32(*CONSYS_IC_DUMP_GATING_STATE) (P_CONSYS_STATE state);
 typedef INT32(*CONSYS_IC_SLEEP_INFO_ENABLE_CTRL) (UINT32 enable);
 typedef INT32(*CONSYS_IC_SLEEP_INFO_READ_CTRL) (WMT_SLEEP_COUNT_TYPE type, PUINT64 sleep_counter, PUINT64 sleep_timer);
 typedef INT32(*CONSYS_IC_SLEEP_INFO_CLEAR) (VOID);
+typedef UINT64(*CONSYS_IC_GET_OPTIONS) (VOID);
 
 typedef struct _WMT_CONSYS_IC_OPS_ {
 	CONSYS_IC_CLOCK_BUFFER_CTRL consys_ic_clock_buffer_ctrl;
@@ -287,6 +322,7 @@ typedef struct _WMT_CONSYS_IC_OPS_ {
 	CONSYS_IC_SLEEP_INFO_ENABLE_CTRL consys_ic_sleep_info_enable_ctrl;
 	CONSYS_IC_SLEEP_INFO_READ_CTRL consys_ic_sleep_info_read_ctrl;
 	CONSYS_IC_SLEEP_INFO_CLEAR consys_ic_sleep_info_clear;
+	CONSYS_IC_GET_OPTIONS consys_ic_get_options;
 } WMT_CONSYS_IC_OPS, *P_WMT_CONSYS_IC_OPS;
 /*******************************************************************************
 *                            P U B L I C   D A T A
@@ -302,6 +338,11 @@ extern CONSYS_EMI_ADDR_INFO mtk_wcn_emi_addr_info;
 
 extern UINT64 gConEmiSize;
 extern phys_addr_t gConEmiPhyBase;
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0))
+extern struct regmap *g_regmap;
+#endif
+
 
 /*******************************************************************************
 *                           P R I V A T E   D A T A
@@ -371,5 +412,6 @@ INT32 mtk_wcn_consys_dump_gating_state(P_CONSYS_STATE state);
 INT32 mtk_wcn_consys_sleep_info_read_all_ctrl(P_CONSYS_STATE state);
 INT32 mtk_wcn_consys_sleep_info_clear(VOID);
 INT32 mtk_wcn_consys_sleep_info_restore(VOID);
+UINT64 mtk_wcn_consys_get_options(VOID);
 #endif /* _MTK_WCN_CONSYS_HW_H_ */
 

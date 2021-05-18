@@ -116,6 +116,8 @@ static INT32 g_bt_no_br_acl_link = 1;
 #define EMI_MET_DATA_OFFSET	0x8
 #define FW_PATCH_UPDATE_RST_DURATION 180 /* 180 seconds */
 
+#define WMT_LIB_DMP_CONSYS_MAX_TIMES 10
+
 /*******************************************************************************
 *                            P U B L I C   D A T A
 ********************************************************************************
@@ -146,9 +148,9 @@ static INT32 wmtd_worker_thread(PVOID pvData);
 
 static INT32 wmt_lib_pin_ctrl(WMT_IC_PIN_ID id, WMT_IC_PIN_STATE stat, UINT32 flag);
 static MTK_WCN_BOOL wmt_lib_hw_state_show(VOID);
-static VOID wmt_lib_utc_sync_timeout_handler(ULONG data);
+static VOID wmt_lib_utc_sync_timeout_handler(timer_handler_arg arg);
 static VOID wmt_lib_utc_sync_worker_handler(struct work_struct *work);
-static VOID wmt_lib_wmtd_worker_thread_timeout_handler(ULONG data);
+static VOID wmt_lib_wmtd_worker_thread_timeout_handler(timer_handler_arg);
 static VOID wmt_lib_wmtd_worker_thread_work_handler(struct work_struct *work);
 
 static VOID wmt_lib_assert_work_cb(struct work_struct *work);
@@ -226,6 +228,21 @@ INT32 wmt_lib_mpu_lock_aquire(VOID)
 VOID wmt_lib_mpu_lock_release(VOID)
 {
 	osal_unlock_sleepable_lock(&gDevWmt.mpu_lock);
+}
+
+INT32 wmt_lib_power_lock_aquire(VOID)
+{
+	return osal_lock_sleepable_lock(&gDevWmt.power_lock);
+}
+
+VOID wmt_lib_power_lock_release(VOID)
+{
+	osal_unlock_sleepable_lock(&gDevWmt.power_lock);
+}
+
+INT32 wmt_lib_power_lock_trylock(VOID)
+{
+	return osal_trylock_sleepable_lock(&gDevWmt.power_lock);
 }
 
 INT32 DISABLE_PSM_MONITOR(VOID)
@@ -343,6 +360,7 @@ INT32 wmt_lib_init(VOID)
 	osal_sleepable_lock_init(&pDevWmt->wlan_lock);
 	osal_sleepable_lock_init(&pDevWmt->assert_lock);
 	osal_sleepable_lock_init(&pDevWmt->mpu_lock);
+	osal_sleepable_lock_init(&pDevWmt->power_lock);
 	osal_sleepable_lock_init(&pDevWmt->rActiveOpQ.sLock);
 	osal_sleepable_lock_init(&pDevWmt->rWorkerOpQ.sLock);
 	osal_sleepable_lock_init(&pDevWmt->rFreeOpQ.sLock);
@@ -512,6 +530,7 @@ INT32 wmt_lib_deinit(VOID)
 	osal_sleepable_lock_deinit(&pDevWmt->rFreeOpQ.sLock);
 	osal_sleepable_lock_deinit(&pDevWmt->rActiveOpQ.sLock);
 	osal_sleepable_lock_deinit(&pDevWmt->rWorkerOpQ.sLock);
+	osal_sleepable_lock_deinit(&pDevWmt->power_lock);
 	osal_sleepable_lock_deinit(&pDevWmt->mpu_lock);
 	osal_sleepable_lock_deinit(&pDevWmt->idc_lock);
 	osal_sleepable_lock_deinit(&pDevWmt->wlan_lock);
@@ -629,7 +648,7 @@ INT32 wmt_lib_set_hif(ULONG hifconf)
 	case STP_UART_FULL:
 		pHif->hifType = WMT_HIF_UART;
 		pHif->uartFcCtrl = ((hifconf & 0xc) >> 2);
-		val = (hifconf >> 8);
+		val = (UINT32)(hifconf >> 8);
 		pHif->au4HifConf[0] = val;
 		pHif->au4HifConf[1] = val;
 		mtk_wcn_stp_set_if_tx_type(STP_UART_IF_TX);
@@ -1072,7 +1091,7 @@ static INT32 wmt_lib_is_bt_able_to_reset(VOID)
 		ULONG local_time;
 		struct rtc_time tm;
 
-		do_gettimeofday(&time);
+		osal_do_gettimeofday(&time);
 		local_time = (ULONG)(time.tv_sec - (sys_tz.tz_minuteswest * 60));
 		rtc_time_to_tm(local_time, &tm);
 		if (tm.tm_hour == 2)
@@ -1235,7 +1254,8 @@ static INT32 wmtd_thread(void *pvData)
 			/* when whole chip reset, only HW RST and SW RST cmd can execute */
 			if ((pOp->op.opId == WMT_OPID_HW_RST)
 			    || (pOp->op.opId == WMT_OPID_SW_RST)
-			    || (pOp->op.opId == WMT_OPID_GPIO_STATE)) {
+			    || (pOp->op.opId == WMT_OPID_GPIO_STATE)
+			    || (pOp->op.opId == WMT_OPID_GET_CONSYS_STATE)) {
 				iResult = wmt_core_opid(&pOp->op);
 			} else {
 				iResult = -2;
@@ -1393,7 +1413,7 @@ met_exit:
 	return 0;
 };
 
-static VOID wmt_lib_wmtd_worker_thread_timeout_handler(ULONG data)
+static VOID wmt_lib_wmtd_worker_thread_timeout_handler(timer_handler_arg arg)
 {
 	schedule_work(&gDevWmt.wmtd_worker_thread_work);
 }
@@ -2074,7 +2094,7 @@ P_WMT_PATCH_INFO wmt_lib_get_patch_info(VOID)
  */
 INT32 wmt_lib_set_aif(enum CMB_STUB_AIF_X aif, MTK_WCN_BOOL share)
 {
-	if (aif >= CMB_STUB_AIF_MAX) {
+	if (aif < 0 || aif >= CMB_STUB_AIF_MAX) {
 		WMT_ERR_FUNC("invalid aif (%d)\n", aif);
 		return -1;
 	}
@@ -2338,7 +2358,7 @@ ENUM_WMTRSTRET_TYPE_T wmt_lib_cmb_rst(ENUM_WMTRSTSRC_TYPE_T src)
 	WMT_INFO_FUNC("coredump mode == %d. Connsys coredump is %s.",
 			coredump_mode, coredump_mode ? "enabled" : "disabled");
 
-	if (src < WMTRSTSRC_RESET_MAX)
+	if (src >= 0 && src < WMTRSTSRC_RESET_MAX)
 		WMT_INFO_FUNC("reset source = %s\n", srcName[src]);
 
 	if (src == WMTRSTSRC_RESET_TEST) {
@@ -2538,6 +2558,9 @@ VOID wmt_lib_set_rom_patch_info(struct wmt_rom_patch_info *PatchInfo, ENUM_WMTDR
 {
 	P_DEV_WMT pWmtDev = &gDevWmt;
 
+	if (type < 0)
+		return;
+
 	/* Allow info of a type to be set only once, to avoid inproper usage */
 	if (pWmtDev->pWmtRomPatchInfo[type])
 		return;
@@ -2712,6 +2735,11 @@ INT32 wmt_lib_register_trigger_assert_cb(trigger_assert_cb trigger_assert)
 {
 	wmt_plat_trigger_assert_cb_reg(trigger_assert);
 	return 0;
+}
+
+INT32 wmt_lib_get_host_assert_info(PUINT32 type, PUINT32 reason, PUINT32 en)
+{
+	return stp_dbg_get_host_assert_info(type, reason, en);
 }
 
 UINT32 wmt_lib_set_host_assert_info(UINT32 type, UINT32 reason, UINT32 en)
@@ -2958,7 +2986,7 @@ UINT32 wmt_lib_get_ext_ldo(VOID)
 	return gDevWmt.ext_ldo_flag;
 }
 
-static VOID wmt_lib_utc_sync_timeout_handler(ULONG data)
+static VOID wmt_lib_utc_sync_timeout_handler(timer_handler_arg arg)
 {
 	schedule_work(&gDevWmt.utcSyncWorker);
 }
@@ -3074,7 +3102,7 @@ INT32 wmt_lib_blank_status_ctrl(UINT32 on_off_flag)
 	}
 
 	pSignal = &pOp->signal;
-	pSignal->timeoutValue = MAX_WMT_OP_TIMEOUT;
+	pSignal->timeoutValue = MAX_EACH_WMT_CMD;
 	WMT_DBG_FUNC("WMT_OPID_BLANK_STATUS_CTRL on_off_flag(0x%x)\n\n", on_off_flag);
 	pOp->op.opId = WMT_OPID_BLANK_STATUS_CTRL;
 	pOp->op.au4OpData[0] = on_off_flag;
@@ -3256,9 +3284,12 @@ VOID wmt_lib_trigger_assert_keyword_delay(ENUM_WMTDRV_TYPE_T type, UINT32 reason
 
 	a->type = type;
 	a->reason = reason;
-	snprintf(a->keyword, sizeof(a->keyword), "%s", keyword);
-	WMT_ERR_FUNC("Assert: type = %d, reason = %d, keyword = %s", type, reason, keyword);
-	schedule_work(&(a->work));
+	if (snprintf(a->keyword, sizeof(a->keyword), "%s", keyword) < 0) {
+		WMT_INFO_FUNC("snprintf a->keyword fail\n");
+	} else {
+		WMT_ERR_FUNC("Assert: type = %d, reason = %d, keyword = %s", type, reason, keyword);
+		schedule_work(&(a->work));
+	}
 }
 
 INT32 wmt_lib_dmp_consys_state(P_CONSYS_STATE_DMP_INFO dmp_info,
@@ -3271,6 +3302,12 @@ INT32 wmt_lib_dmp_consys_state(P_CONSYS_STATE_DMP_INFO dmp_info,
 	P_CONSYS_STATE_DMP_OP tmp_op;
 	int i, wait_ms = 1000, tmp;
 	struct consys_state_dmp_req *p_req = &gDevWmt.state_dmp_req;
+
+
+	if (cpupcr_times > WMT_LIB_DMP_CONSYS_MAX_TIMES) {
+		pr_warn("dump too many times [%d]\n", cpupcr_times);
+		return MTK_WCN_BOOL_FALSE;
+	}
 
 	/* make sure:						*/
 	/* 1. consys already power on		*/
@@ -3297,9 +3334,6 @@ INT32 wmt_lib_dmp_consys_state(P_CONSYS_STATE_DMP_INFO dmp_info,
 
 	if (dmp_op == NULL)
 		return MTK_WCN_BOOL_FALSE;
-
-	if (cpupcr_times > WMT_CORE_DMP_CPUPCR_NUM)
-		cpupcr_times = WMT_CORE_DMP_CPUPCR_NUM;
 
 	memset(&dmp_op->dmp_info, 0, sizeof(struct consys_state_dmp_info));
 	dmp_op->times = cpupcr_times;
@@ -3337,7 +3371,6 @@ err:
 	return bRet;
 }
 
-
 INT32 wmt_lib_reg_readable(VOID)
 {
 	return wmt_lib_reg_readable_by_addr(0);
@@ -3351,3 +3384,4 @@ INT32 wmt_lib_reg_readable_by_addr(SIZE_T addr)
 	}
 	return mtk_consys_check_reg_readable_by_addr(addr);
 }
+

@@ -57,8 +57,8 @@ static _osal_inline_ INT32 stp_dbg_combo_put_dump_to_aee(VOID)
 	static UINT8 tmp[2048];
 
 	UINT32 buf_len;
-	STP_PACKET_T *pkt;
-	STP_DBG_HDR_T *hdr;
+	STP_PACKET_T *pkt = NULL;
+	STP_DBG_HDR_T *hdr = NULL;
 	INT32 remain = 0;
 	INT32 retry = 0;
 	INT32 ret = 0;
@@ -72,8 +72,10 @@ static _osal_inline_ INT32 stp_dbg_combo_put_dump_to_aee(VOID)
 				if (pkt->hdr.len <= 1500) {
 					tmp[pkt->hdr.len] = '\n';
 					tmp[pkt->hdr.len + 1] = '\0';
-					osal_memcpy(&tmp[0], pkt->raw, pkt->hdr.len);
-
+					if (pkt->hdr.len < STP_DMP_SZ)
+						osal_memcpy(&tmp[0], pkt->raw, pkt->hdr.len);
+					else
+						osal_memcpy(&tmp[0], pkt->raw, STP_DMP_SZ);
 					ret = stp_dbg_aee_send(tmp, pkt->hdr.len, 0);
 				} else {
 					STP_DBG_PR_INFO("dump entry length is over long\n");
@@ -99,8 +101,8 @@ static _osal_inline_ INT32 stp_dbg_combo_put_dump_to_nl(VOID)
 	static UINT8 tmp[2048];
 
 	UINT32 buf_len;
-	STP_PACKET_T *pkt;
-	STP_DBG_HDR_T *hdr;
+	STP_PACKET_T *pkt = NULL;
+	STP_DBG_HDR_T *hdr = NULL;
 	INT32 remain = 0;
 	INT32 index = 0;
 	INT32 retry = 0;

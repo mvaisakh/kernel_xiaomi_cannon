@@ -284,7 +284,6 @@ void nic_rxd_v2_fill_rfb(
 		HAL_MAC_CONNAC2X_RX_STATUS_GET_RXV_SEQ_NO(prRxStatus);
 	prSwRfb->ucChnlNum =
 		HAL_MAC_CONNAC2X_RX_STATUS_GET_CHNL_NUM(prRxStatus);
-
 #if 0
 	if (prHifRxHdr->ucReorder &
 	    HIF_RX_HDR_80211_HEADER_FORMAT) {
@@ -328,6 +327,7 @@ u_int8_t nic_rxd_v2_sanity_check(
 
 	prChipInfo = prAdapter->chip_info;
 	prRxStatus = (struct HW_MAC_CONNAC2X_RX_DESC *)prSwRfb->prRxStatus;
+
 	if (!HAL_MAC_CONNAC2X_RX_STATUS_IS_FCS_ERROR(prRxStatus)) {
 		if (!HAL_MAC_CONNAC2X_RX_STATUS_IS_NAMP(prRxStatus)
 			&& !HAL_MAC_CONNAC2X_RX_STATUS_IS_DAF(prRxStatus))
@@ -375,6 +375,29 @@ u_int8_t nic_rxd_v2_sanity_check(
 			if (prSwRfb->u2HeaderLen >= ETH_HLEN
 			    && *pu2EtherType == NTOHS(ETH_P_VLAN))
 				fgDrop = FALSE;
+		}
+	}
+
+	/* Drop plain text during security connection */
+	if (prSwRfb->fgIsCipherMS && prSwRfb->fgDataFrame == TRUE) {
+		uint16_t *pu2EtherType;
+
+		pu2EtherType = (uint16_t *)
+				((uint8_t *)prSwRfb->pvHeader +
+				2 * MAC_ADDR_LEN);
+		if (prSwRfb->u2HeaderLen >= ETH_HLEN
+			&& (*pu2EtherType == NTOHS(ETH_P_1X)
+#if CFG_SUPPORT_WAPI
+			|| (*pu2EtherType == NTOHS(ETH_WPI_1X))
+#endif
+		)) {
+			fgDrop = FALSE;
+			DBGLOG(RSN, INFO,
+				"Don't drop eapol or wpi packet\n");
+		} else {
+			fgDrop = TRUE;
+			DBGLOG(RSN, INFO,
+				"Drop plain text during security connection\n");
 		}
 	}
 

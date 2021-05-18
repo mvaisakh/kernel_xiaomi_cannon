@@ -59,6 +59,7 @@
 #include "wmt_lib.h"
 #include "wmt_conf.h"
 #include "wmt_dbg.h"
+#include "wmt_user_proc.h"
 #include "psm_core.h"
 #include "stp_core.h"
 #include "stp_exp.h"
@@ -560,10 +561,12 @@ LONG wmt_dev_tm_temp_query(VOID)
 {
 #define HISTORY_NUM       3
 #define REFRESH_TIME    300	/* sec */
+#define ONE_DAY_LONG    86400	/* sec */
 
 	static INT32 s_temp_table[HISTORY_NUM] = { 99 };	/* not query yet. */
 	static INT32 s_idx_temp_table;
 	static struct timeval s_query_time;
+	static struct timeval sync_log_last_time = {0, 0};
 
 	INT32 temp_table[HISTORY_NUM];
 	INT32 idx_temp_table;
@@ -593,7 +596,7 @@ LONG wmt_dev_tm_temp_query(VOID)
 		}
 	}
 
-	do_gettimeofday(&now_time);
+	osal_do_gettimeofday(&now_time);
 #if 1
 	/* Query condition 2: */
 	/* Moniter the bus activity to decide if we have the need to query temperature. */
@@ -640,6 +643,13 @@ LONG wmt_dev_tm_temp_query(VOID)
 		}
 	}
 
+	/* update utc time for fw once a day */
+	if ((now_time.tv_sec < sync_log_last_time.tv_sec) ||
+			((now_time.tv_sec - sync_log_last_time.tv_sec) > ONE_DAY_LONG)) {
+		sync_log_last_time.tv_sec = now_time.tv_sec;
+		wmt_lib_utc_time_sync();
+	}
+
 	if (query_cond) {
 		/* update the temperature record */
 		mtk_wcn_wmt_therm_ctrl(WMTTHERM_ENABLE);
@@ -652,7 +662,7 @@ LONG wmt_dev_tm_temp_query(VOID)
 			osal_memcpy(s_temp_table, temp_table, sizeof(s_temp_table));
 			s_idx_temp_table = (s_idx_temp_table + 1) % HISTORY_NUM;
 			s_temp_table[s_idx_temp_table] = current_temp;
-			do_gettimeofday(&s_query_time);
+			osal_do_gettimeofday(&s_query_time);
 			index = -1;
 		} else {
 			index = s_idx_temp_table;
@@ -748,7 +758,7 @@ ssize_t WMT_read(struct file *filp, char __user *buf, size_t count, loff_t *f_po
 	if (pCmd != NULL) {
 		cmdLen = osal_strlen(pCmd) < NAME_MAX ? osal_strlen(pCmd) : NAME_MAX;
 		if (cmdLen > count)
-			cmdLen = count;
+			cmdLen = (UINT32)count;
 		WMT_DBG_FUNC("cmd str(%s)\n", pCmd);
 		if (copy_to_user(buf, pCmd, cmdLen))
 			iRet = -EFAULT;
@@ -1016,8 +1026,14 @@ LONG WMT_unlocked_ioctl(struct file *filp, UINT32 cmd, ULONG arg)
 	case 10:
 		if (mtk_wcn_stp_coredump_start_get()) {
 			wmt_lib_host_awake_get();
-			if (wmt_detect_get_chip_type() == WMT_CHIP_TYPE_SOC)
-				WMT_INFO_FUNC("stp dump start.\n");
+			if (wmt_detect_get_chip_type() == WMT_CHIP_TYPE_SOC) {
+				char buf[60];
+
+				if (copy_from_user(buf, (PVOID)arg, 60) == 0) {
+					buf[59] = '\0';
+					WMT_INFO_FUNC("coredump path: %s\n", buf);
+				}
+			}
 			else {
 				WMT_INFO_FUNC("Trigger kernel api dump.\n");
 				if (wmt_detect_get_chip_type() == WMT_CHIP_TYPE_COMBO ||
@@ -1044,7 +1060,12 @@ LONG WMT_unlocked_ioctl(struct file *filp, UINT32 cmd, ULONG arg)
 	case 11:
 		if (mtk_wcn_stp_coredump_start_get()) {
 			if (wmt_detect_get_chip_type() == WMT_CHIP_TYPE_SOC) {
-				WMT_INFO_FUNC("Dump connsys EMI done.\n");
+				char buf[60];
+
+				if (copy_from_user(buf, (PVOID)arg, 60) == 0) {
+					buf[59] = '\0';
+					WMT_INFO_FUNC("emi_dump path: %s\n", buf);
+				}
 				mtk_stp_notify_emi_dump_end();
 			}
 			wmt_lib_host_awake_put();
@@ -1088,7 +1109,7 @@ LONG WMT_unlocked_ioctl(struct file *filp, UINT32 cmd, ULONG arg)
 			break;
 		}
 
-		pAtchNum = arg;
+		pAtchNum = (UINT32)arg;
 
 		if (pPatchInfo == NULL)
 			pPatchInfo = kcalloc(pAtchNum, sizeof(WMT_PATCH_INFO), GFP_ATOMIC);
@@ -1126,7 +1147,6 @@ LONG WMT_unlocked_ioctl(struct file *filp, UINT32 cmd, ULONG arg)
 			}
 
 			dWloadSeq = wMtPatchInfo.dowloadSeq;
-			wMtPatchInfo.patchName[255] = '\0';
 			WMT_DBG_FUNC(
 				"patch dl seq %d,name %s,address info 0x%02x,0x%02x,0x%02x,0x%02x\n",
 			     dWloadSeq, wMtPatchInfo.patchName,
@@ -1566,6 +1586,9 @@ static INT32 WMT_init(VOID)
 	/*static allocate chrdev */
 	gWmtInitStatus = WMT_INIT_START;
 	init_waitqueue_head((wait_queue_head_t *) &gWmtInitWq);
+
+	osal_unsleepable_lock_init(&g_temp_query_spinlock);
+
 #if (MTK_WCN_REMOVE_KO)
 	/* called in do_common_drv_init() */
 #else
@@ -1629,6 +1652,7 @@ static INT32 WMT_init(VOID)
 #if CFG_WMT_DBG_SUPPORT
 	wmt_dev_dbg_setup();
 #endif
+	wmt_dev_user_proc_setup();
 
 	wmt_dev_proc_init();
 	wmt_alarm_init();
@@ -1639,8 +1663,6 @@ static INT32 WMT_init(VOID)
 	if (chip_type == WMT_CHIP_TYPE_COMBO)
 		mtk_wcn_hif_sdio_update_cb_reg(wmt_dev_tra_sdio_update);
 
-	WMT_DBG_FUNC("wmt_dev register thermal cb\n");
-	osal_unsleepable_lock_init(&g_temp_query_spinlock);
 	wmt_lib_register_thermal_ctrl_cb(wmt_dev_tm_temp_query);
 	wmt_lib_register_trigger_assert_cb(wmt_lib_trigger_assert);
 
@@ -1678,6 +1700,7 @@ error:
 #if CFG_WMT_DBG_SUPPORT
 	wmt_dev_dbg_remove();
 #endif
+	wmt_dev_user_proc_remove();
 #if WMT_CREATE_NODE_DYNAMIC
 	if (!(IS_ERR(wmt_dev)))
 		device_destroy(wmt_class, devID);
@@ -1729,6 +1752,7 @@ static VOID WMT_exit(VOID)
 #if CFG_WMT_DBG_SUPPORT
 	wmt_dev_dbg_remove();
 #endif
+	wmt_dev_user_proc_remove();
 
 	wmt_dev_proc_deinit();
 	wmt_alarm_deinit();

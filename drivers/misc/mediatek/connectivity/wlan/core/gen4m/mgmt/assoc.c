@@ -121,12 +121,16 @@ struct APPEND_VAR_IE_ENTRY txAssocReqIETable[] = {
 	,			/*199 */
 #endif
 #if (CFG_SUPPORT_802_11AX == 1)
-	{(0), heRlmReqGetHeCapIELen, heRlmReqGenerateHeCapIE}
+	{(0), heRlmCalculateHeCapIELen, heRlmReqGenerateHeCapIE}
 	,			/* 255, EXT 35 */
 #endif
 #if CFG_SUPPORT_MTK_SYNERGY
 	{(ELEM_HDR_LEN + ELEM_MIN_LEN_MTK_OUI), NULL, rlmGenerateMTKOuiIE}
 	,			/* 221 */
+#endif
+#if CFG_SUPPORT_ASSURANCE
+	{0, assocCalculateRoamReasonLen, assocGenerateRoamReason}
+	,
 #endif
 	{(ELEM_HDR_LEN + ELEM_MAX_LEN_WPA), NULL, rsnGenerateWPAIE}
 	/* 221 */
@@ -167,6 +171,12 @@ struct APPEND_VAR_IE_ENTRY txAssocRespIETable[] = {
 	{(ELEM_HDR_LEN + ELEM_MAX_LEN_VHT_OP_MODE_NOTIFICATION), NULL,
 	 rlmRspGenerateVhtOpNotificationIE}
 	,			/*199 */
+#endif
+#if CFG_SUPPORT_802_11AX
+	{0, heRlmCalculateHeCapIELen, heRlmRspGenerateHeCapIE}
+	,			/* 255, EXT 35 */
+	{0, heRlmCalculateHeOpIELen, heRlmRspGenerateHeOpIE}
+	,			/* 255, EXT 36 */
 #endif
 	{(ELEM_HDR_LEN + ELEM_MAX_LEN_WMM_PARAM), NULL, mqmGenerateWmmParamIE}
 	,			/* 221 */
@@ -786,8 +796,10 @@ void assocGenerateConnIE(struct ADAPTER *prAdapter,
 	struct STA_RECORD *prStaRec;
 	uint8_t *pucBuffer, *cp;
 	const uint8_t *rsnConn;
+	const uint8_t *extCapConn;
 	uint8_t ucBssIndex;
 	uint32_t len, rsnIeLen;
+	uint32_t extCapIeLen;
 
 	prStaRec = cnmGetStaRecByIndex(prAdapter, prMsduInfo->ucStaRecIndex);
 	if (!prStaRec)
@@ -801,34 +813,146 @@ void assocGenerateConnIE(struct ADAPTER *prAdapter,
 	prConnSettings = aisGetConnSettings(prAdapter, ucBssIndex);
 
 	if (IS_STA_IN_AIS(prStaRec) && prConnSettings->assocIeLen > 0) {
+		kalMemCopy(cp, prConnSettings->pucAssocIEs,
+				   prConnSettings->assocIeLen);
+		cp += prConnSettings->assocIeLen;
+
 		rsnConn = kalFindIeMatchMask(ELEM_ID_RSN,
-				       prConnSettings->pucAssocIEs,
-				       prConnSettings->assocIeLen,
+				       pucBuffer,
+				       cp - pucBuffer,
 				       NULL, 0, 0, NULL);
 
-		if (!rsnConn) {
-			kalMemCopy(cp, prConnSettings->pucAssocIEs,
-				   prConnSettings->assocIeLen);
-			cp += prConnSettings->assocIeLen;
-			goto dump;
+		if (rsnConn) {
+			rsnIeLen = IE_SIZE(rsnConn);
+
+			len = cp - rsnConn - rsnIeLen;
+			/* copy to the start of RSN IE*/
+			cp = (char *) rsnConn;
+			/* jump to the end of RSN IE to copy Remaing IEs*/
+			kalMemCopy(cp, rsnConn + rsnIeLen, len);
+			cp += len;
 		}
 
-		rsnIeLen = ELEM_HDR_LEN + RSN_IE(rsnConn)->ucLength;
+		extCapConn = kalFindIeMatchMask(ELEM_ID_EXTENDED_CAP,
+				       pucBuffer,
+				       cp  - pucBuffer,
+				       NULL, 0, 0, NULL);
 
-		/* Copy data before RSN IE to assoc req */
-		len = rsnConn - prConnSettings->pucAssocIEs;
-		kalMemCopy(cp, prConnSettings->pucAssocIEs, len);
-		cp += len;
+		if (extCapConn) {
+			extCapIeLen = IE_SIZE(extCapConn);
 
-		/* jump to the end of RSN IE and copy Remaing IEs*/
-		len = prConnSettings->assocIeLen - len - rsnIeLen;
-		kalMemCopy(cp, rsnConn + rsnIeLen, len);
-		cp += len;
+			len = cp - extCapConn - extCapIeLen;
+			/* copy to the start of EXT CAP IE*/
+			cp = (char *) extCapConn;
+			/* jump to the end of EXT CAP IE to copy remaing IEs */
+			kalMemCopy(cp, extCapConn + extCapIeLen, len);
+			cp += len;
+		}
+
 	}
-dump:
 	prMsduInfo->u2FrameLength += cp - pucBuffer;
 	DBGLOG_MEM8(SAA, INFO, pucBuffer, cp - pucBuffer);
 }
+
+#if CFG_SUPPORT_ASSURANCE
+
+uint32_t assocCalculateRoamReasonLen(struct ADAPTER *prAdapter,
+		uint8_t ucBssIdx, struct STA_RECORD *prStaRec)
+{
+	struct AIS_SPECIFIC_BSS_INFO *prAisSpecificBssInfo;
+	uint8_t ucBssIndex = 0;
+
+	ucBssIndex = prStaRec->ucBssIndex;
+	prAisSpecificBssInfo = aisGetAisSpecBssInfo(prAdapter, ucBssIndex);
+	if (IS_STA_IN_AIS(prStaRec) && prStaRec->fgIsReAssoc &&
+	    prAisSpecificBssInfo->fgRoamingReasonEnable)
+		return sizeof(struct IE_ASSURANCE_ROAMING_REASON);
+
+	return 0;
+}
+
+void assocGenerateRoamReason(struct ADAPTER *prAdapter,
+			   struct MSDU_INFO *prMsduInfo)
+{
+	struct AIS_SPECIFIC_BSS_INFO *prAisSpecificBssInfo;
+	struct ROAMING_INFO *prRoamingFsmInfo = NULL;
+	struct STA_RECORD *prStaRec;
+	uint8_t *pucBuffer;
+	uint8_t ucBssIndex;
+	struct BSS_INFO *prAisBssInfo;
+
+	prStaRec = cnmGetStaRecByIndex(prAdapter, prMsduInfo->ucStaRecIndex);
+	if (!prStaRec)
+		return;
+
+	pucBuffer = (uint8_t *) ((unsigned long)
+				 prMsduInfo->prPacket + (unsigned long)
+				 prMsduInfo->u2FrameLength);
+
+	ucBssIndex = prStaRec->ucBssIndex;
+	prAisSpecificBssInfo = aisGetAisSpecBssInfo(prAdapter, ucBssIndex);
+	prRoamingFsmInfo = aisGetRoamingInfo(prAdapter, ucBssIndex);
+	prAisBssInfo = aisGetAisBssInfo(prAdapter, ucBssIndex);
+
+	if (IS_STA_IN_AIS(prStaRec) && prStaRec->fgIsReAssoc &&
+	    prAisSpecificBssInfo->fgRoamingReasonEnable) {
+		struct IE_ASSURANCE_ROAMING_REASON *ie =
+			(struct IE_ASSURANCE_ROAMING_REASON *) pucBuffer;
+
+		ie->ucId = ELEM_ID_VENDOR;
+		ie->ucLength =
+		      sizeof(struct IE_ASSURANCE_ROAMING_REASON) - ELEM_HDR_LEN;
+		WLAN_SET_FIELD_BE24(ie->aucOui, VENDOR_IE_SAMSUNG_OUI);
+		ie->ucOuiType = 0x22;
+		ie->ucSubType = 0x04;
+		ie->ucVersion = 0x01;
+		ie->ucSubTypeReason = 0x00;
+
+		/* 0. unspecified
+		 * 1. low rssi
+		 * 2. CU
+		 * 3. Beacon lost
+		 * 4. Deauth/Disassoc
+		 * 5. BTM
+		 * 6. idle roaming
+		 * 7. manual
+		 */
+		switch (prRoamingFsmInfo->eReason) {
+		case ROAMING_REASON_POOR_RCPI:
+			ie->ucReason = 0x01;
+			break;
+		case ROAMING_REASON_BEACON_TIMEOUT:
+		case ROAMING_REASON_BEACON_TIMEOUT_TX_ERR:
+			ie->ucReason = 0x03;
+			break;
+		case ROAMING_REASON_SAA_FAIL:
+			ie->ucReason = 0x04;
+			break;
+		case ROAMING_REASON_BTM:
+			ie->ucReason = 0x05;
+			break;
+		case ROAMING_REASON_IDLE:
+			ie->ucReason = 0x06;
+			break;
+		case ROAMING_REASON_INACTIVE:
+		case ROAMING_REASON_TX_ERR:
+			ie->ucReason = 0x07;
+			break;
+		default:
+			ie->ucReason = 0x00;
+		}
+		ie->ucSubTypeRcpi = 0x01;
+		ie->ucRcpi = prRoamingFsmInfo->ucRcpi;
+		ie->ucSubTypeRcpiThreshold = 0x02;
+		ie->ucRcpiThreshold = prRoamingFsmInfo->ucThreshold;
+		ie->ucSubTypeCuThreshold = 0x03;
+		ie->ucCuThreshold = 0;
+		prMsduInfo->u2FrameLength += IE_SIZE(pucBuffer);
+		DBGLOG_MEM8(SAA, INFO, pucBuffer, IE_SIZE(pucBuffer));
+	}
+}
+
+#endif
 
 /*----------------------------------------------------------------------------*/
 /*!
@@ -1537,6 +1661,12 @@ uint32_t assocProcessRxAssocReqFrame(IN struct ADAPTER *prAdapter,
 				return WLAN_STATUS_FAILURE;
 			}
 			break;
+#if (CFG_SUPPORT_802_11AX == 1)
+		case ELEM_ID_RESERVED:
+			if (IE_ID_EXT(pucIE) == ELEM_EXT_ID_HE_CAP)
+				prStaRec->ucPhyTypeSet |= PHY_TYPE_SET_802_11AX;
+			break;
+#endif
 		default:
 			for (i = 0;
 			     i <
@@ -1899,7 +2029,8 @@ uint32_t assocSendReAssocRespFrame(IN struct ADAPTER *prAdapter,
 
 	for (i = 0;
 	     i <
-	     sizeof(txAssocRespIETable) / sizeof(struct APPEND_VAR_IE_ENTRY);
+	     (uint32_t) sizeof(txAssocRespIETable) /
+	     (uint32_t) sizeof(struct APPEND_VAR_IE_ENTRY);
 	     i++) {
 		if (txAssocRespIETable[i].u2EstimatedFixedIELen != 0) {
 			u2EstimatedExtraIELen +=

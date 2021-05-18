@@ -153,7 +153,7 @@ uint8_t g_au8RlmHeCfgContellIdx[4][4][2] = {
 *                              F U N C T I O N S
 ********************************************************************************
 */
-uint32_t heRlmReqGetHeCapIELen(
+uint32_t heRlmCalculateHeCapIELen(
 	struct ADAPTER *prAdapter,
 	uint8_t ucBssIndex,
 	struct STA_RECORD *prStaRec)
@@ -181,6 +181,16 @@ uint32_t heRlmReqGetHeCapIELen(
 	} else {
 		u4OverallLen = 0;
 	}
+
+	return u4OverallLen;
+}
+
+uint32_t heRlmCalculateHeOpIELen(
+	struct ADAPTER *prAdapter,
+	uint8_t ucBssIndex,
+	struct STA_RECORD *prStaRec)
+{
+	uint32_t u4OverallLen = OFFSET_OF(struct _IE_HE_OP_T, aucVarInfo[0]);
 
 	return u4OverallLen;
 }
@@ -277,6 +287,16 @@ static uint8_t heRlmFillPPEThresholdInfo(
 	uint8_t ucNssIdx, ucRUIdx;
 	uint8_t ucT16Pos = HE_CAP_PPE_PPET16_NSS1_RU0_SHFT;
 	uint8_t ucT8Pos = HE_CAP_PPE_PPET8_NSS1_RU0_SHFT;
+	uint8_t ucMaxSupportNss = (sizeof(g_au8RlmHeCfgContellIdx) /
+				sizeof(g_au8RlmHeCfgContellIdx[0]));
+
+	/* Coverity:
+	 * due to ucSupportedNss is Supported Nss - 1
+	 * if it > first dimention of g_au8RlmHeCfgContellIdx - 1
+	 * assign it to first dimention of g_au8RlmHeCfgContellIdx - 1
+	 */
+	ucSupportedNss = (ucSupportedNss > (ucMaxSupportNss - 1)) ?
+				(ucMaxSupportNss - 1) : ucSupportedNss;
 
 	for (ucNssIdx = 0; ucNssIdx <= ucSupportedNss; ucNssIdx++) {
 		for (ucRUIdx = 0; ucRUIdx < ucRUIdxSize; ucRUIdx++) {
@@ -348,7 +368,7 @@ static void heRlmFillHeCapIE(
 	struct _HE_SUPPORTED_MCS_FIELD *prHeSupportedMcsSet;
 	uint32_t u4OverallLen = OFFSET_OF(struct _IE_HE_CAP_T, aucVarInfo[0]);
 	uint16_t ucMaxBw;
-	boolean fgBfEn = TRUE;
+	u_int8_t fgBfEn = TRUE;
 
 	struct WIFI_VAR *prWifiVar = &prAdapter->rWifiVar;
 #if (CFG_RX_PPE_THRESHOLD == 1)
@@ -510,6 +530,100 @@ void heRlmReqGenerateHeCapIE(
 	    && (!prStaRec || (prStaRec->ucPhyTypeSet & PHY_TYPE_SET_802_11AX)))
 		heRlmFillHeCapIE(prAdapter, prBssInfo, prMsduInfo);
 	}
+}
+
+void heRlmRspGenerateHeCapIE(
+	struct ADAPTER *prAdapter,
+	struct MSDU_INFO *prMsduInfo)
+{
+	struct BSS_INFO *prBssInfo;
+	struct STA_RECORD *prStaRec;
+	uint8_t ucPhyTypeSet;
+
+	ASSERT(prAdapter);
+	ASSERT(prMsduInfo);
+
+	prBssInfo = prAdapter->aprBssInfo[prMsduInfo->ucBssIndex];
+	if (!prBssInfo)
+		return;
+
+	if (!IS_BSS_ACTIVE(prBssInfo))
+		return;
+
+	prStaRec = cnmGetStaRecByIndex(prAdapter, prMsduInfo->ucStaRecIndex);
+
+	/* Decide PHY type set source */
+	if (prStaRec) {
+		/* Get PHY type set from target STA */
+		ucPhyTypeSet = prStaRec->ucPhyTypeSet;
+	} else {
+		/* Get PHY type set from current BSS */
+		ucPhyTypeSet = prBssInfo->ucPhyTypeSet;
+	}
+
+	if (RLM_NET_IS_11AX(prBssInfo) &&
+	    (ucPhyTypeSet & PHY_TYPE_SET_802_11AX))
+		heRlmFillHeCapIE(prAdapter, prBssInfo, prMsduInfo);
+}
+
+static void heRlmFillHeOpIE(
+	struct ADAPTER *prAdapter,
+	struct BSS_INFO *prBssInfo,
+	struct MSDU_INFO *prMsduInfo)
+{
+	struct _IE_HE_OP_T *prHeOp;
+	uint32_t u4OverallLen = OFFSET_OF(struct _IE_HE_OP_T, aucVarInfo[0]);
+
+	ASSERT(prAdapter);
+	ASSERT(prBssInfo);
+	ASSERT(prMsduInfo);
+
+	prHeOp = (struct _IE_HE_OP_T *)
+		(((uint8_t *)prMsduInfo->prPacket)+prMsduInfo->u2FrameLength);
+
+	prHeOp->ucId = ELEM_ID_RESERVED;
+	prHeOp->ucExtId = ELEM_EXT_ID_HE_OP;
+
+	memcpy(prHeOp->ucHeOpParams, prBssInfo->ucHeOpParams, HE_OP_BYTE_NUM);
+	prHeOp->ucBssColorInfo = prBssInfo->ucBssColorInfo;
+	prHeOp->u2HeBasicMcsSet = CPU_TO_LE16(prBssInfo->u2HeBasicMcsSet);
+
+	prHeOp->ucLength = u4OverallLen - ELEM_HDR_LEN;
+	prMsduInfo->u2FrameLength += IE_SIZE(prHeOp);
+}
+
+void heRlmRspGenerateHeOpIE(
+	struct ADAPTER *prAdapter,
+	struct MSDU_INFO *prMsduInfo)
+{
+	struct BSS_INFO *prBssInfo;
+	struct STA_RECORD *prStaRec;
+	uint8_t ucPhyTypeSet;
+
+	ASSERT(prAdapter);
+	ASSERT(prMsduInfo);
+
+	prBssInfo = prAdapter->aprBssInfo[prMsduInfo->ucBssIndex];
+	if (!prBssInfo)
+		return;
+
+	if (!IS_BSS_ACTIVE(prBssInfo))
+		return;
+
+	prStaRec = cnmGetStaRecByIndex(prAdapter, prMsduInfo->ucStaRecIndex);
+
+	/* Decide PHY type set source */
+	if (prStaRec) {
+		/* Get PHY type set from target STA */
+		ucPhyTypeSet = prStaRec->ucPhyTypeSet;
+	} else {
+		/* Get PHY type set from current BSS */
+		ucPhyTypeSet = prBssInfo->ucPhyTypeSet;
+	}
+
+	if (RLM_NET_IS_11AX(prBssInfo) &&
+	    (ucPhyTypeSet & PHY_TYPE_SET_802_11AX))
+		heRlmFillHeOpIE(prAdapter, prBssInfo, prMsduInfo);
 }
 
 static uint16_t heRlmGetHeMcsMap(uint8_t *pSrc)

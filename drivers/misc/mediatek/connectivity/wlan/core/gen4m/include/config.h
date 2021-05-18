@@ -506,7 +506,15 @@
  * Flags and Parameters for CMD/RESPONSE
  *------------------------------------------------------------------------------
  */
+/* WMT expects wlan driver on/off to be completed within 4s.
+ * To avoid on/off timeout, only polling ready bit in 1s
+ * (CFG_RESPONSE_POLLING_TIMEOUT * CFG_RESPONSE_POLLING_DELAY).
+ */
+#if CFG_MTK_ANDROID_WMT
+#define CFG_RESPONSE_POLLING_TIMEOUT            200
+#else
 #define CFG_RESPONSE_POLLING_TIMEOUT            1000
+#endif
 #define CFG_RESPONSE_POLLING_DELAY              5
 
 /*------------------------------------------------------------------------------
@@ -718,7 +726,7 @@
 #define CFG_UNITEST_P2P                         0
 
 #ifndef CONFIG_WLAN_DRV_BUILD_IN
-#define CONFIG_WLAN_DRV_BUILD_IN 0
+#define CONFIG_WLAN_DRV_BUILD_IN		0
 #endif
 
 /*
@@ -733,6 +741,16 @@
 #define CFG_AUTO_CHANNEL_SEL_SUPPORT            1
 
 #define CFG_SUPPORT_SOFTAP_WPA3	1
+
+#define CFG_HOTSPOT_SUPPORT_ADJUST_SCC          1
+
+#if CFG_TC1_FEATURE
+#define CFG_HOTSPOT_SUPPORT_FORCE_ACS_SCC       0
+#elif CFG_TC10_FEATURE
+#define CFG_HOTSPOT_SUPPORT_FORCE_ACS_SCC       1
+#else
+#define CFG_HOTSPOT_SUPPORT_FORCE_ACS_SCC       0
+#endif
 
 #ifndef CFG_ENABLE_UNIFY_WIPHY
 #define CFG_ENABLE_UNIFY_WIPHY 1
@@ -786,7 +804,7 @@
 #endif
 
 #define CFG_SUPPORT_AIS_5GHZ                    1
-#define CFG_SUPPORT_BEACON_CHANGE_DETECTION     0
+#define CFG_SUPPORT_DETECT_SECURITY_MODE_CHANGE 0
 
 /*------------------------------------------------------------------------------
  * Option for NVRAM and Version Checking
@@ -868,7 +886,11 @@
 
 #define CFG_SHOW_MACADDR_SOURCE			1
 
+#ifdef BUILD_QA_DBG
 #define CFG_SHOW_FULL_MACADDR     1
+#else
+#define CFG_SHOW_FULL_MACADDR     0
+#endif
 
 #ifndef CFG_SUPPORT_VO_ENTERPRISE
 #define CFG_SUPPORT_VO_ENTERPRISE               1
@@ -899,12 +921,20 @@
 #ifndef CFG_SUPPORT_802_11V
 #define CFG_SUPPORT_802_11V                     1
 #endif
-#if CFG_SUPPORT_802_11V
+
+#define CFG_SUPPORT_802_11V_TIMING_MEASUREMENT	0
+
+#if (CFG_SUPPORT_802_11V == 1) && (CFG_TC3_FEATURE == 0)
 #define CFG_SUPPORT_802_11V_BSS_TRANSITION_MGT  1
 #else
 #define CFG_SUPPORT_802_11V_BSS_TRANSITION_MGT  0
 #endif
-#define CFG_SUPPORT_802_11V_TIMING_MEASUREMENT	0
+
+#if (CFG_SUPPORT_802_11V_BSS_TRANSITION_MGT == 1) && (CFG_TC10_FEATURE == 1)
+#define CFG_SUPPORT_802_11V_BTM_OFFLOAD 1
+#else
+#define CFG_SUPPORT_802_11V_BTM_OFFLOAD 0
+#endif
 
 #if (CFG_SUPPORT_802_11V_TIMING_MEASUREMENT == 1) && \
 	(CFG_SUPPORT_802_11V == 0)
@@ -949,11 +979,6 @@
 
 #define CFG_SUPPORT_DYNAMIC_PWR_LIMIT		1
 
-#if (CFG_SUPPORT_802_11AX == 1)
-#define CFG_SUPPORT_PWR_LIMIT_HE		    1
-#else
-#define CFG_SUPPORT_PWR_LIMIT_HE		    0
-#endif
 #define CFG_FIX_2_TX_PORT			0
 
 #define CFG_CHANGE_CRITICAL_PACKET_PRIORITY	1
@@ -1067,6 +1092,12 @@
 #define CFG_SUPPORT_SNIFFER                 1
 
 #define WLAN_INCLUDE_PROC                   1
+
+#if CFG_TC10_FEATURE
+#define WLAN_INCLUDE_SYS                   1
+#else
+#define WLAN_INCLUDE_SYS                   0
+#endif
 
 /*------------------------------------------------------------------------------
  * Flags of Sniffer SUPPORT
@@ -1242,14 +1273,26 @@
  * CFG_SUPPORT_NCHO_AUTO_ENABLE: sub-feature depends with CFG_SUPPORT_NCHO
  *------------------------------------------------------------------------------
  */
-#define CFG_SUPPORT_NCHO		0
+#define CFG_SUPPORT_NCHO		1
 #define CFG_SUPPORT_NCHO_AUTO_ENABLE	0
+
+/*------------------------------------------------------------------------------
+ * Flags of Assurance support
+ *------------------------------------------------------------------------------
+ */
+#define CFG_SUPPORT_ASSURANCE 1
 
 /*------------------------------------------------------------------------------
  * Flags of Key Word Exception Mechanism
  *------------------------------------------------------------------------------
  */
 #define CFG_ENABLE_KEYWORD_EXCEPTION_MECHANISM  0
+
+/*------------------------------------------------------------------------------
+ * Flags of Manipulate TID for UDP packets
+ *------------------------------------------------------------------------------
+ */
+#define CFG_SUPPORT_MANIPULATE_TID	1
 
 /*------------------------------------------------------------------------------
  * Flags of WPA3 support
@@ -1294,7 +1337,7 @@
  * in mtk_cfg80211_get_station
  *------------------------------------------------------------------------------
  */
-#define CFG_REPORT_MAX_TX_RATE	1
+#define CFG_REPORT_MAX_TX_RATE	0
 
 /*------------------------------------------------------------------------------
  * Link Quality Monitor
@@ -1326,20 +1369,16 @@
 #define CFG_WLAN_ASSISTANT_NVRAM		1
 
 /*------------------------------------------------------------------------------
- * Flags of WORKAROUND HWITS00012836 WTBL_SEARCH_FAIL
+ * SW handles WTBL_SEARCH_FAIL
  *------------------------------------------------------------------------------
  */
-#ifndef CFG_WIFI_WORKAROUND_HWITS00012836_WTBL_SEARCH_FAIL
-#define CFG_WIFI_WORKAROUND_HWITS00012836_WTBL_SEARCH_FAIL 0
-#endif
+#define CFG_WIFI_SW_WTBL_SEARCH_FAIL 1
 
 /*------------------------------------------------------------------------------
- * Flags of WORKAROUND HWITS00010371 PMF_CIPHER_MISMATCH
+ * SW enables CIPHER_MISMATCH
  *------------------------------------------------------------------------------
  */
-#ifndef CFG_WIFI_WORKAROUND_HWITS00010371_PMF_CIPHER_MISMATCH
-#define CFG_WIFI_WORKAROUND_HWITS00010371_PMF_CIPHER_MISMATCH 0
-#endif
+#define CFG_WIFI_SW_CIPHER_MISMATCH 1
 
 /*------------------------------------------------------------------------------
  * CONNINFRA SUPPORT (Without WMT)
@@ -1406,6 +1445,33 @@
 #define CFG_SUPPORT_PERSIST_NETDEV 1
 
 
+/*------------------------------------------------------------------------------
+ * Dynamic tx power control:
+ * Support additional tx power setting on OFDM
+ *
+ * No define: CCK,HT20L,HT20H,HT40L,HT40H,HT80L,HT80H,HT160L,HT160H
+ * Defined: CCK,OFDM_L,OFDM_H,HT20L,HT20H,HT40L,HT40H,HT80L,HT80H,HT160L,HT160H
+ *
+ * note: need to confirm firmware support this feature
+ *       COUNTRY_CHANNEL_TXPOWER_LIMIT_TYPE_COMP_11AG_11N
+ *------------------------------------------------------------------------------
+ */
+#define CFG_SUPPORT_DYNA_TX_PWR_CTRL_OFDM_SETTING 0
+
+/*------------------------------------------------------------------------------
+ * tx power control:
+ * Support additional tx power setting for HE
+ *
+ * support power limit for RU26/RU52/RU104/RU242/RU484/RU996
+ *
+ * note: need to confirm firmware support HE (802.11AX)
+ *------------------------------------------------------------------------------
+ */
+#if (CFG_SUPPORT_802_11AX == 1)
+#define CFG_SUPPORT_PWR_LIMIT_HE		    1
+#else
+#define CFG_SUPPORT_PWR_LIMIT_HE		    0
+#endif
 
 /*******************************************************************************
  *                             D A T A   T Y P E S

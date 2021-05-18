@@ -120,49 +120,187 @@
 void dumpMemory8(IN uint8_t *pucStartAddr,
 		 IN uint32_t u4Length)
 {
-#define ONE_LINE_MAX_COUNT	32
-#define TMP_BUF_SZ			20
-	uint32_t i, endCount;
-	char buf[ONE_LINE_MAX_COUNT*10];
-	char tmp[TMP_BUF_SZ] = {'\0'};
-
 	ASSERT(pucStartAddr);
 
 	LOG_FUNC("DUMP8 ADDRESS: %p, Length: %d\n", pucStartAddr,
 		 u4Length);
 
+#define case16 "(%p) %02x %02x %02x %02x  %02x %02x %02x %02x" \
+			" - %02x %02x %02x %02x  %02x %02x %02x %02x\n"
+
+#define case07 "(%p) %02x %02x %02x %02x  %02x %02x %02x\n"
+
+#define case08 "(%p) %02x %02x %02x %02x  %02x %02x %02x %02x\n"
+
+#define case09 "(%p) %02x %02x %02x %02x  %02x %02x %02x %02x" \
+			" - %02x\n"
+
+#define case10 "(%p) %02x %02x %02x %02x  %02x %02x %02x %02x" \
+			" - %02x %02x\n"
+
+#define case11 "(%p) %02x %02x %02x %02x  %02x %02x %02x %02x" \
+			" - %02x %02x %02x\n"
+
+#define case12 "(%p) %02x %02x %02x %02x  %02x %02x %02x %02x" \
+			" - %02x %02x %02x %02x\n"
+
+#define case13 "(%p) %02x %02x %02x %02x  %02x %02x %02x %02x" \
+			" - %02x %02x %02x %02x  %02x\n"
+
+#define case14 "(%p) %02x %02x %02x %02x  %02x %02x %02x %02x" \
+			" - %02x %02x %02x %02x  %02x %02x\n"
+
+#define case15 "(%p) %02x %02x %02x %02x  %02x %02x %02x %02x" \
+			" - %02x %02x %02x %02x  %02x %02x %02x\n"
+
 	while (u4Length > 0) {
-
-		snprintf(buf, TMP_BUF_SZ, "%02x", pucStartAddr[0]);
-
-		if (u4Length > ONE_LINE_MAX_COUNT)
-			endCount = ONE_LINE_MAX_COUNT;
-		else
-			endCount = u4Length;
-
-		for (i = 1; i < endCount; i++) {
-			if ((i % 8) == 0)
-				snprintf(tmp, TMP_BUF_SZ, " - %02x",
-					pucStartAddr[i]);
-			else if ((i % 4) == 0)
-				snprintf(tmp, TMP_BUF_SZ, "  %02x",
-					pucStartAddr[i]);
-			else
-				snprintf(tmp, TMP_BUF_SZ, " %02x",
-					pucStartAddr[i]);
-
-			strncat(buf, tmp, strlen(tmp));
-		}
-
-		LOG_FUNC("(%p) %s\n", pucStartAddr, buf);
-
-		if (u4Length > ONE_LINE_MAX_COUNT) {
-			u4Length -= ONE_LINE_MAX_COUNT;
-			pucStartAddr += ONE_LINE_MAX_COUNT;
-		} else
+		if (u4Length >= 16) {
+			LOG_FUNC
+			(case16,
+			 pucStartAddr, pucStartAddr[0], pucStartAddr[1],
+			 pucStartAddr[2], pucStartAddr[3], pucStartAddr[4],
+			 pucStartAddr[5], pucStartAddr[6], pucStartAddr[7],
+			 pucStartAddr[8], pucStartAddr[9], pucStartAddr[10],
+			 pucStartAddr[11], pucStartAddr[12],
+			 pucStartAddr[13], pucStartAddr[14],
+			 pucStartAddr[15]);
+			u4Length -= 16;
+			pucStartAddr += 16;
+		} else {
+			switch (u4Length) {
+			case 1:
+				LOG_FUNC("(%p) %02x\n", pucStartAddr,
+					 pucStartAddr[0]);
+				break;
+			case 2:
+				LOG_FUNC("(%p) %02x %02x\n", pucStartAddr,
+					 pucStartAddr[0], pucStartAddr[1]);
+				break;
+			case 3:
+				LOG_FUNC("(%p) %02x %02x %02x\n",
+					 pucStartAddr, pucStartAddr[0],
+					 pucStartAddr[1], pucStartAddr[2]);
+				break;
+			case 4:
+				LOG_FUNC("(%p) %02x %02x %02x %02x\n",
+					 pucStartAddr,
+					 pucStartAddr[0], pucStartAddr[1],
+					 pucStartAddr[2], pucStartAddr[3]);
+				break;
+			case 5:
+				LOG_FUNC("(%p) %02x %02x %02x %02x  %02x\n",
+					 pucStartAddr,
+					 pucStartAddr[0], pucStartAddr[1],
+					 pucStartAddr[2], pucStartAddr[3],
+					 pucStartAddr[4]);
+				break;
+			case 6:
+				LOG_FUNC
+				("(%p) %02x %02x %02x %02x  %02x %02x\n",
+				 pucStartAddr, pucStartAddr[0],
+				 pucStartAddr[1], pucStartAddr[2],
+				 pucStartAddr[3], pucStartAddr[4],
+				 pucStartAddr[5]);
+				break;
+			case 7:
+				LOG_FUNC
+				(case07,
+				 pucStartAddr, pucStartAddr[0],
+				 pucStartAddr[1], pucStartAddr[2],
+				 pucStartAddr[3], pucStartAddr[4],
+				 pucStartAddr[5], pucStartAddr[6]);
+				break;
+			case 8:
+				LOG_FUNC
+				(case08,
+				 pucStartAddr, pucStartAddr[0],
+				 pucStartAddr[1], pucStartAddr[2],
+				 pucStartAddr[3], pucStartAddr[4],
+				 pucStartAddr[5], pucStartAddr[6],
+				 pucStartAddr[7]);
+				break;
+			case 9:
+				LOG_FUNC
+				(case09,
+				 pucStartAddr, pucStartAddr[0],
+				 pucStartAddr[1], pucStartAddr[2],
+				 pucStartAddr[3], pucStartAddr[4],
+				 pucStartAddr[5], pucStartAddr[6],
+				 pucStartAddr[7], pucStartAddr[8]);
+				break;
+			case 10:
+				LOG_FUNC
+				(case10,
+				 pucStartAddr, pucStartAddr[0],
+				 pucStartAddr[1], pucStartAddr[2],
+				 pucStartAddr[3], pucStartAddr[4],
+				 pucStartAddr[5], pucStartAddr[6],
+				 pucStartAddr[7], pucStartAddr[8],
+				 pucStartAddr[9]);
+				break;
+			case 11:
+				LOG_FUNC
+				(case11,
+				 pucStartAddr, pucStartAddr[0],
+				 pucStartAddr[1], pucStartAddr[2],
+				 pucStartAddr[3], pucStartAddr[4],
+				 pucStartAddr[5], pucStartAddr[6],
+				 pucStartAddr[7], pucStartAddr[8],
+				 pucStartAddr[9], pucStartAddr[10]);
+				break;
+			case 12:
+				LOG_FUNC
+				(case12,
+				 pucStartAddr, pucStartAddr[0],
+				 pucStartAddr[1], pucStartAddr[2],
+				 pucStartAddr[3], pucStartAddr[4],
+				 pucStartAddr[5], pucStartAddr[6],
+				 pucStartAddr[7], pucStartAddr[8],
+				 pucStartAddr[9], pucStartAddr[10],
+				 pucStartAddr[11]);
+				break;
+			case 13:
+				LOG_FUNC
+				(case13,
+				 pucStartAddr, pucStartAddr[0],
+				 pucStartAddr[1], pucStartAddr[2],
+				 pucStartAddr[3], pucStartAddr[4],
+				 pucStartAddr[5], pucStartAddr[6],
+				 pucStartAddr[7], pucStartAddr[8],
+				 pucStartAddr[9], pucStartAddr[10],
+				 pucStartAddr[11], pucStartAddr[12]);
+				break;
+			case 14:
+				LOG_FUNC
+				(case14,
+				 pucStartAddr, pucStartAddr[0],
+				 pucStartAddr[1], pucStartAddr[2],
+				 pucStartAddr[3], pucStartAddr[4],
+				 pucStartAddr[5], pucStartAddr[6],
+				 pucStartAddr[7], pucStartAddr[8],
+				 pucStartAddr[9], pucStartAddr[10],
+				 pucStartAddr[11], pucStartAddr[12],
+				 pucStartAddr[13]);
+				break;
+			case 15:
+			default:
+				LOG_FUNC
+				(case15,
+				 pucStartAddr, pucStartAddr[0],
+				 pucStartAddr[1], pucStartAddr[2],
+				 pucStartAddr[3], pucStartAddr[4],
+				 pucStartAddr[5], pucStartAddr[6],
+				 pucStartAddr[7], pucStartAddr[8],
+				 pucStartAddr[9], pucStartAddr[10],
+				 pucStartAddr[11], pucStartAddr[12],
+				 pucStartAddr[13], pucStartAddr[14]);
+				break;
+			}
 			u4Length = 0;
+		}
 	}
 }				/* end of dumpMemory8() */
+
 
 /*----------------------------------------------------------------------------*/
 /*!

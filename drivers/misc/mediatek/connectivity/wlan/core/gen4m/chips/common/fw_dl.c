@@ -1468,8 +1468,9 @@ uint32_t wlanConfigWifiFuncStatus(IN struct ADAPTER
 	ASSERT(prAdapter);
 	prChipInfo = prAdapter->chip_info;
 
-	u4EventSize = prChipInfo->rxd_size + prChipInfo->init_event_size +
-		sizeof(struct INIT_EVENT_CMD_RESULT);
+	u4EventSize = prChipInfo->init_evt_rxd_size +
+		prChipInfo->init_event_size +
+		(uint32_t) sizeof(struct INIT_EVENT_CMD_RESULT);
 	aucBuffer = kalMemAlloc(u4EventSize, PHY_MEM_TYPE);
 	if (aucBuffer == NULL) {
 		DBGLOG(INIT, ERROR, "Alloc CMD buffer failed\n");
@@ -1487,7 +1488,7 @@ uint32_t wlanConfigWifiFuncStatus(IN struct ADAPTER
 			u4Status = WLAN_STATUS_FAILURE;
 		} else {
 			prInitEvent = (struct INIT_WIFI_EVENT *)
-				(aucBuffer + prChipInfo->rxd_size);
+				(aucBuffer + prChipInfo->init_evt_rxd_size);
 
 			/* EID / SeqNum check */
 			if (prInitEvent->ucEID != INIT_EVENT_ID_CMD_RESULT)
@@ -2044,18 +2045,19 @@ uint32_t wlanGetConnacTailerInfo(IN struct ADAPTER
 	kalMemCopy(&prVerInfo->rCommonTailer, prComTailer,
 		   sizeof(struct TAILER_COMMON_FORMAT_T));
 
-	/* Dump image information */
-	DBGLOG(INIT, INFO,
-	       "%s INFO: chip_info[%u:E%u] region_num[%d]\n",
-	       (eDlIdx == IMG_DL_IDX_N9_FW) ? "N9" : "CR4",
-	       prComTailer->ucChipInfo,
-	       prComTailer->ucEcoCode + 1, prComTailer->ucRegionNum);
-
 	kalMemZero(aucBuf, 32);
 	kalStrnCpy(aucBuf, prComTailer->aucRamVersion,
 		   sizeof(prComTailer->aucRamVersion));
-	DBGLOG(INIT, INFO, "date[%s] version[%s]\n",
-	       prComTailer->aucRamBuiltDate, aucBuf);
+
+	/* Dump image information */
+	DBGLOG(INIT, INFO,
+		"%s: chip_info[%u:E%u] region_num[%d] date[%s] version[%s]\n",
+			(eDlIdx == IMG_DL_IDX_N9_FW) ? "N9" : "CR4",
+			prComTailer->ucChipInfo,
+			prComTailer->ucEcoCode + 1,
+			prComTailer->ucRegionNum,
+			prComTailer->aucRamBuiltDate,
+			aucBuf);
 
 	if (prComTailer->ucRegionNum > MAX_FWDL_SECTION_NUM) {
 		DBGLOG(INIT, INFO,
@@ -2206,12 +2208,16 @@ uint32_t wlanConnacFormatDownload(IN struct ADAPTER
 	if (wlanGetConnacTailerInfo(prAdapter, prFwBuffer, u4FwSize,
 				    eDlIdx) != WLAN_STATUS_SUCCESS) {
 		DBGLOG(INIT, WARN, "Get tailer info error!\n");
-		return WLAN_STATUS_FAILURE;
+		rDlStatus = WLAN_STATUS_FAILURE;
+		goto exit;
 	}
 
 	if (prAdapter->chip_info->checkbushang) {
-		if (prAdapter->chip_info->checkbushang(prAdapter, TRUE) != 0)
-			return WLAN_STATUS_FAILURE;
+		if (prAdapter->chip_info->checkbushang(prAdapter, TRUE) != 0) {
+			DBGLOG(INIT, WARN, "Check bus hang failed.\n");
+			rDlStatus = WLAN_STATUS_FAILURE;
+			goto exit;
+		}
 	}
 
 	ucRegionNum = prAdapter->rVerInfo.rCommonTailer.ucRegionNum;
@@ -2234,6 +2240,7 @@ uint32_t wlanConnacFormatDownload(IN struct ADAPTER
 #endif
 /* To support dynamic memory map for WiFi RAM code download::End */
 
+exit:
 	kalFirmwareImageUnmapping(prAdapter->prGlueInfo, NULL,
 				  prFwBuffer);
 
@@ -2288,7 +2295,7 @@ uint32_t wlanDownloadFW(IN struct ADAPTER *prAdapter)
 	if (prChipInfo->coantVFE28En)
 		prChipInfo->coantVFE28En(prAdapter);
 
-	DBGLOG(INIT, TRACE, "FW download Start\n");
+	DBGLOG(INIT, INFO, "FW download Start\n");
 #if (CFG_SUPPORT_CONNINFRA == 1)
 	if (prChipInfo->coexpccifon) {
 		rPccifstatus = prChipInfo->coexpccifon();
@@ -2427,10 +2434,10 @@ uint32_t fwDlGetFwdlInfo(struct ADAPTER *prAdapter,
 
 	prFwDlOps = prAdapter->chip_info->fw_dl_ops;
 
-	kalMemZero(aucBuf, 32);
-	kalStrnCpy(aucBuf, prVerInfo->aucFwBranchInfo, 4);
-	kalMemZero(aucDate, 32);
-	kalStrnCpy(aucDate, prVerInfo->aucFwDateCode, 16);
+	kalMemZero(aucBuf, sizeof(aucBuf));
+	kalStrnCpy(aucBuf, prVerInfo->aucFwBranchInfo, sizeof(aucBuf) - 1);
+	kalMemZero(aucDate, sizeof(aucDate));
+	kalStrnCpy(aucDate, prVerInfo->aucFwDateCode, sizeof(aucDate) - 1);
 
 	u4Offset += snprintf(pcBuf + u4Offset,
 			i4TotalLen - u4Offset,
@@ -2454,11 +2461,12 @@ uint32_t fwDlGetFwdlInfo(struct ADAPTER *prAdapter,
 #endif
 	}
 
-	kalMemZero(aucBuf, 32);
-	kalMemZero(aucDate, 32);
-	kalStrnCpy(aucBuf, prVerInfo->rPatchHeader.aucPlatform, 4);
+	kalMemZero(aucBuf, sizeof(aucBuf));
+	kalMemZero(aucDate, sizeof(aucDate));
+	kalStrnCpy(aucBuf, prVerInfo->rPatchHeader.aucPlatform,
+			sizeof(aucBuf) - 1);
 	kalStrnCpy(aucDate, prVerInfo->rPatchHeader.aucBuildDate,
-		   16);
+			sizeof(aucDate) - 1);
 	u4Offset += snprintf(pcBuf + u4Offset,
 			     i4TotalLen - u4Offset,
 			     "Patch platform %s version 0x%04X %s\n",

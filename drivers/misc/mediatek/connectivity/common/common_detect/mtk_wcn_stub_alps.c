@@ -449,7 +449,7 @@ static void mtk_wcn_cmb_sdio_enable_eirq(void)
 		CMB_STUB_LOG_PR_DBG("wifi eint has been enabled\n");
 	else {
 		atomic_set(&irq_enable_flag, 1);
-		if (wifi_irq != 0xfffffff) {
+		if (wifi_irq != 0xffffffff) {
 			enable_irq(wifi_irq);
 			CMB_STUB_LOG_PR_DBG(" enable WIFI EINT irq %d !!\n",
 					wifi_irq);
@@ -462,7 +462,7 @@ static void mtk_wcn_cmb_sdio_disable_eirq(void)
 	if (!atomic_read(&irq_enable_flag))
 		CMB_STUB_LOG_PR_DBG("wifi eint has been disabled!\n");
 	else {
-		if (wifi_irq != 0xfffffff) {
+		if (wifi_irq != 0xffffffff) {
 			disable_irq_nosync(wifi_irq);
 			CMB_STUB_LOG_PR_DBG("disable WIFI EINT irq %d !!\n",
 					wifi_irq);
@@ -587,12 +587,12 @@ int board_sdio_ctrl(unsigned int sdio_port_num, unsigned int on)
 #endif
 		/* off -> on */
 		mtk_wcn_cmb_sdio_on(sdio_port_num);
-		if (wifi_irq != 0xfffffff)
+		if (wifi_irq != 0xffffffff)
 			irq_set_irq_wake(wifi_irq, 1);
 		else
 			CMB_STUB_LOG_PR_WARN("wifi_irq is not available\n");
 	} else {
-			if (wifi_irq != 0xfffffff)
+			if (wifi_irq != 0xffffffff)
 				irq_set_irq_wake(wifi_irq, 0);
 			else
 				CMB_STUB_LOG_PR_WARN("wifi_irq is not available\n");

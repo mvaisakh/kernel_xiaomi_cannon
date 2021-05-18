@@ -98,13 +98,6 @@ enum ENUM_OP_NOTIFY_STATE_T {
  *                           P R I V A T E   D A T A
  *******************************************************************************
  */
-/*
-** Should Not Force to BW 20 after Channel Switch.
-** Enable for DFS Certification
-*/
-#ifdef CFG_DFS_CHSW_FORCE_BW20
-u_int8_t g_fgHasChannelSwitchIE = FALSE;
-#endif
 u_int8_t g_fgHasStopTx = FALSE;
 
 #if CFG_SUPPORT_CAL_RESULT_BACKUP_TO_HOST
@@ -210,9 +203,6 @@ void rlmFsmEventInit(struct ADAPTER *prAdapter)
 	rlmDomainCheckCountryPowerLimitTable(prAdapter);
 #endif
 
-#ifdef CFG_DFS_CHSW_FORCE_BW20
-	g_fgHasChannelSwitchIE = FALSE;
-#endif
 }
 
 /*----------------------------------------------------------------------------*/
@@ -291,6 +281,8 @@ void rlmReqGenerateSupportedChIE(struct ADAPTER *prAdapter,
 	uint8_t ucIdx = 0;
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prMsduInfo->ucBssIndex);
+	kalMemZero(&auc2gChannelList[0], sizeof(auc2gChannelList));
+	kalMemZero(&auc5gChannelList[0], sizeof(auc5gChannelList));
 
 	/* We should add supported channels IE in assoc/reassoc request
 	 * if the spectrum management bit is set to 1 in Capability Info
@@ -901,11 +893,23 @@ static void rlmFillExtCapIE(struct ADAPTER *prAdapter,
 #endif
 	u_int8_t fg40mAllowed, fgAppendVhtCap;
 	struct STA_RECORD *prStaRec;
+	struct CONNECTION_SETTINGS *prConnSettings;
+	const uint8_t *extCapConn;
+	uint32_t extCapIeLen = 0;
 
 	ASSERT(prAdapter);
 	ASSERT(prMsduInfo);
 
 	fg40mAllowed = prBssInfo->fgAssoc40mBwAllowed;
+	prConnSettings = aisGetConnSettings(prAdapter, prBssInfo->ucBssIndex);
+	extCapConn = kalFindIeMatchMask(ELEM_ID_EXTENDED_CAP,
+				       prConnSettings->pucAssocIEs,
+				       prConnSettings->assocIeLen,
+				       NULL, 0, 0, NULL);
+	if (extCapConn) {
+		extCapIeLen = ELEM_HDR_LEN + RSN_IE(extCapConn)->ucLength;
+		DBGLOG_MEM8(SAA, INFO, extCapConn, extCapIeLen);
+	}
 
 #if CFG_SUPPORT_PASSPOINT
 	prHS20Info = aisGetHS20Info(prAdapter,
@@ -923,8 +927,7 @@ static void rlmFillExtCapIE(struct ADAPTER *prAdapter,
 	else
 		prHsExtCap->ucLength = 3 - ELEM_HDR_LEN;
 
-	kalMemZero(prHsExtCap->aucCapabilities,
-		   sizeof(prHsExtCap->aucCapabilities));
+	kalMemZero(prHsExtCap->aucCapabilities, ELEM_MAX_LEN_EXT_CAP);
 
 	prHsExtCap->aucCapabilities[0] = ELEM_EXT_CAP_DEFAULT_VAL;
 
@@ -994,6 +997,15 @@ static void rlmFillExtCapIE(struct ADAPTER *prAdapter,
 	}
 #endif
 
+	if ((extCapIeLen - ELEM_HDR_LEN) > prHsExtCap->ucLength)
+		prHsExtCap->ucLength = ELEM_MAX_LEN_EXT_CAP;
+
+	if (extCapConn)
+		rlmSyncExtCapIEwithSupplicant(prHsExtCap->aucCapabilities,
+			extCapConn, extCapIeLen);
+	else
+		DBGLOG(RLM, WARN, "extCapConn = NULL!");
+
 	ASSERT(IE_SIZE(prHsExtCap) <= (ELEM_HDR_LEN + ELEM_MAX_LEN_EXT_CAP));
 
 	prMsduInfo->u2FrameLength += IE_SIZE(prHsExtCap);
@@ -1006,8 +1018,7 @@ static void rlmFillExtCapIE(struct ADAPTER *prAdapter,
 	prExtCap->ucId = ELEM_ID_EXTENDED_CAP;
 
 	prExtCap->ucLength = 3 - ELEM_HDR_LEN;
-	kalMemZero(prExtCap->aucCapabilities,
-		   sizeof(prExtCap->aucCapabilities));
+	kalMemZero(prExtCap->aucCapabilities, ELEM_MAX_LEN_EXT_CAP);
 
 	prExtCap->aucCapabilities[0] = ELEM_EXT_CAP_DEFAULT_VAL;
 
@@ -1076,10 +1087,31 @@ static void rlmFillExtCapIE(struct ADAPTER *prAdapter,
 		prExtCap->ucLength = ELEM_MAX_LEN_EXT_CAP_11ABGNAC;
 #endif
 
+	if ((extCapIeLen - ELEM_HDR_LEN) > prExtCap->ucLength)
+		prExtCap->ucLength = ELEM_MAX_LEN_EXT_CAP;
+
+	if (extCapConn)
+		rlmSyncExtCapIEwithSupplicant(prExtCap->aucCapabilities,
+			extCapConn, extCapIeLen);
+	else
+		DBGLOG(RLM, WARN, "extCapConn = NULL!");
+
 	ASSERT(IE_SIZE(prExtCap) <= (ELEM_HDR_LEN + ELEM_MAX_LEN_EXT_CAP));
 
 	prMsduInfo->u2FrameLength += IE_SIZE(prExtCap);
 #endif
+}
+
+void rlmSyncExtCapIEwithSupplicant(uint8_t *aucCapabilities,
+			const uint8_t *supExtCapIEs, size_t IElen) {
+	uint32_t i;
+
+	for (i = ELEM_HDR_LEN * 8; i < IElen * 8; i++) {
+		if (supExtCapIEs[i / 8] & BIT(i % 8)) {
+			SET_EXT_CAP(aucCapabilities, ELEM_MAX_LEN_EXT_CAP,
+			    i-ELEM_HDR_LEN*8);
+		}
+	}
 }
 
 /*----------------------------------------------------------------------------*/
@@ -1732,7 +1764,7 @@ rlmGetSupportRxNssInVhtCap(struct IE_VHT_CAP *prVhtCap)
 			!= VHT_CAP_INFO_MCS_NOT_SUPPORTED)
 			ucRxNss = 8;
 		} else
-			DBGLOG(RLM, TRACE, "null prVhtCap, assume RxNss=1\n");
+			DBGLOG(RLM, WARN, "null prVhtCap, assume RxNss=1\n");
 
 	return ucRxNss;
 }
@@ -2051,7 +2083,7 @@ void rlmModifyVhtBwPara(uint8_t *pucVhtChannelFrequencyS1,
 	}
 }
 
-static void rlmRevisePreferBandwidthNss(struct ADAPTER *prAdapter,
+void rlmRevisePreferBandwidthNss(struct ADAPTER *prAdapter,
 					uint8_t ucBssIndex,
 					struct STA_RECORD *prStaRec)
 {
@@ -2262,18 +2294,12 @@ static uint8_t rlmRecIeInfoForClient(struct ADAPTER *prAdapter,
 #endif
 
 #if CFG_SUPPORT_DFS
-	u_int8_t fgHasWideBandIE = FALSE;
-	u_int8_t fgHasSCOIE = FALSE;
-	u_int8_t fgHasChannelSwitchIE = FALSE;
-	u_int8_t fgNeedSwitchChannel = FALSE;
-	uint8_t ucChannelAnnouncePri;
-	enum ENUM_CHNL_EXT eChannelAnnounceSco;
-	uint8_t ucChannelAnnounceChannelS1 = 0;
-	uint8_t ucChannelAnnounceChannelS2 = 0;
-	uint8_t ucChannelAnnounceVhtBw;
-	struct IE_CHANNEL_SWITCH *prChannelSwitchAnnounceIE;
+	struct IE_CHANNEL_SWITCH *prCSAIE;
+	struct SWITCH_CH_AND_BAND_PARAMS *prCSAParams;
+	uint8_t curCSAcount;
 	struct IE_SECONDARY_OFFSET *prSecondaryOffsetIE;
 	struct IE_WIDE_BAND_CHANNEL *prWideBandChannelIE;
+	struct AIS_FSM_INFO *prAisFsmInfo;
 #endif
 	uint8_t *pucDumpIE;
 
@@ -2290,6 +2316,10 @@ static uint8_t rlmRecIeInfoForClient(struct ADAPTER *prAdapter,
 	prObssScnParam = NULL;
 	ucMaxBwAllowed = cnmGetBssMaxBw(prAdapter, prBssInfo->ucBssIndex);
 	pucDumpIE = pucIE;
+#if CFG_SUPPORT_DFS
+	prCSAParams = &prBssInfo->CSAParams;
+	curCSAcount = MAX_CSA_COUNT;
+#endif
 
 	/* Note: HT-related members in staRec may not be zero before, so
 	 *       if following IE does not exist, they are still not zero.
@@ -2600,17 +2630,13 @@ static uint8_t rlmRecIeInfoForClient(struct ADAPTER *prAdapter,
 			       "[Channel Switch] ELEM_ID_WIDE_BAND_CHANNEL_SWITCH, 11AC\n");
 			prWideBandChannelIE =
 				(struct IE_WIDE_BAND_CHANNEL *)pucIE;
-			ucChannelAnnounceVhtBw =
+			prCSAParams->vht_bw =
 				prWideBandChannelIE->ucNewChannelWidth;
-			ucChannelAnnounceChannelS1 =
-				prWideBandChannelIE->ucChannelS1;
-			ucChannelAnnounceChannelS2 =
-				prWideBandChannelIE->ucChannelS2;
-			fgHasWideBandIE = TRUE;
+			prCSAParams->S1 = prWideBandChannelIE->ucChannelS1;
+			prCSAParams->S2 = prWideBandChannelIE->ucChannelS2;
 			DBGLOG(RLM, INFO, "[Ch] BW=%d, s1=%d, s2=%d\n",
-			       ucChannelAnnounceVhtBw,
-			       ucChannelAnnounceChannelS1,
-			       ucChannelAnnounceChannelS2);
+			       prCSAParams->vht_bw,
+			       prCSAParams->S1, prCSAParams->S2);
 			break;
 #endif
 
@@ -2663,54 +2689,37 @@ static uint8_t rlmRecIeInfoForClient(struct ADAPTER *prAdapter,
 			    (sizeof(struct IE_CHANNEL_SWITCH) - 2))
 				break;
 
-			prChannelSwitchAnnounceIE =
-				(struct IE_CHANNEL_SWITCH *)pucIE;
+			prCSAIE = (struct IE_CHANNEL_SWITCH *)pucIE;
+			if (prCSAIE->ucChannelSwitchMode != 1)
+				continue;
 
 			DBGLOG(RLM, INFO, "[Ch] Count=%d\n",
-			       prChannelSwitchAnnounceIE->ucChannelSwitchCount);
-
-				/* Need to stop data transmission immediately */
-				fgHasChannelSwitchIE = TRUE;
-				if (!g_fgHasStopTx) {
-					g_fgHasStopTx = TRUE;
-					/* AP */
-					qmSetStaRecTxAllowed(prAdapter,
-								 prStaRec,
-								 FALSE);
-					DBGLOG(RLM, EVENT,
-						"[Ch] TxAllowed = FALSE\n");
-				}
-
-				if (prChannelSwitchAnnounceIE
-					    ->ucChannelSwitchCount <= 5) {
-					DBGLOG(RLM, INFO,
-					       "[Ch] switch channel [%d]->[%d]\n",
-					       prBssInfo->ucPrimaryChannel,
-					       prChannelSwitchAnnounceIE
-						       ->ucNewChannelNum);
-					ucChannelAnnouncePri =
-						prChannelSwitchAnnounceIE
-							->ucNewChannelNum;
-					fgNeedSwitchChannel = TRUE;
+			       prCSAIE->ucChannelSwitchCount);
+			prCSAParams->newCh = prCSAIE->ucNewChannelNum;
+			curCSAcount = prCSAIE->ucChannelSwitchCount;
+			if (!g_fgHasStopTx) {
+				g_fgHasStopTx = TRUE;
+				/* AP */
+				qmSetStaRecTxAllowed(prAdapter,
+						     prStaRec,
+						     FALSE);
+				DBGLOG(RLM, EVENT, "[Ch] TxAllowed = FALSE\n");
+			}
 #ifdef CFG_DFS_CHSW_FORCE_BW20
-					g_fgHasChannelSwitchIE = TRUE;
+			if (RLM_NET_IS_11AC(prBssInfo)) {
+				DBGLOG(RLM, INFO,
+				       "Send Operation Action Frame");
+				rlmSendOpModeNotificationFrame(
+					prAdapter, prStaRec,
+					VHT_OP_MODE_CHANNEL_WIDTH_20,
+					1);
+			} else {
+				DBGLOG(RLM, INFO,
+				       "Skip Send Operation Action Frame");
+			}
 #endif
-				}
-#ifdef CFG_DFS_CHSW_FORCE_BW20
-				if (RLM_NET_IS_11AC(prBssInfo)) {
-					DBGLOG(RLM, INFO,
-					       "Send Operation Action Frame");
-					rlmSendOpModeNotificationFrame(
-						prAdapter, prStaRec,
-						VHT_OP_MODE_CHANNEL_WIDTH_20,
-						1);
-				} else {
-					DBGLOG(RLM, INFO,
-					       "Skip Send Operation Action Frame");
-				}
-#endif
-
 			break;
+
 		case ELEM_ID_SCO:
 			if (IE_LEN(pucIE) !=
 			    (sizeof(struct IE_SECONDARY_OFFSET) - 2))
@@ -2721,10 +2730,8 @@ static uint8_t rlmRecIeInfoForClient(struct ADAPTER *prAdapter,
 			DBGLOG(RLM, INFO, "[Channel Switch] SCO [%d]->[%d]\n",
 			       prBssInfo->eBssSCO,
 			       prSecondaryOffsetIE->ucSecondaryOffset);
-			eChannelAnnounceSco =
-				(enum ENUM_CHNL_EXT)
+			prCSAParams->sco = (enum ENUM_CHNL_EXT)
 					prSecondaryOffsetIE->ucSecondaryOffset;
-			fgHasSCOIE = TRUE;
 			break;
 #endif
 
@@ -2836,85 +2843,17 @@ static uint8_t rlmRecIeInfoForClient(struct ADAPTER *prAdapter,
 #endif
 
 #if CFG_SUPPORT_DFS
-	/* Check whether Channel Announcement IE, Secondary Offset IE &
-	 * Wide Bandwidth Channel Switch IE exist or not. If exist, the
-	 * priority is
-	 * the highest.
-	 */
-
-	if (fgNeedSwitchChannel) {
-		struct BSS_DESC *prBssDesc;
-		struct PARAM_SSID rSsid;
-
-		prBssInfo->ucPrimaryChannel = ucChannelAnnouncePri;
-		prBssInfo->eBand =
-			(prBssInfo->ucPrimaryChannel <= 14)
-				? BAND_2G4
-				: BAND_5G;
-		/* Change to BW20 for certification issue due to signal sidelope
-		 * leakage
-		 */
-		prBssInfo->ucVhtChannelWidth = 0;
-		prBssInfo->ucVhtChannelFrequencyS1 = 0;
-		prBssInfo->ucVhtChannelFrequencyS2 = 0;
-		prBssInfo->eBssSCO = 0;
-
-		if (fgHasWideBandIE != FALSE) {
-			prBssInfo->ucVhtChannelWidth = ucChannelAnnounceVhtBw;
-			prBssInfo->ucVhtChannelFrequencyS1 =
-				ucChannelAnnounceChannelS1;
-			prBssInfo->ucVhtChannelFrequencyS2 =
-				ucChannelAnnounceChannelS2;
-
-			/* Revise by own OP BW if needed */
-			if ((prBssInfo->fgIsOpChangeChannelWidth) &&
-			    (rlmGetVhtOpBwByBssOpBw(
-				     prBssInfo->ucOpChangeChannelWidth) <
-			     prBssInfo->ucVhtChannelWidth)) {
-
-				DBGLOG(RLM, LOUD,
-				       "Change to w:%d s1:%d s2:%d since own changed BW < peer's WideBand BW",
-				       prBssInfo->ucVhtChannelWidth,
-				       prBssInfo->ucVhtChannelFrequencyS1,
-				       prBssInfo->ucVhtChannelFrequencyS2);
-				rlmFillVhtOpInfoByBssOpBw(
-					prBssInfo,
-					prBssInfo->ucOpChangeChannelWidth);
-			}
-		}
-		if (fgHasSCOIE != FALSE)
-			prBssInfo->eBssSCO = eChannelAnnounceSco;
-
-		COPY_SSID(rSsid.aucSsid, rSsid.u4SsidLen, prBssInfo->aucSSID,
-			  prBssInfo->ucSSIDLen);
-		prBssDesc = scanSearchBssDescByBssidAndSsid(
-			prAdapter, prBssInfo->aucBSSID, TRUE, &rSsid);
-
-		if (prBssDesc) {
-			DBGLOG(RLM, INFO,
-			       "DFS: BSS: " MACSTR
-			       " Desc found, channel from %u to %u\n ",
-			       MAC2STR(prBssInfo->aucBSSID),
-			       prBssDesc->ucChannelNum, ucChannelAnnouncePri);
-			prBssDesc->ucChannelNum = ucChannelAnnouncePri;
-			prBssDesc->eChannelWidth = prBssInfo->ucVhtChannelWidth;
-			prBssDesc->ucCenterFreqS1 =
-				prBssInfo->ucVhtChannelFrequencyS1;
-			prBssDesc->ucCenterFreqS2 =
-				prBssInfo->ucVhtChannelFrequencyS2;
-			kalIndicateChannelSwitch(
-				prAdapter->prGlueInfo,
-				prBssInfo->eBssSCO,
-				prBssDesc->ucChannelNum);
-		} else {
-			DBGLOG(RLM, INFO,
-			       "DFS: BSS: " MACSTR " Desc is not found\n ",
-			       MAC2STR(prBssInfo->aucBSSID));
-		}
+	prAisFsmInfo = aisGetAisFsmInfo(prAdapter, prBssInfo->ucBssIndex);
+	if (SHOULD_CH_SWITCH(curCSAcount, prCSAParams) && prAisFsmInfo) {
+		cnmTimerStopTimer(prAdapter, &prAisFsmInfo->rCSATimer);
+		cnmTimerStartTimer(prAdapter, &prAisFsmInfo->rCSATimer,
+			prBssInfo->u2BeaconInterval * curCSAcount);
+		prCSAParams->count = curCSAcount;
+		DBGLOG(RLM, INFO, "Channel switch Countdown: %d msecs\n",
+		       prBssInfo->u2BeaconInterval * prCSAParams->count);
 	}
 #endif
-
-	if (!fgHasChannelSwitchIE && g_fgHasStopTx) {
+	if (!HAS_CH_SWITCH_PARAMS(prCSAParams) && g_fgHasStopTx) {
 		/* AP */
 		qmSetStaRecTxAllowed(prAdapter, prStaRec, TRUE);
 
@@ -2922,21 +2861,6 @@ static uint8_t rlmRecIeInfoForClient(struct ADAPTER *prAdapter,
 		g_fgHasStopTx = FALSE;
 	}
 
-#if CFG_SUPPORT_DFS
-#ifdef CFG_DFS_CHSW_FORCE_BW20
-	/*DFS Certification for Channel Bandwidth 20MHz */
-	DBGLOG(RLM, INFO, "Ch : SwitchIE = %d\n", g_fgHasChannelSwitchIE);
-	if (g_fgHasChannelSwitchIE == TRUE) {
-		prBssInfo->eBssSCO = CHNL_EXT_SCN;
-		prBssInfo->ucVhtChannelWidth = CW_20_40MHZ;
-		prBssInfo->ucVhtChannelFrequencyS1 = 0;
-		prBssInfo->ucVhtChannelFrequencyS2 = 255;
-		prBssInfo->ucHtOpInfo1 &=
-			~(HT_OP_INFO1_SCO | HT_OP_INFO1_STA_CHNL_WIDTH);
-		DBGLOG(RLM, INFO, "Ch : DFS has Appeared\n");
-	}
-#endif
-#endif
 	rlmReviseMaxBw(prAdapter, prBssInfo->ucBssIndex, &prBssInfo->eBssSCO,
 		       (enum ENUM_CHANNEL_WIDTH *)&prBssInfo->ucVhtChannelWidth,
 		       &prBssInfo->ucVhtChannelFrequencyS1,
@@ -3877,11 +3801,11 @@ void rlmProcessVhtAction(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb)
 					(prStaRec->u2VhtRxMcsMapAssoc &
 					(VHT_CAP_INFO_MCS_1SS_MASK |
 					VHT_CAP_INFO_MCS_2SS_MASK));
+
 				DBGLOG(RLM, INFO,
 				       "NSS=2 RxMcsMap:0x%x, McsMapAssoc:0x%x\n",
 				       prStaRec->u2VhtRxMcsMap,
 				       prStaRec->u2VhtRxMcsMapAssoc);
-
 			} else {
 				/* NSS = 1 or others */
 				prStaRec->u2VhtRxMcsMap = BITS(0, 15) &
@@ -3890,6 +3814,7 @@ void rlmProcessVhtAction(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb)
 				prStaRec->u2VhtRxMcsMap |=
 					(prStaRec->u2VhtRxMcsMapAssoc &
 					VHT_CAP_INFO_MCS_1SS_MASK);
+
 				DBGLOG(RLM, INFO,
 				       "NSS=1 RxMcsMap:0x%x, McsMapAssoc:0x%x\n",
 				       prStaRec->u2VhtRxMcsMap,
@@ -4015,6 +3940,30 @@ void rlmFillSyncCmdParam(struct CMD_SET_BSS_RLM_PARAM *prCmdBody,
 	} else {
 		DBGLOG(RLM, INFO, "N=%d closed\n", prCmdBody->ucBssIndex);
 	}
+#if CFG_TC10_FEATURE
+	if (IS_BSS_AIS(prBssInfo)) {
+		if (prBssInfo->eBssSCO == CHNL_EXT_SCN) {
+			prBssInfo->aisConnectedBandwidth = 20;
+		} else if (prBssInfo->eBssSCO != CHNL_EXT_SCN) {
+			switch (prBssInfo->ucVhtChannelWidth) {
+			case CW_20_40MHZ:
+				prBssInfo->aisConnectedBandwidth = 40;
+				break;
+			case CW_80MHZ:
+				prBssInfo->aisConnectedBandwidth = 80;
+				break;
+			case CW_160MHZ:
+				prBssInfo->aisConnectedBandwidth = 160;
+				break;
+			case CW_80P80MHZ:
+				prBssInfo->aisConnectedBandwidth = 160;
+				break;
+			}
+		}
+		DBGLOG(RLM, INFO, "AIS connected bandwidth=%d\n",
+				prBssInfo->aisConnectedBandwidth);
+	}
+#endif
 }
 
 /*----------------------------------------------------------------------------*/
@@ -4175,6 +4124,13 @@ void rlmProcessAssocReq(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb,
 			prStaRec->ucAselCap = prHtCap->ucAselCap;
 			break;
 
+#if (CFG_SUPPORT_802_11AX == 1)
+		case ELEM_ID_RESERVED:
+			if (IE_ID_EXT(pucIE) == ELEM_EXT_ID_HE_CAP)
+				heRlmRecHeCapInfo(prAdapter, prStaRec, pucIE);
+			break;
+#endif
+
 #if CFG_SUPPORT_802_11AC
 		case ELEM_ID_VHT_CAP:
 			if (!RLM_NET_IS_11AC(prBssInfo) ||
@@ -4228,8 +4184,6 @@ void rlmProcessAssocReq(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb,
 
 			prStaRec->u2VhtRxMcsMap =
 				prVhtCap->rVhtSupportedMcsSet.u2RxMcsMap;
-			prStaRec->u2VhtRxMcsMapAssoc =
-				prStaRec->u2VhtRxMcsMap;
 
 			prStaRec->u2VhtRxMcsMapAssoc =
 				prStaRec->u2VhtRxMcsMap;
@@ -4415,10 +4369,6 @@ static void rlmBssReset(struct ADAPTER *prAdapter, struct BSS_INFO *prBssInfo)
 		prBssInfo->ucBssColorInfo = 0;
 		prBssInfo->u2HeBasicMcsSet = 0;
 	}
-#endif
-
-#ifdef CFG_DFS_CHSW_FORCE_BW20
-	g_fgHasChannelSwitchIE = FALSE;
 #endif
 }
 
@@ -5026,14 +4976,19 @@ void rlmProcessSpecMgtAction(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb)
 
 			/* Check SAP channel */
 			p2pFuncSwitchSapChannel(prAdapter);
-
-			prBssDesc->ucChannelNum = prBssInfo->ucPrimaryChannel;
-			prBssDesc->eChannelWidth = prBssInfo->
-							ucVhtChannelWidth;
-			prBssDesc->ucCenterFreqS1 = prBssInfo->
-							ucVhtChannelFrequencyS1;
-			prBssDesc->ucCenterFreqS2 = prBssInfo->
-							ucVhtChannelFrequencyS2;
+			if (prBssDesc) {
+				prBssDesc->ucChannelNum =
+						prBssInfo->ucPrimaryChannel;
+				prBssDesc->eChannelWidth =
+						prBssInfo->ucVhtChannelWidth;
+				prBssDesc->ucCenterFreqS1 = prBssInfo->
+					ucVhtChannelFrequencyS1;
+				prBssDesc->ucCenterFreqS2 = prBssInfo->
+					ucVhtChannelFrequencyS2;
+			} else {
+				DBGLOG(RLM, WARN,
+				"[Mgt Action] BssDesc is not found!\n");
+			}
 		}
 		nicUpdateBss(prAdapter, prBssInfo->ucBssIndex);
 		break;
@@ -5042,6 +4997,20 @@ void rlmProcessSpecMgtAction(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb)
 	}
 }
 
+void rlmResetCSAParams(struct BSS_INFO *prBssInfo)
+{
+	struct SWITCH_CH_AND_BAND_PARAMS *prCSAParams;
+
+	if (!prBssInfo) {
+		DBGLOG(RLM, ERROR, "Reset CSA params failed");
+		return;
+	}
+	prCSAParams = &(prBssInfo->CSAParams);
+	kalMemZero(prCSAParams, sizeof(struct SWITCH_CH_AND_BAND_PARAMS));
+	prCSAParams->count = MAX_CSA_COUNT;
+	DBGLOG(RLM, INFO, "Reset CSA count to %u for BSS%d",
+	       prCSAParams->count, prBssInfo->ucBssIndex);
+}
 #endif
 
 /*----------------------------------------------------------------------------*/
@@ -5383,9 +5352,9 @@ static void rlmOpModeTxDoneHandler(IN struct ADAPTER *prAdapter,
 	u_int8_t fgIsOpModeChangeSuccess = FALSE; /* OP change result */
 	uint8_t ucRelatedFrameType =
 		OP_NOTIFY_TYPE_NUM; /* Used for HT notification frame */
-	enum ENUM_OP_NOTIFY_STATE_T
-		*pucCurrOpState = NULL,
-		*pucRelatedOpState = NULL; /* Used for HT notification frame */
+		/* Used for HT notification frame */
+	uint8_t *pucCurrOpState = NULL;
+	uint8_t *pucRelatedOpState = NULL;
 
 	/* Sanity check */
 	ASSERT((prAdapter != NULL) && (prMsduInfo != NULL));
@@ -5425,6 +5394,9 @@ static void rlmOpModeTxDoneHandler(IN struct ADAPTER *prAdapter,
 			break;
 		}
 
+		pucCurrOpState = &prBssInfo
+				->aucOpModeChangeState[ucOpChangeType];
+
 		/* <2>Assign Op notification Type/State for HT notification
 		 * frame
 		 */
@@ -5436,13 +5408,8 @@ static void rlmOpModeTxDoneHandler(IN struct ADAPTER *prAdapter,
 					? OP_NOTIFY_TYPE_HT_NSS
 					: OP_NOTIFY_TYPE_HT_BW;
 
-			pucCurrOpState =
-				(enum ENUM_OP_NOTIFY_STATE_T *)&prBssInfo
-					->aucOpModeChangeState[ucOpChangeType];
-			pucRelatedOpState =
-				(enum ENUM_OP_NOTIFY_STATE_T *)&prBssInfo
-					->aucOpModeChangeState
-						[ucRelatedFrameType];
+			pucRelatedOpState = &prBssInfo
+				->aucOpModeChangeState[ucRelatedFrameType];
 		}
 
 		/* <3.1>handle TX done - SUCCESS */
@@ -5452,6 +5419,20 @@ static void rlmOpModeTxDoneHandler(IN struct ADAPTER *prAdapter,
 			prBssInfo->aucOpModeChangeRetryCnt[ucOpChangeType] = 0;
 
 			if (ucOpChangeType == OP_NOTIFY_TYPE_VHT_NSS_BW) {
+				*pucCurrOpState = OP_NOTIFY_STATE_SUCCESS;
+
+				if (prBssInfo->aucOpModeChangeState
+					[OP_NOTIFY_TYPE_HT_BW] ==
+						OP_NOTIFY_STATE_SENDING ||
+					prBssInfo->aucOpModeChangeState
+					[OP_NOTIFY_TYPE_HT_NSS] ==
+						OP_NOTIFY_STATE_SENDING) {
+					/* Wait for HT BW/Nss notification
+					 * frames Tx done
+					 */
+					return;
+				}
+
 				/* VHT notification frame sent */
 				fgIsOpModeChangeSuccess = TRUE;
 				break;
@@ -5460,14 +5441,16 @@ static void rlmOpModeTxDoneHandler(IN struct ADAPTER *prAdapter,
 			/* HT notification frame sent */
 			if (*pucCurrOpState ==
 			    OP_NOTIFY_STATE_SENDING) { /* Change OpMode */
-
 				*pucCurrOpState = OP_NOTIFY_STATE_SUCCESS;
 
-				/* Case1: Wait for both HT BW/Nss notification
-				 * frame TX done
+				/* Case1: Wait for VHT notification frame &
+				 * HT BW/Nss notification frame TX done
 				 */
 				if (*pucRelatedOpState ==
-				    OP_NOTIFY_STATE_SENDING)
+					OP_NOTIFY_STATE_SENDING ||
+					prBssInfo->aucOpModeChangeState
+					[OP_NOTIFY_TYPE_VHT_NSS_BW] ==
+						OP_NOTIFY_STATE_SENDING)
 					return;
 
 				/* Case2: Both BW and Nss notification TX done
@@ -5570,6 +5553,8 @@ static void rlmOpModeTxDoneHandler(IN struct ADAPTER *prAdapter,
 			/* VHT notification frame sent */
 			if (ucOpChangeType ==
 			    OP_NOTIFY_TYPE_VHT_NSS_BW) {
+				*pucCurrOpState = OP_NOTIFY_STATE_FAIL;
+
 				/* Change failed, keep original OP BW/Nss */
 				rlmRollbackOpChangeParam(prBssInfo, TRUE, TRUE);
 				fgIsOpModeChangeSuccess = FALSE;
@@ -5941,10 +5926,9 @@ static void rlmCompleteOpModeChange(struct ADAPTER *prAdapter,
 	}
 
 	DBGLOG(RLM, INFO,
-		"Complete BSS[%d] OP Mode change to BW[%d] ",
+		"Complete BSS[%d] OP Mode change to BW[%d] RxNss[%d] TxNss[%d]",
 		prBssInfo->ucBssIndex,
-		rlmGetBssOpBwByVhtAndHtOpInfo(prBssInfo));
-	DBGLOG(RLM, INFO, "RxNss[%d] TxNss[%d]\n",
+		rlmGetBssOpBwByVhtAndHtOpInfo(prBssInfo),
 		prBssInfo->ucOpRxNss,
 		prBssInfo->ucOpTxNss);
 
@@ -6016,15 +6000,18 @@ rlmChangeOperationMode(
 	/* <3>Check if the current operating BW/Nss is the same as the target
 	 * one
 	 */
-	if (ucChannelWidth == rlmGetBssOpBwByVhtAndHtOpInfo(prBssInfo))
+	if (ucChannelWidth == rlmGetBssOpBwByVhtAndHtOpInfo(prBssInfo)) {
 		fgIsChangeBw = FALSE;
-
-	if (ucOpRxNss == prBssInfo->ucOpRxNss)
+		prBssInfo->fgIsOpChangeChannelWidth = FALSE;
+	}
+	if (ucOpRxNss == prBssInfo->ucOpRxNss) {
 		fgIsChangeRxNss = FALSE;
-
-	if (ucOpTxNss == prBssInfo->ucOpTxNss)
+		prBssInfo->fgIsOpChangeRxNss = FALSE;
+	}
+	if (ucOpTxNss == prBssInfo->ucOpTxNss) {
 		fgIsChangeTxNss = FALSE;
-
+		prBssInfo->fgIsOpChangeTxNss = FALSE;
+	}
 	if ((!fgIsChangeBw) && (!fgIsChangeRxNss) && (!fgIsChangeTxNss)) {
 		DBGLOG(RLM, INFO,
 			"BSS[%d] target OpMode BW[%d] RxNss[%d] TxNss[%d] No change, return\n",
@@ -6079,8 +6066,7 @@ rlmChangeOperationMode(
 		 * No action frame is needed if we only changed OpTxNss.
 		 */
 #if CFG_SUPPORT_802_11AC
-		if (RLM_NET_IS_11AC(prBssInfo) && prStaRec &&
-			(prStaRec->ucPhyTypeSet & PHY_TYPE_SET_802_11AC) &&
+		if (RLM_NET_IS_11AC(prBssInfo) &&
 			(fgIsChangeBw || fgIsChangeRxNss)) {
 			if (prBssInfo->pfOpChangeHandler)
 				prBssInfo->aucOpModeChangeState
@@ -6092,41 +6078,35 @@ rlmChangeOperationMode(
 			u4Status = rlmSendOpModeNotificationFrame(
 				prAdapter, prStaRec,
 				ucChannelWidth, ucOpRxNss);
-		} else
+		}
 #endif
-		{
-			if (RLM_NET_IS_11N(prBssInfo) &&
-				(fgIsChangeBw || fgIsChangeRxNss)) {
-				if (prBssInfo->pfOpChangeHandler) {
-					if (fgIsChangeRxNss)
-						prBssInfo->aucOpModeChangeState
+		if (RLM_NET_IS_11N(prBssInfo) &&
+			(fgIsChangeBw || fgIsChangeRxNss)) {
+			if (prBssInfo->pfOpChangeHandler) {
+				if (fgIsChangeRxNss)
+					prBssInfo->aucOpModeChangeState
 						[OP_NOTIFY_TYPE_HT_NSS] =
 						OP_NOTIFY_STATE_SENDING;
-					if (fgIsChangeBw)
-						prBssInfo->aucOpModeChangeState
-							[OP_NOTIFY_TYPE_HT_BW] =
-							OP_NOTIFY_STATE_SENDING;
-				}
-				if (fgIsChangeRxNss) {
-					u4Status = rlmSendSmPowerSaveFrame(
-						prAdapter, prStaRec, ucOpRxNss);
-					DBGLOG(RLM, INFO,
-						"Send HT SM Power Save frame ");
-					DBGLOG(RLM, INFO,
-						"BSS[%d] RxNss[%d]\n",
-						ucBssIndex, ucOpRxNss);
-				}
-				if (fgIsChangeBw) {
-					u4Status =
-					rlmSendNotifyChannelWidthFrame(
-						prAdapter, prStaRec,
-						ucChannelWidth);
-					DBGLOG(RLM, INFO,
-						"Send HT Notify Channel Width frame: ");
-					DBGLOG(RLM, INFO,
-						"BSS[%d] BW[%d]\n",
-						ucBssIndex, ucChannelWidth);
-				}
+				if (fgIsChangeBw)
+					prBssInfo->aucOpModeChangeState
+						[OP_NOTIFY_TYPE_HT_BW] =
+						OP_NOTIFY_STATE_SENDING;
+			}
+			if (fgIsChangeRxNss) {
+				u4Status = rlmSendSmPowerSaveFrame(
+					prAdapter, prStaRec, ucOpRxNss);
+				DBGLOG(RLM, INFO,
+					"Send HT SM Power Save frame: ");
+				DBGLOG(RLM, INFO, "BSS[%d] RxNss[%d]\n",
+					ucBssIndex, ucOpRxNss);
+			}
+			if (fgIsChangeBw) {
+				u4Status = rlmSendNotifyChannelWidthFrame(
+					prAdapter, prStaRec, ucChannelWidth);
+				DBGLOG(RLM, INFO,
+					"Send HT Notify Channel Width frame: ");
+				DBGLOG(RLM, INFO, "BSS[%d] BW[%d]\n",
+					ucBssIndex, ucChannelWidth);
 			}
 		}
 #if CFG_SUPPORT_SMART_GEAR

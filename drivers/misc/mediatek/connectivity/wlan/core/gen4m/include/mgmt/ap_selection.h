@@ -58,8 +58,15 @@
 #define AX_SEL_DEF_WEIGHT		(0)
 #define AX_SEL_DEF_DIVIDER		(1)
 #endif
+
+enum ROAM_TYPE {
+	ROAM_TYPE_RCPI,
+	ROAM_TYPE_PER,
+	ROAM_TYPE_NUM
+};
+
 struct BSS_DESC *scanSearchBssDescByScoreForAis(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex);
+	enum ENUM_ROAMING_REASON eRoamReason, uint8_t ucBssIndex);
 void scanGetCurrentEssChnlList(struct ADAPTER *prAdapter, uint8_t ucBssIndex);
 uint8_t scanCheckNeedDriverRoaming(
 	struct ADAPTER *prAdapter, uint8_t ucBssIndex);

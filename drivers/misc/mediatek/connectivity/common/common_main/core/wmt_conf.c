@@ -155,6 +155,7 @@ static const struct parse_data wmtcfg_fields[] = {
 	INT(coex_wmt_ext_elna_gain_p1_D2),
 	INT(coex_wmt_ext_elna_gain_p1_D3),
 	STRING(coex_wmt_antsel_invert_support),
+	CHAR(coex_wmt_ext_epa_mode),
 
 	BYTE_ARRAY(coex_wmt_epa_elna),
 

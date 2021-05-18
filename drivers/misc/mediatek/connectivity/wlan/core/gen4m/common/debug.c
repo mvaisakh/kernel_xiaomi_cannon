@@ -299,7 +299,7 @@ uint32_t wlanWakeLogCmd(uint8_t ucCmdId)
 		}
 
 		if (j >= WAKE_MAX_CMD_EVENT_NUM) {
-			DBGLOG_LIMITED(OID, TRACE,
+			DBGLOG_LIMITED(OID, WARN,
 			"Wake cmd over flow %d-0x%02x\n",
 			WAKE_MAX_CMD_EVENT_NUM, ucCmdId);
 		}
@@ -697,6 +697,7 @@ void wlanDbgSetLogLevelImpl(IN struct ADAPTER *prAdapter,
 
 	wlanDbgGetGlobalLogLevel(ENUM_WIFI_LOG_MODULE_DRIVER, &u4DriverLevel);
 	wlanDbgGetGlobalLogLevel(ENUM_WIFI_LOG_MODULE_FW, &u4FwLevel);
+#if KERNEL_VERSION(4, 14, 0) >= LINUX_VERSION_CODE
 #if (CFG_BUILT_IN_DRIVER == 0) && (CFG_MTK_ANDROID_WMT == 1)
 	/*
 	 * The function definition of get_logtoomuch_enable() and
@@ -715,6 +716,7 @@ void wlanDbgSetLogLevelImpl(IN struct ADAPTER *prAdapter,
 		set_logtoomuch_enable(0);
 	}
 #endif
+#endif /* KERNEL_VERSION(4, 14, 0) >= LINUX_VERSION_CODE */
 }
 
 u_int8_t wlanDbgGetGlobalLogLevel(uint32_t u4Module, uint32_t *pu4Level)
@@ -813,6 +815,7 @@ void wlanPrintFwLog(uint8_t *pucLogContent,
 #define DBG_LOG_BUF_SIZE 128
 
 	int8_t aucLogBuffer[DBG_LOG_BUF_SIZE];
+	int32_t err;
 	va_list args;
 
 	if (u2MsgSize > DEBUG_MSG_SIZE_MAX - 1) {
@@ -837,11 +840,12 @@ void wlanPrintFwLog(uint8_t *pucLogContent,
 	case DEBUG_MSG_TYPE_DRIVER:
 		/* Only 128 Bytes is available to print in driver */
 		va_start(args, pucFmt);
-		vsnprintf(aucLogBuffer, sizeof(aucLogBuffer) - 1, pucFmt,
+		err = vsnprintf(aucLogBuffer, sizeof(aucLogBuffer) - 1, pucFmt,
 			  args);
 		va_end(args);
 		aucLogBuffer[DBG_LOG_BUF_SIZE - 1] = '\0';
-		LOG_FUNC("%s\n", aucLogBuffer);
+		if (err >= 0)
+			LOG_FUNC("%s\n", aucLogBuffer);
 		break;
 	case DEBUG_MSG_TYPE_MEM8:
 		firmwareHexDump("fw data:", DUMP_PREFIX_ADDRESS,

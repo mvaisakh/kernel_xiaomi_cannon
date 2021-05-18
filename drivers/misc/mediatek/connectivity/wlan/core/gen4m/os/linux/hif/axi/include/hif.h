@@ -86,12 +86,10 @@ extern int mtk_wcn_wlan_unreg(void);
 #endif /*end of CFG_SUPPORT_CONNINFRA == 0*/
 #endif /*end of CFG_MTK_ANDROID_WMT */
 
-extern phys_addr_t gWifiRsvMemPhyBase;
-extern unsigned long long gWifiRsvMemSize;
 #if (CFG_SUPPORT_CONNINFRA == 1)
 extern wait_queue_head_t g_waitq_rst;
 extern unsigned long g_ulFlag;
-extern KAL_WAKE_LOCK_T g_IntrWakeLock;
+extern KAL_WAKE_LOCK_T *g_IntrWakeLock;
 #endif
 /*******************************************************************************
  *                              C O N S T A N T S
@@ -125,7 +123,7 @@ struct HIF_MEM_OPS {
 	void (*allocRxDesc)(struct GL_HIF_INFO *prHifInfo,
 			    struct RTMP_DMABUF *prDescRing,
 			    uint32_t u4Num);
-	void (*allocTxCmdBuf)(struct RTMP_DMABUF *prDmaBuf,
+	bool (*allocTxCmdBuf)(struct RTMP_DMABUF *prDmaBuf,
 			      uint32_t u4Num, uint32_t u4Idx);
 	void (*allocTxDataBuf)(struct MSDU_TOKEN_ENTRY *prToken,
 			       uint32_t u4Idx);
@@ -148,8 +146,6 @@ struct HIF_MEM_OPS {
 			   struct RTMP_DMACB *pRxCell,
 			   struct RTMP_DMABUF *prDmaBuf,
 			   struct SW_RFB *prSwRfb);
-	void (*flushCache)(struct GL_HIF_INFO *prHifInfo,
-			   void *pucSrc, uint32_t u4Len);
 	phys_addr_t (*mapTxBuf)(struct GL_HIF_INFO *prHifInfo,
 			  void *pucBuf, uint32_t u4Offset, uint32_t u4Len);
 	phys_addr_t (*mapRxBuf)(struct GL_HIF_INFO *prHifInfo,
@@ -207,6 +203,7 @@ struct GL_HIF_INFO {
 
 	struct ERR_RECOVERY_CTRL_T rErrRecoveryCtl;
 	struct timer_list rSerTimer;
+	u_int64_t rSerTimerData;
 	struct list_head rTxCmdQ;
 	struct list_head rTxDataQ;
 	uint32_t u4TxDataQLen;
@@ -310,6 +307,7 @@ struct BUS_INFO {
 	bool (*wfdmaAllocRxRing)(
 		struct GLUE_INFO *prGlueInfo,
 		bool fgAllocMem);
+	void (*setPdmaIntMask)(struct GLUE_INFO *prGlueInfo, u_int8_t fgEnable);
 };
 
 struct HIF_MEM {
@@ -344,6 +342,7 @@ struct HIF_PREALLOC_MEM {
 	struct HIF_MEM rMsduBuf[HIF_TX_MSDU_TOKEN_NUM];
 #endif
 	phys_addr_t pucRsvMemBase;
+	void *pucRsvMemVirBase;
 	uint64_t u4RsvMemSize;
 	uint32_t u4Offset;
 };

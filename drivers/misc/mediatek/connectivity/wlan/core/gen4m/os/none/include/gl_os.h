@@ -842,6 +842,13 @@ struct NL80211_DRIVER_TEST_MODE_PARAMS {
 	uint32_t buflen;
 };
 
+struct NL80211_DRIVER_STRING_CMD_PARAMS {
+	struct NL80211_DRIVER_TEST_MODE_PARAMS hdr;
+	uint32_t reply_buf_size;
+	uint32_t reply_len;
+	uint8_t *reply_buf;
+};
+
 /*SW CMD */
 struct NL80211_DRIVER_SW_CMD_PARAMS {
 	struct NL80211_DRIVER_TEST_MODE_PARAMS hdr;
@@ -1058,6 +1065,10 @@ struct PACKET_PRIVATE_RX_DATA {
 /* TODO: os-related implementation */
 #define GLUE_INC_REF_CNT(_refCount)     (_refCount++)
 #define GLUE_DEC_REF_CNT(_refCount)     (_refCount--)
+#define GLUE_ADD_REF_CNT(_value, _refCount) \
+	(_refCount += _value)
+#define GLUE_SUB_REF_CNT(_value, _refCount) \
+	(_refCount -= _value)
 #define GLUE_GET_REF_CNT(_refCount)     (_refCount)
 
 #define DbgPrint(...)

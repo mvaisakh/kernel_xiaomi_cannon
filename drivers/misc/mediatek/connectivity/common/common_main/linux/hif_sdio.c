@@ -2045,6 +2045,7 @@ static VOID hif_sdio_irq(struct sdio_func *func)
 {
 	INT32 probed_list_index = -1;
 	INT32 registed_list_index = -1;
+	INT32 ret;
 
 	HIF_SDIO_DBG_FUNC("start!\n");
 
@@ -2090,7 +2091,9 @@ static VOID hif_sdio_irq(struct sdio_func *func)
 		HIF_SDIO_WARN_FUNC("release irq (func:0x%p) v(0x%x) d(0x%x) n(0x%x)\n",
 				   func, func->vendor, func->device, func->num);
 		mtk_wcn_hif_sdio_irq_flag_set(0);
-		sdio_release_irq(func);
+		ret = sdio_release_irq(func);
+		if (ret)
+			HIF_SDIO_WARN_FUNC("sdio_release_irq() fail(%d)\n", ret);
 	}
 	osal_ftrace_print("%s|E\n", __func__);
 }

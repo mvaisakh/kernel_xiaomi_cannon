@@ -91,26 +91,26 @@ struct TIMINGMSMT_PARAM {
 	uint32_t u4ToA;		/* Timestamp of Arrival [10ns] */
 };
 
-struct BSS_TRANSITION_MGT_PARAM_T {
+struct BSS_TRANSITION_MGT_PARAM {
 	/* for Query */
-	uint8_t ucDialogToken;
-	uint8_t ucQueryReason;
+	uint8_t ucQueryDialogToken;
+	uint8_t fgWaitBtmRequest;
 	/* for Request */
+	uint8_t ucDialogToken;
 	uint8_t ucRequestMode;
-	uint16_t u2DisassocTimer;
+	uint32_t u4ReauthDelay;
 	uint16_t u2TermDuration;
 	uint8_t aucTermTsf[8];
 	uint8_t ucSessionURLLen;
 	uint8_t aucSessionURL[255];
+	uint8_t ucDisImmiState;
+	uint8_t aucBSSID[MAC_ADDR_LEN];
 	/* for Respone */
-	u_int8_t fgPendingResponse:1;
-	u_int8_t fgUnsolicitedReq:1;
-	u_int8_t fgReserved:6;
+	uint8_t fgPendingResponse:1;
+	uint8_t fgIsMboPresent:1;
+	uint8_t fgWaitBtmRespDone:1;
+	u_int8_t fgReserved:5;
 	uint8_t ucStatusCode;
-	uint8_t ucTermDelay;
-	uint8_t aucTargetBssid[MAC_ADDR_LEN];
-	uint8_t *pucOurNeighborBss;
-	uint16_t u2OurNeighborBssLen;
 };
 
 /*******************************************************************************
@@ -127,23 +127,30 @@ struct BSS_TRANSITION_MGT_PARAM_T {
  *                                 M A C R O S
  *******************************************************************************
  */
-#define BTM_REQ_MODE_CAND_INCLUDED_BIT                  BIT(0)
-#define BTM_REQ_MODE_ABRIDGED                           BIT(1)
-#define BTM_REQ_MODE_DISC_IMM                           BIT(2)
-#define BTM_REQ_MODE_BSS_TERM_INCLUDE                   BIT(3)
-#define BTM_REQ_MODE_ESS_DISC_IMM                       BIT(4)
+#define WNM_MAX_NEIGHBOR_REPORT 10
 
-#define BSS_TRANSITION_MGT_STATUS_ACCEPT                0
-#define BSS_TRANSITION_MGT_STATUS_UNSPECIFIED           1
-#define BSS_TRANSITION_MGT_STATUS_NEED_SCAN             2
-#define BSS_TRANSITION_MGT_STATUS_CAND_NO_CAPACITY      3
-#define BSS_TRANSITION_MGT_STATUS_TERM_UNDESIRED        4
-#define BSS_TRANSITION_MGT_STATUS_TERM_DELAY_REQUESTED  5
-#define BSS_TRANSITION_MGT_STATUS_CAND_LIST_PROVIDED    6
-#define BSS_TRANSITION_MGT_STATUS_CAND_NO_CANDIDATES    7
-#define BSS_TRANSITION_MGT_STATUS_LEAVING_ESS           8
+/* IEEE 802.11v - BSS Transition Management Request - Request Mode */
+#define WNM_BSS_TM_REQ_PREF_CAND_LIST_INCLUDED BIT(0)
+#define WNM_BSS_TM_REQ_ABRIDGED BIT(1)
+#define WNM_BSS_TM_REQ_DISASSOC_IMMINENT BIT(2)
+#define WNM_BSS_TM_REQ_BSS_TERMINATION_INCLUDED BIT(3)
+#define WNM_BSS_TM_REQ_ESS_DISASSOC_IMMINENT BIT(4)
 
-/* 802.11v: define Transtion and Transition Query reasons */
+/* IEEE Std 802.11-2012 - Table 8-253 */
+enum BSS_TRANS_MGMT_STATUS_CODE {
+	WNM_BSS_TM_ACCEPT = 0,
+	WNM_BSS_TM_REJECT_UNSPECIFIED = 1,
+	WNM_BSS_TM_REJECT_INSUFFICIENT_BEACON = 2,
+	WNM_BSS_TM_REJECT_INSUFFICIENT_CAPABITY = 3,
+	WNM_BSS_TM_REJECT_UNDESIRED = 4,
+	WNM_BSS_TM_REJECT_DELAY_REQUEST = 5,
+	WNM_BSS_TM_REJECT_STA_CANDIDATE_LIST_PROVIDED = 6,
+	WNM_BSS_TM_REJECT_NO_SUITABLE_CANDIDATES = 7,
+	WNM_BSS_TM_REJECT_LEAVING_ESS = 8
+};
+
+/* 802.11v Table 9-176: define Transtion and Transition Query reasons */
+#define BSS_TRANSITION_LOAD_BALANCING                   5
 #define BSS_TRANSITION_BETTER_AP_FOUND                  6
 #define BSS_TRANSITION_LOW_RSSI                         16
 #define BSS_TRANSITION_INCLUDE_PREFER_CAND_LIST         19
@@ -169,12 +176,11 @@ void wnmTimingMeasUnitTest1(struct ADAPTER *prAdapter,
 void wnmRecvBTMRequest(IN struct ADAPTER *prAdapter, IN struct SW_RFB *prSwRfb);
 
 void wnmSendBTMQueryFrame(IN struct ADAPTER *prAdapter,
-			 IN struct STA_RECORD *prStaRec);
+		 IN struct STA_RECORD *prStaRec, IN uint8_t ucQueryReason);
 
-void wnmSendBTMResponseFrame(IN struct ADAPTER *prAdapter,
-			 IN struct STA_RECORD *prStaRec);
-
-uint8_t wnmGetBtmToken(void);
+uint8_t wnmSendBTMResponse(IN struct ADAPTER *prAdapter,
+	IN const uint8_t *aucBssid, IN uint8_t ucStatus,
+	IN uint8_t ucReason, IN uint8_t ucBssIndex);
 
 /*******************************************************************************
  *                              F U N C T I O N S

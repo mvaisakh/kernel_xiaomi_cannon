@@ -274,7 +274,8 @@ typedef struct _WMT_GEN_CONF {
 	UINT32 coex_wmt_ext_elna_gain_p1_D1;
 	UINT32 coex_wmt_ext_elna_gain_p1_D2;
 	UINT32 coex_wmt_ext_elna_gain_p1_D3;
-	PINT8 coex_wmt_antsel_invert_support;
+	PINT8  coex_wmt_antsel_invert_support;
+	UINT8  coex_wmt_ext_epa_mode;
 
 	struct WMT_BYTE_ARRAY *coex_wmt_epa_elna;
 
@@ -356,6 +357,7 @@ typedef MTK_WCN_BOOL(*DEEP_SLEEP_CONTROL) (INT32 value);
 
 typedef struct _WMT_IC_OPS_ {
 	UINT32 icId;
+	UINT64 options;
 	SW_INIT sw_init;
 	SW_DEINIT sw_deinit;
 	IC_PIN_CTRL ic_pin_ctrl;
