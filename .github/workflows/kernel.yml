@@ -1,0 +1,45 @@
+name: Kernel Build CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: toolchain
+      run: git clone --depth=1 https://github.com/mvaisakh/gcc-arm64 ~/tc/gcc64 && git clone --depth=1 https://github.com/mvaisakh/gcc-arm ~/tc/gcc32
+    - name: Set build date
+      id: get-date
+      run: |  # to generate kernel gzip based on time
+        echo ::set-output name=date::$(/bin/date -u "+%Y%m%d")
+    - name: configure
+      run: make O=out ARCH=arm64 cannong_user_defconfig
+    - name: make
+      run: make O=out ARCH=arm64 CROSS_COMPILE=~/tc/gcc64/bin/aarch64-elf- CROSS_COMPILE_ARM32=~/tc/gcc32/bin/arm-eabi- -j$(nproc --all)
+    - name: Kernel Image
+      run: cp out/arch/arm64/boot/Image.gz-dtb kernel-${{ steps.get-date.outputs.date }}.gz
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+         tag_name: ${{ github.ref }}
+         release_name: Release ${{ github.ref }}
+         draft: true
+         prerelease: true
+    - name: Upload Release Asset # This will upload the compiled kernel gzip to your releases page
+      id: upload-release-asset 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./kernel-${{ steps.get-date.outputs.date }}.gz
+        asset_name: kernel-${{ steps.get-date.outputs.date }}.gz
+        asset_content_type: application/gz
