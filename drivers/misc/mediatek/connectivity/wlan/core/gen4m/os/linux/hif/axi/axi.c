@@ -647,9 +647,9 @@ static int _init_resv_mem(struct platform_device *pdev)
 	int ret = 0;
 	struct device_node *np;
 
-	np = of_parse_phandle(pdev->dev.of_node, "memory-region", 0);
+	np = of_parse_phandle(pdev->dev.of_node, "wifi-reserve-memory", 0);
 	if (!np) {
-		DBGLOG(INIT, ERROR, "can NOT find memory-region.\n");
+		DBGLOG(INIT, ERROR, "can NOT find wifi-reserve-memory.\n");
 		return -1;
 	}
 
