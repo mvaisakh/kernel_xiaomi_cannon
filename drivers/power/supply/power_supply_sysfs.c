@@ -42,12 +42,20 @@ static struct device_attribute power_supply_attrs[];
 
 static const char * const power_supply_type_text[] = {
 	"Unknown", "Battery", "UPS", "Mains", "USB",
-	"USB_DCP", "USB_CDP", "USB_ACA", "USB_C",
-	"USB_PD", "USB_PD_DRP", "BrickID"
+/* BSP.Charge - 2020.12.06 - add USB_FLOAT */
+	"USB_FLOAT",
+	"USB_DCP", "USB_CDP", "USB_ACA", "Wireless", "USB_C",
+	"USB_PD", "USB_PD_DRP", "BrickID",
+/* BSP.Charge - 2020.11.14 - enable 18W charging start */
+#ifdef CONFIG_MTK_SOFT_HVDCP_2
+	"HVDCP",
+#endif
+/* BSP.Charge - 2020.11.14 - enable 18W charging end */
 };
 
 static const char * const power_supply_status_text[] = {
-	"Unknown", "Charging", "Discharging", "Not charging", "Full"
+	"Unknown", "Charging", "Discharging", "Not charging", "Full",
+	"Cmd discharging"
 };
 
 static const char * const power_supply_charge_type_text[] = {
@@ -65,12 +73,28 @@ static const char * const power_supply_technology_text[] = {
 	"LiMn"
 };
 
+/* BSP.Charger - 2020.12.16 - add battery vendor info - start */
+static const char * const power_supply_battery_type_text[] = {
+	"COSMX_68K", "NVT_330K", "Unuse", "Unknown"
+};
+/* BSP.Charger - 2020.12.16 - add battery vendor info - end */
+
 static const char * const power_supply_capacity_level_text[] = {
 	"Unknown", "Critical", "Low", "Normal", "High", "Full"
 };
 
 static const char * const power_supply_scope_text[] = {
 	"Unknown", "System", "Device"
+};
+
+/* BSP.Charge - 2021.03.02 - Add node to show typec_mode start */
+static const char * const typec_text[] = {
+		"Nothing attached", "Sink attached", "Powered cable w/ sink",
+		"Debug Accessory", "Audio Adapter", "Powered cable w/o sink",
+		"Source attached (default current)",
+		"Source attached (medium current)",
+		"Source attached (high current)",
+		"Non compliant",
 };
 
 static ssize_t power_supply_show_property(struct device *dev,
@@ -113,9 +137,20 @@ static ssize_t power_supply_show_property(struct device *dev,
 	else if (off == POWER_SUPPLY_PROP_CAPACITY_LEVEL)
 		return sprintf(buf, "%s\n",
 			       power_supply_capacity_level_text[value.intval]);
-	else if (off == POWER_SUPPLY_PROP_TYPE)
+	/* BSP.Charge - 2020.11.09 - Add battery node - start */
+	else if (off == POWER_SUPPLY_PROP_TYPE ||
+				off == POWER_SUPPLY_PROP_REAL_TYPE)
 		return sprintf(buf, "%s\n",
 			       power_supply_type_text[value.intval]);
+	else if (off == POWER_SUPPLY_PROP_BATTERY_VENDOR)
+		return sprintf(buf, "%s\n",
+				power_supply_battery_type_text[value.intval]);
+	/* BSP.Charge - 2021.03.02 - Add node to show typec_mode start */
+	else if (off == POWER_SUPPLY_PROP_TYPEC_MODE)
+		return scnprintf(buf, PAGE_SIZE, "%s\n",
+					typec_text[value.intval]);
+	/* BSP.Charge - 2021.03.02 - Add node to show typec_mode end */
+	/* BSP.Charge - 2020.11.09 - Add battery node - end */
 	else if (off == POWER_SUPPLY_PROP_SCOPE)
 		return sprintf(buf, "%s\n",
 			       power_supply_scope_text[value.intval]);
@@ -249,6 +284,15 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(precharge_current),
 	POWER_SUPPLY_ATTR(charge_term_current),
 	POWER_SUPPLY_ATTR(calibrate),
+	/* BSP.Charge - 2020.11.09 - Add custorm node - start */
+	POWER_SUPPLY_ATTR(battery_id_voltage),
+	POWER_SUPPLY_ATTR(battery_id),
+	POWER_SUPPLY_ATTR(input_suspend),
+	/* BSP.Charge - 2020.11.09 - Add custorm node - end */
+	/* BSP.Charge - 2020.12.01 - Add bms */
+	POWER_SUPPLY_ATTR(resistance),
+	/* BSP.Charge - 2020.11.11 - Add node to show typec_cc_orientation */
+	POWER_SUPPLY_ATTR(typec_cc_orientation),
 	/* Local extensions */
 	POWER_SUPPLY_ATTR(usb_hc),
 	POWER_SUPPLY_ATTR(usb_otg),
@@ -259,6 +303,12 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(model_name),
 	POWER_SUPPLY_ATTR(manufacturer),
 	POWER_SUPPLY_ATTR(serial_number),
+	/* BSP.Charge - 2020.11.09 - Add custorm node - start */
+	POWER_SUPPLY_ATTR(real_type),
+	POWER_SUPPLY_ATTR(battery_vendor),
+	/* BSP.Charge - 2020.11.09 - Add custorm node - end */
+	/* BSP.Charge - 2021.03.02 - Add node to show typec_mode */
+	POWER_SUPPLY_ATTR(typec_mode),
 };
 
 static struct attribute *

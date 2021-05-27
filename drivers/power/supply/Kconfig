@@ -8,6 +8,14 @@ menuconfig POWER_SUPPLY
 
 if POWER_SUPPLY
 
+# BSP.Charge - 2020.11.14 - enable 18W charging start
+config MTK_SOFT_HVDCP_2
+	bool "mtk_soft_hvdcp_2"
+	default n
+	help
+	  Select if you want to enable 18W charging.
+# BSP.Charge - 2020.11.14 - enable 18W charging end
+
 config POWER_SUPPLY_DEBUG
 	bool "Power supply debug"
 	help
@@ -609,5 +617,16 @@ config CHARGER_RT9455
 	select REGMAP_I2C
 	help
 	  Say Y to enable support for Richtek RT9455 battery charger.
+
+config CUSTOM_BATTERY_EXTERNAL_CHANNEL
+	bool "customer external gauge test"
+	help
+	  This config is for internal testing only.
+	  If not required, select n
+	  Say Y to enable support for Customer external gauge.
+	  if unsure ,choose n.
+
+source "drivers/power/supply/mediatek/battery/Kconfig"
+source "drivers/power/supply/mediatek/charger/Kconfig"
 
 endif # POWER_SUPPLY
