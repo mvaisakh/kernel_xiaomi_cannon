@@ -79,6 +79,8 @@ source "drivers/hwmon/Kconfig"
 
 source "drivers/thermal/Kconfig"
 
+source "drivers/trusty/Kconfig"
+
 source "drivers/watchdog/Kconfig"
 
 source "drivers/ssb/Kconfig"
@@ -212,5 +214,9 @@ source "drivers/fsi/Kconfig"
 source "drivers/tee/Kconfig"
 
 source "drivers/mux/Kconfig"
+
+# BSP.audio - 2020.11.09 - modify to add headphone node start
+source "drivers/switch/Kconfig"
+# BSP.audio - 2020.11.09 - modify to add headphone node end
 
 endmenu
