@@ -648,13 +648,12 @@ int mt_ppm_main(void)
 	list_for_each_entry(pos, &ppm_main_info.policy_list, link) {
 		if ((pos->is_activated)
 			&& pos->update_limit_cb) {
-			int idx;
 
 			ppm_lock(&pos->lock);
 			policy_mask |= 1 << pos->policy;
 			pos->update_limit_cb();
 			pos->is_limit_updated = true;
-
+#ifdef CONFIG_MTK_LPM_DBG_COMMON
 			for (idx = 0; idx < pos->req.cluster_num; idx++) {
 				trace_ppm_user_setting(
 					pos->policy,
@@ -663,7 +662,7 @@ int mt_ppm_main(void)
 					pos->req.limit[idx].max_cpufreq_idx
 				);
 			}
-
+#endif /* CONFIG_MTK_LPM_DBG_COMMON */
 			ppm_unlock(&pos->lock);
 		}
 	}

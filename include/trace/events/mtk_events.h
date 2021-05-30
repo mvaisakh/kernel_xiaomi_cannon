@@ -146,6 +146,7 @@ TRACE_EVENT(ppm_update,
 		__entry->root, __get_str(limits))
 );
 
+#ifdef CONFIG_MTK_LPM_DBG_COMMON
 TRACE_EVENT(ppm_user_setting,
 
 		TP_PROTO(unsigned int policy_mask,
@@ -173,6 +174,7 @@ TRACE_EVENT(ppm_user_setting,
 				__entry->mask, __entry->cid,
 				__entry->min_idx, __entry->max_idx)
 );
+#endif
 
 TRACE_EVENT(ppm_hica,
 
@@ -591,6 +593,7 @@ TRACE_EVENT(perf_index_s,
 
 #endif /* _TRACE_MTK_EVENTS_H */
 
+#ifdef CONFIG_MTK_LPM_DBG_COMMON
 TRACE_EVENT(swpm_power,
 
 	TP_PROTO(char *power),
@@ -607,6 +610,7 @@ TRACE_EVENT(swpm_power,
 
 	TP_printk("%s", __get_str(power_str))
 );
+#endif /* CONFIG_MTK_LPM_DBG_COMMON */
 
 /* This part must be outside protection */
 #include <trace/define_trace.h>

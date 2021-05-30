@@ -809,8 +809,10 @@ static void swpm_log_loop(unsigned long data)
 		/* put power index data to ftrace */
 		trace_swpm_power_idx(idx_buf);
 	}
+#ifdef CONFIG_MTK_LPM_DBG_COMMON
 	/* put power data to ftrace */
 	trace_swpm_power(buf);
+#endif
 
 #ifdef LOG_LOOP_TIME_PROFILE
 	t2 = ktime_get();
