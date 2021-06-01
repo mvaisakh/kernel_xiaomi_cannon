@@ -7,7 +7,7 @@ steps:
   - name: Kernel Pipeline
     image: ubuntu:focal
     commands: 
-      - apt update && apt -y install bc libssl-dev python2 build-essential make git python curl wget zip
+      - apt update && apt -y install bc libssl-dev python2 build-essential make git python curl wget zip flex bison
       - "export token=$TOKEN"
       - "bash cannon-build.sh"
     environment: 
