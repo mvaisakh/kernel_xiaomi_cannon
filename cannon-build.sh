@@ -193,7 +193,7 @@ DATE=$(TZ=Asia/Kolkata date +"%Y%m%d-%s")
 	git clone --depth 1 --no-single-branch https://github.com/"$AUTHOR"/AnyKernel3.git
 	msg "|| Cloning libufdt ||"
 	git submodule init
-	gti submodule update
+	git submodule update
 }
 
 ##------------------------------------------------------##
