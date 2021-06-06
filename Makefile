@@ -847,6 +847,9 @@ ifdef CONFIG_LTO
 lto-flags	:= $(lto-clang-flags)
 KBUILD_CFLAGS	+= $(lto-flags)
 
+# Limit inlining across translation units to reduce binary size
+KBUILD_LDFLAGS += -mllvm -import-instr-limit=5
+
 DISABLE_LTO	:= $(DISABLE_LTO_CLANG)
 export DISABLE_LTO
 
