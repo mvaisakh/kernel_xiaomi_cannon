@@ -1722,11 +1722,12 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi,
 		/* add for ESD recovery */
 		if (mtk_dsi_is_cmd_mode(&dsi->ddp_comp) && mode_id != 0) {
 			if (dsi->ext && dsi->ext->funcs &&
-				dsi->ext->funcs->mode_switch)
+				dsi->ext->funcs->mode_switch) {
 				DDPMSG("%s do lcm mode_switch to %u\n",
 					__func__, mode_id);
-				dsi->ext->funcs->mode_switch(dsi->panel, 0,
-					mode_id, AFTER_DSI_POWERON);
+			}
+			dsi->ext->funcs->mode_switch(dsi->panel, 0,
+				mode_id, AFTER_DSI_POWERON);
 		}
 
 		if (new_doze_state && !dsi->doze_enabled) {
