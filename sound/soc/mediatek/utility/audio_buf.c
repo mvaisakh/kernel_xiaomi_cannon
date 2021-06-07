@@ -3,7 +3,7 @@
 // Copyright (C) 2018 MediaTek Inc.
 
 /* linux include path*/
-#if defined(__linux__)
+#if defined(__linux__) || defined(__KERNEL__)
 #include <linux/uaccess.h>
 #include <sound/pcm.h>
 #include <sound/core.h>
@@ -91,7 +91,7 @@ unsigned int RingBuf_getFreeSpace(const struct RingBuf *RingBuf1)
 
 void dump_ring_bufinfo(struct RingBuf *buf)
 {
-#if defined(__linux__)
+#if defined(__linux__) || defined(__KERNEL__)
 	pr_info(
 		"pBufBase = %p pBufEnd = %p  pread = %p p write = %p DataCount = %u freespace = %u\n",
 		buf->pBufBase, buf->pBufEnd, buf->pRead, buf->pWrite,
@@ -108,7 +108,7 @@ void dump_rbuf(struct RingBuf *ring_buffer)
 {
 	if (ring_buffer == NULL)
 		return;
-#if defined(__linux__)
+#if defined(__linux__) || defined(__KERNEL__)
 	pr_info("%s Base[%p] End[%p] R[%p] w[%p] Len[%d] count[%d]\n",
 		__func__,
 		ring_buffer->pBufBase,
@@ -133,7 +133,7 @@ void dump_rbuf_s(const char *appendingstring, struct RingBuf *ring_buffer)
 {
 	if (ring_buffer == NULL)
 		return;
-#if defined(__linux__)
+#if defined(__linux__) || defined(__KERNEL__)
 	pr_info("%s %s Base[%p] End[%p] R[%p] w[%p] Len[%d] count[%d]\n",
 		appendingstring, __func__,
 		ring_buffer->pBufBase,
@@ -185,7 +185,7 @@ void Ringbuf_Check(struct RingBuf *RingBuf1)
 		if (RingBuf1->datacount != 0 && RingBuf1->datacount
 		    != RingBuf1->bufLen) {
 			dump_ring_bufinfo(RingBuf1);
-#if defined(__linux__)
+#if defined(__linux__) || defined(__KERNEL__)
 			dump_stack();
 #endif
 			AUD_ASSERT(0);
@@ -196,7 +196,7 @@ void Ringbuf_Check(struct RingBuf *RingBuf1)
 		if ((RingBuf1->pWrite - RingBuf1->pRead)
 		     != RingBuf1->datacount) {
 			dump_ring_bufinfo(RingBuf1);
-#if defined(__linux__)
+#if defined(__linux__) || defined(__KERNEL__)
 			dump_stack();
 #endif
 			AUD_ASSERT(0);
@@ -207,7 +207,7 @@ void Ringbuf_Check(struct RingBuf *RingBuf1)
 		if ((RingBuf1->bufLen - (RingBuf1->pRead - RingBuf1->pWrite))
 		     != RingBuf1->datacount) {
 			dump_ring_bufinfo(RingBuf1);
-#if defined(__linux__)
+#if defined(__linux__) || defined(__KERNEL__)
 			dump_stack();
 #endif
 			AUD_ASSERT(0);
@@ -217,7 +217,7 @@ void Ringbuf_Check(struct RingBuf *RingBuf1)
 	if (RingBuf1->pWrite < RingBuf1->pBufBase ||
 	    RingBuf1->pWrite > RingBuf1->pBufEnd) {
 		dump_rbuf(RingBuf1);
-#if defined(__linux__)
+#if defined(__linux__) || defined(__KERNEL__)
 		dump_stack();
 #endif
 		AUD_ASSERT(0);
@@ -225,14 +225,14 @@ void Ringbuf_Check(struct RingBuf *RingBuf1)
 	if (RingBuf1->pRead < RingBuf1->pBufBase ||
 	    RingBuf1->pRead > RingBuf1->pBufEnd) {
 		dump_rbuf(RingBuf1);
-#if defined(__linux__)
+#if defined(__linux__) || defined(__KERNEL__)
 		dump_stack();
 #endif
 		AUD_ASSERT(0);
 	}
 	if (RingBuf1->datacount < 0) {
 		dump_ring_bufinfo(RingBuf1);
-#if defined(__linux__)
+#if defined(__linux__) || defined(__KERNEL__)
 		dump_stack();
 #endif
 		AUD_ASSERT(0);

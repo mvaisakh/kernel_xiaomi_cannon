@@ -9,7 +9,7 @@
 #ifndef AUDIO_RINGBUF_H
 #define AUDIO_RINGBUF_H
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__KERNEL__)
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <sound/memalloc.h>
@@ -201,7 +201,7 @@ void dump_audio_hwbuffer(struct audio_hw_buffer *audio_hwbuf);
 void dump_audio_dsp_dram(struct audio_dsp_dram *dsp_dram);
 
 /* linux OS API related */
-#if defined(__linux__)
+#if defined(__linux__) || defined(__KERNEL__)
 
 struct snd_pcm_substream;
 struct snd_pcm_hw_params;
