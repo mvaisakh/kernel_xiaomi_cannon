@@ -3305,7 +3305,9 @@ uint32_t wlanSetChipEcoInfo(IN struct ADAPTER *prAdapter)
 {
 	uint32_t hw_version = 0, sw_version = 0;
 	struct mt66xx_chip_info *prChipInfo = prAdapter->chip_info;
+#ifdef DEBUG
 	uint32_t chip_id = prChipInfo->chip_id;
+#endif
 	/* WLAN_STATUS status; */
 	uint32_t u4Status = WLAN_STATUS_SUCCESS;
 
@@ -9807,7 +9809,7 @@ wlanPktTxDone(IN struct ADAPTER *prAdapter,
 {
 	OS_SYSTIME rCurrent = kalGetTimeTick();
 	struct PKT_PROFILE *prPktProfile = &prMsduInfo->rPktProfile;
-
+#ifdef DEBUG
 	uint8_t *apucPktType[ENUM_PKT_FLAG_NUM] = {
 		(uint8_t *) DISP_STRING("INVALID"),
 		(uint8_t *) DISP_STRING("802_3"),
@@ -9821,6 +9823,7 @@ wlanPktTxDone(IN struct ADAPTER *prAdapter,
 		(uint8_t *) DISP_STRING("TDLS"),
 		(uint8_t *) DISP_STRING("DNS")
 	};
+#endif
 	if (prMsduInfo->ucPktType >= ENUM_PKT_FLAG_NUM)
 		prMsduInfo->ucPktType = 0;
 

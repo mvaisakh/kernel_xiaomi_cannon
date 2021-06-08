@@ -3290,9 +3290,10 @@ void nicTxProcessTxDoneEvent(IN struct ADAPTER *prAdapter,
 		if (prTxDone->ucFlag & BIT(TXS_IS_EXIST)) {
 			uint8_t ucNss, ucStbc;
 			int8_t icTxPwr;
+#ifdef DEBUG
 			uint32_t *pu4RawTxs =
 				(uint32_t *)&prTxDone->aucRawTxS[0];
-
+#endif
 			ucNss = (prTxDone->u2TxRate & TX_DESC_NSTS_MASK) >>
 				TX_DESC_NSTS_OFFSET;
 			ucNss += 1;
