@@ -180,8 +180,8 @@ DATE=$(TZ=Asia/Kolkata date +"%Y%m%d-%s")
 		msg "|| Downloading Clang-9 ||"
 		mkdir clang-llvm
 		mkdir gcc-aosp
-		wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/tags/android-11.0.0_r37/clang-r353983c1.tar.gz
-		tar -C clang-llvm/ -zxvf clang-r353983c1.tar.gz
+		wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r416183b.tar.gz
+		tar -C clang-llvm/ -zxvf clang-r416183b.tar.gz
 		# Toolchain Directory defaults to clang-llvm
 		TC_DIR=$KERNEL_DIR/clang-llvm/
 		wget https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-11.0.0_r35.tar.gz
