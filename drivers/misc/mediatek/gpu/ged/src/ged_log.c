@@ -1043,11 +1043,13 @@ void ged_log_perf_trace_counter(char *name, long long count, int pid,
 {
 	if (ged_log_perf_trace_enable) {
 		__mt_update_tracing_mark_write_addr();
+#ifdef ENABLE_GED_SYSTRACE_UTIL
 		preempt_disable();
 		event_trace_printk(tracing_mark_write_addr,
 			"C|%d|%s|%lld|%llu|%lu\n", pid,
 			name, count, (unsigned long long)BQID, frameID);
 		preempt_enable();
+#endif
 	}
 }
 EXPORT_SYMBOL(ged_log_perf_trace_counter);
