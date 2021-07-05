@@ -36,10 +36,12 @@ unsigned long mtk_drm_get_tracing_mark(void)
 
 static void drm_print_trace(const char *tag, int value)
 {
+#ifdef CONFIG_TRACING
 	preempt_disable();
 	event_trace_printk(mtk_drm_get_tracing_mark(), "C|%d|%s|%d\n",
 		DRM_TRACE_ID, tag, value);
 	preempt_enable();
+#endif
 }
 
 void drm_trace_tag_start(const char *tag)
@@ -54,12 +56,14 @@ void drm_trace_tag_end(const char *tag)
 
 void drm_trace_tag_mark(const char *tag)
 {
+#ifdef CONFIG_TRACING
 	preempt_disable();
 	event_trace_printk(mtk_drm_get_tracing_mark(), "C|%d|%s|%d\n",
 		DRM_TRACE_ID, tag, 1);
 	event_trace_printk(mtk_drm_get_tracing_mark(), "C|%d|%s|%d\n",
 		DRM_TRACE_ID, tag, 0);
 	preempt_enable();
+#endif
 }
 
 void mtk_drm_refresh_tag_start(struct mtk_ddp_comp *ddp_comp)
@@ -95,10 +99,12 @@ void mtk_drm_refresh_tag_start(struct mtk_ddp_comp *ddp_comp)
 	if (b_layer_changed) {
 		sprintf(tag_name,
 			crtc_idx ? "ExtDispRefresh" : "PrimDispRefresh");
+#ifdef CONFIG_TRACING
 		preempt_disable();
 		event_trace_printk(mtk_drm_get_tracing_mark(), "C|%d|%s|%d\n",
 				   DRM_TRACE_FPS_ID, tag_name, 1);
 		preempt_enable();
+#endif
 	}
 }
 
@@ -118,10 +124,12 @@ void mtk_drm_refresh_tag_end(struct mtk_ddp_comp *ddp_comp)
 
 	crtc_idx = drm_crtc_index(&mtk_crtc->base);
 	sprintf(tag_name, crtc_idx ? "ExtDispRefresh" : "PrimDispRefresh");
+#ifdef CONFIG_TRACING
 	preempt_disable();
 	event_trace_printk(mtk_drm_get_tracing_mark(), "C|%d|%s|%d\n",
 				DRM_TRACE_FPS_ID, tag_name, 0);
 	preempt_enable();
+#endif
 }
 
 #ifdef DRM_MMPATH
