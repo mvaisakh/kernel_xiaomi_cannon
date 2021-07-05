@@ -59,7 +59,7 @@
 #include <net/rtnetlink.h>
 #include <net/net_namespace.h>
 
-/* #ifdef CONFIG_MTK_NET_LOGGING */
+#ifdef CONFIG_MTK_NET_LOGGING
 #include <linux/stacktrace.h>
 #define RTNL_DEBUG_ADDRS_COUNT 10
 #define RTNL_LOCK_MAX_HOLD_TIME 4
@@ -146,7 +146,7 @@ void rtnl_relase_btrace(void)
 	rtnl_instance.count = 0;
 }
 
-/*#endif*/
+#endif
 
 struct rtnl_link {
 	rtnl_doit_func		doit;
@@ -161,9 +161,9 @@ void rtnl_lock(void)
 {
 	mutex_lock(&rtnl_mutex);
 	rtnl_mutex_ts = sched_clock();
-/* #ifdef CONFIG_MTK_NET_LOGGING */
+#ifdef CONFIG_MTK_NET_LOGGING
 	rtnl_get_btrace(current);
-/* #endif */
+#endif
 }
 EXPORT_SYMBOL(rtnl_lock);
 
@@ -184,12 +184,13 @@ void __rtnl_unlock(void)
 	defer_kfree_skb_list = NULL;
 
 	rtnl_mutex_te = sched_clock();
+#ifdef CONFIG_MTK_NET_LOGGING
 	if (rtnl_mutex_te - rtnl_mutex_ts > 4000000000)
 		pr_info("[mtk_net][rtnl_unlock] rtnl_lock is held by [%d] from [%llu] to [%llu]\n",
 			rtnl_instance.pid,
 			rtnl_mutex_ts, rtnl_mutex_te);
-
 	mod_timer(&rtnl_chk_timer, 0);
+#endif
 	mutex_unlock(&rtnl_mutex);
 
 	while (head) {
@@ -199,9 +200,9 @@ void __rtnl_unlock(void)
 		cond_resched();
 		head = next;
 	}
-/* #ifdef CONFIG_MTK_NET_LOGGING */
+#ifdef CONFIG_MTK_NET_LOGGING
 	rtnl_relase_btrace();
-/* #endif */
+#endif
 }
 
 void rtnl_unlock(void)
