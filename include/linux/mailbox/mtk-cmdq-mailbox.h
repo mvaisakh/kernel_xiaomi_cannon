@@ -172,7 +172,7 @@ extern int mtk_cmdq_log;
 #define cmdq_log(fmt, args...) \
 do { \
 	if (mtk_cmdq_log) \
-		pr_notice("[cmdq] "fmt" @%s,%u\n", \
+		pr_debug("[cmdq] "fmt" @%s,%u\n", \
 		##args, __func__, __LINE__); \
 } while (0)
 
@@ -180,13 +180,13 @@ do { \
 /* MTK only functions */
 
 #define cmdq_msg(fmt, args...) \
-	pr_notice("[cmdq] "fmt"\n", ##args)
+	pr_warn("[cmdq] "fmt"\n", ##args)
 
 #define cmdq_err(fmt, args...) \
-	pr_notice("[cmdq][err] "fmt" @%s,%u\n", ##args, __func__, __LINE__)
+	pr_err("[cmdq][err] "fmt" @%s,%u\n", ##args, __func__, __LINE__)
 
 #define cmdq_dump(fmt, args...) \
-	pr_notice("[cmdq][err] "fmt"\n", ##args)
+	pr_err("[cmdq][err] "fmt"\n", ##args)
 
 /* CMDQ FTRACE */
 #ifdef CONFIG_TRACING
