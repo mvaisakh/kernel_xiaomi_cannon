@@ -23,6 +23,7 @@
 
 
 /* MTK_DRM FTRACE */
+#ifdef CONFIG_TRACING
 extern bool g_trace_log;
 #define mtk_drm_trace_begin(fmt, args...) do { \
 	if (g_trace_log) { \
@@ -49,6 +50,19 @@ extern bool g_trace_log;
 		preempt_enable();\
 	} \
 } while (0)
+#else
+static inline void mtk_drm_trace_begin(const char *fmt, ...)
+{
+}
+
+static inline void mtk_drm_trace_end()
+{
+}
+
+static inline void mtk_drm_trace_c(const char *fmt, ...)
+{
+}
+#endif
 
 unsigned long mtk_drm_get_tracing_mark(void);
 void drm_trace_tag_start(const char *tag);
