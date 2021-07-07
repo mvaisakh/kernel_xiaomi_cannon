@@ -13,10 +13,8 @@
 
 #include <linux/uaccess.h>
 #include "mtk_perfmgr_internal.h"
-#ifdef CONFIG_TRACING
 #include <linux/kallsyms.h>
 #include <linux/trace_events.h>
-#endif
 
 char *perfmgr_copy_from_user_for_proc(const char __user *buffer,
 		size_t count)
