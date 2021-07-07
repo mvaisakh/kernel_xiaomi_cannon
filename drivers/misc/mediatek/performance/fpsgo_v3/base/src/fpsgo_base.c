@@ -81,6 +81,7 @@ unsigned long long fpsgo_get_time(void)
 	return temp;
 }
 
+#ifdef CONFIG_DEBUG_FS
 uint32_t fpsgo_systrace_mask;
 struct dentry *fpsgo_debugfs_dir;
 
@@ -106,9 +107,11 @@ static const struct file_operations fpsgo_##name##_fops = { \
 	.llseek = seq_lseek, \
 	.release = single_release, \
 }
+#endif /* CONFIG_DEBUG_FS */
 
 void __fpsgo_systrace_c(pid_t pid, int val, const char *fmt, ...)
 {
+#ifdef CONFIG_TRACING
 	char log[256];
 	va_list args;
 
@@ -120,10 +123,12 @@ void __fpsgo_systrace_c(pid_t pid, int val, const char *fmt, ...)
 	preempt_disable();
 	event_trace_printk(mark_addr, "C|%d|%s|%d\n", pid, log, val);
 	preempt_enable();
+#endif
 }
 
 void __fpsgo_systrace_b(pid_t tgid, const char *fmt, ...)
 {
+#ifdef CONFIG_TRACING
 	char log[256];
 	va_list args;
 
@@ -135,17 +140,21 @@ void __fpsgo_systrace_b(pid_t tgid, const char *fmt, ...)
 	preempt_disable();
 	event_trace_printk(mark_addr, "B|%d|%s\n", tgid, log);
 	preempt_enable();
+#endif
 }
 
 void __fpsgo_systrace_e(void)
 {
+#ifdef CONFIG_TRACING
 	preempt_disable();
 	event_trace_printk(mark_addr, "E\n");
 	preempt_enable();
+#endif
 }
 
 void fpsgo_main_trace(const char *fmt, ...)
 {
+#ifdef CONFIG_TRACING
 	char log[256];
 	va_list args;
 	int len;
@@ -158,6 +167,7 @@ void fpsgo_main_trace(const char *fmt, ...)
 		log[255] = '\0';
 	va_end(args);
 	trace_fpsgo_main_log(log);
+#endif
 }
 EXPORT_SYMBOL(fpsgo_main_trace);
 
@@ -738,6 +748,7 @@ int fpsgo_get_BQid_pair(int pid, int tgid, long long identifier,
 	return 0;
 }
 
+#ifdef CONFIG_DEBUG_FS
 static int fpsgo_systrace_mask_show(struct seq_file *m, void *unused)
 {
 	int i;
@@ -1001,4 +1012,4 @@ int init_fpsgo_common(void)
 
 	return 0;
 }
-
+#endif /* CONFIG_DEBUG_FS */
