@@ -59,6 +59,7 @@ enum GBE_BOOST_DEVICE {
 	GBE_BOOST_NUM,
 };
 
+#ifdef CONFIG_TRACING
 static unsigned long __read_mostly tracing_mark_write_addr;
 static inline void __mt_update_tracing_mark_write_addr(void)
 {
@@ -99,6 +100,15 @@ void gbe_trace_count(int tid, int val, const char *fmt, ...)
 
 	preempt_enable();
 }
+#else
+inline void gbe_trace_printk(int pid, char *module, char *string)
+{
+}
+
+inline void gbe_trace_count(int tid, int val, const char *fmt, ...)
+{
+}
+#endif /* CONFIG_TRACING */
 
 static struct miscdevice gbe_object;
 bool sentuevent(const char *src)
