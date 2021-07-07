@@ -109,6 +109,7 @@
 		}						\
 	} while (0)
 
+#ifdef CONFIG_TRACING
 #define thrm_systrace(mask, pid, val, fmt...) \
 	do { \
 		if (mask) \
@@ -117,6 +118,15 @@
 
 #define thrm_systrace_default(pid, val, fmt...) \
 	thrm_systrace(1, pid, val, EARA_THRM_TAG fmt)
+#else
+static inline void thrm_systrace(const char *mask, pid_t pid, int val, ...)
+{
+}
+
+static inline void thrm_systrace_default(pid_t pid, int val, ...)
+{
+}
+#endif /* CONFIG_TRACING */
 
 #define TIME_MAX(a, b) ((a) >= (b) ? (a) : (b))
 #define DIFF_ABS(a, b) (((a) >= (b)) ? ((a) - (b)) : ((b) - (a)))
@@ -282,6 +292,7 @@ static unsigned long long get_time(void)
 	return temp;
 }
 
+#ifdef CONFIG_TRACING
 static void __systrace(pid_t pid, int val, const char *fmt, ...)
 {
 	char log[256];
@@ -296,6 +307,7 @@ static void __systrace(pid_t pid, int val, const char *fmt, ...)
 	event_trace_printk(mark_addr, "C|%d|%s|%d\n", pid, log, val);
 	preempt_enable();
 }
+#endif
 
 static void thrm_pb_list_clear(void)
 {
