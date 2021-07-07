@@ -24,10 +24,13 @@
 
 #define LOGSIZE 1
 
+#ifdef CONFIG_TRACING
 static unsigned long __read_mostly mark_addr;
+#endif
 
 void __rs_systrace_c(pid_t pid, int val, const char *fmt, ...)
 {
+#ifdef CONFIG_TRACING
 	char log[LOGSIZE];
 	va_list args;
 
@@ -41,10 +44,12 @@ void __rs_systrace_c(pid_t pid, int val, const char *fmt, ...)
 	preempt_disable();
 	event_trace_printk(mark_addr, "C|%d|%s|%d\n", pid, log, val);
 	preempt_enable();
+#endif
 }
 
 void __rs_systrace_c_uint64(pid_t pid, uint64_t val, const char *fmt, ...)
 {
+#ifdef CONFIG_TRACING
 	char log[LOGSIZE];
 	va_list args;
 
@@ -58,10 +63,12 @@ void __rs_systrace_c_uint64(pid_t pid, uint64_t val, const char *fmt, ...)
 	preempt_disable();
 	event_trace_printk(mark_addr, "C|%d|%s|%llu\n", pid, log, val);
 	preempt_enable();
+#endif
 }
 
 void __rs_systrace_b(pid_t tgid, const char *fmt, ...)
 {
+#ifdef CONFIG_TRACING
 	char log[LOGSIZE];
 	va_list args;
 
@@ -75,22 +82,26 @@ void __rs_systrace_b(pid_t tgid, const char *fmt, ...)
 	preempt_disable();
 	event_trace_printk(mark_addr, "B|%d|%s\n", tgid, log);
 	preempt_enable();
+#endif
 }
 
 void __rs_systrace_e(void)
 {
+#ifdef CONFIG_TRACING
 	if (unlikely(!mark_addr))
 		return;
 
 	preempt_disable();
 	event_trace_printk(mark_addr, "E\n");
 	preempt_enable();
+#endif
 }
 
 int rs_init_trace(struct dentry *rs_debugfs_dir)
 {
+#ifdef CONFIG_DEBUG_FS
 	mark_addr = kallsyms_lookup_name("tracing_mark_write");
-
+#endif
 	return 0;
 }
 
