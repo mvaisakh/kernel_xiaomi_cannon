@@ -22,7 +22,7 @@
 
 #include "rs_trace.h"
 
-#define LOGSIZE 32
+#define LOGSIZE 1
 
 static unsigned long __read_mostly mark_addr;
 
