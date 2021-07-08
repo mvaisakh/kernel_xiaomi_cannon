@@ -50,7 +50,9 @@
 
 static struct rb_root ui_pid_tree;
 static struct rb_root connect_api_tree;
+#ifdef CONFIG_DEBUG_FS
 static struct dentry *fpsgo_com_debugfs_dir;
+#endif
 
 static inline int fpsgo_com_check_is_surfaceflinger(int pid)
 {
@@ -797,7 +799,7 @@ int __init fpsgo_composer_init(void)
 {
 	ui_pid_tree = RB_ROOT;
 	connect_api_tree = RB_ROOT;
-
+#ifdef CONFIG_DEBUG_FS
 	if (fpsgo_debugfs_dir) {
 		fpsgo_com_debugfs_dir =
 			debugfs_create_dir("composer", fpsgo_debugfs_dir);
@@ -810,7 +812,7 @@ int __init fpsgo_composer_init(void)
 					&fspgo_com_connect_api_info_fops);
 		}
 	}
-
+#endif
 	return 0;
 }
 

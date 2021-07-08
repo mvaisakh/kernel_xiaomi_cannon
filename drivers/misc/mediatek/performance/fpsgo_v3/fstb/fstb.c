@@ -79,7 +79,9 @@ static HLIST_HEAD(fstb_fteh_list);
 
 static struct hrtimer hrt;
 static struct workqueue_struct *wq;
+#ifdef CONFIG_DEBUG_FS
 static struct dentry *fstb_debugfs_dir;
+#endif
 
 static struct fps_level fps_levels[MAX_NR_FPS_LEVELS];
 static int nr_fps_levels = MAX_NR_FPS_LEVELS;
@@ -2341,7 +2343,7 @@ int mtk_fstb_init(void)
 	num_cluster = arch_get_nr_clusters();
 
 	ged_kpi_output_gfx_info2_fp = gpu_time_update;
-
+#ifdef CONFIG_DEBUG_FS
 	/* create debugfs file */
 	if (!fpsgo_debugfs_dir)
 		goto err;
@@ -2426,7 +2428,7 @@ int mtk_fstb_init(void)
 			fstb_debugfs_dir,
 			NULL,
 			&fstb_jump_check_num_fops);
-
+#endif
 	reset_fps_level();
 
 	wq = create_singlethread_workqueue("mt_fstb");
@@ -2449,8 +2451,9 @@ int __exit mtk_fstb_exit(void)
 	mtk_fstb_dprintk("exit\n");
 
 	disable_fstb_timer();
-
+#ifdef CONFIG_DEBUG_FS
 	/* remove the debugfs file */
 	debugfs_remove_recursive(fstb_debugfs_dir);
+#endif
 	return 0;
 }

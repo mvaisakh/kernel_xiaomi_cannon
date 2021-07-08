@@ -73,8 +73,9 @@ static int fps_active;
 static int ai_bench;
 
 static DEFINE_MUTEX(eara_lock);
-
+#ifdef CONFIG_DEBUG_FS
 static struct dentry *eara_debugfs_dir;
+#endif
 static int get_pwr_tbl_done;
 static void get_pwr_tbl(void);
 #define NR_FREQ_CPU 16
@@ -1389,7 +1390,7 @@ static const struct file_operations eara_pwr_tbl_fops = {
 
 static int __init init_eara_job(void)
 {
-
+#ifdef CONFIG_DEBUG_FS
 	if (!fpsgo_debugfs_dir)
 		goto err;
 
@@ -1416,11 +1417,12 @@ static int __init init_eara_job(void)
 			eara_debugfs_dir,
 			NULL,
 			&eara_ai_bench_fops);
-
+#endif
 	return 0;
-
+#ifdef CONFIG_DEBUG_FS
 err:
 	return -1;
+#endif
 }
 
 late_initcall(init_eara_job);

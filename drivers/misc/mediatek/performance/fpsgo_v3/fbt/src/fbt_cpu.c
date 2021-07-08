@@ -122,7 +122,9 @@ enum FPSGO_LLF_CPU_POLICY {
 	FPSGO_LLF_CPU_NONE = 2,
 };
 
+#ifdef CONFIG_DEBUG_FS
 static struct dentry *fbt_debugfs_dir;
+#endif
 
 static int bhr;
 static int bhr_opp;
@@ -3257,7 +3259,7 @@ int __init fbt_cpu_init(void)
 		kcalloc(cluster_num, sizeof(int), GFP_KERNEL);
 
 	fbt_update_pwd_tbl();
-
+#ifdef CONFIG_DEBUG_FS
 	if (fpsgo_debugfs_dir) {
 		fbt_debugfs_dir = debugfs_create_dir("fbt", fpsgo_debugfs_dir);
 		if (fbt_debugfs_dir) {
@@ -3323,7 +3325,7 @@ int __init fbt_cpu_init(void)
 					&fbt_llf_task_policy_fops);
 		}
 	}
-
+#endif
 	INIT_LIST_HEAD(&loading_list);
 	INIT_LIST_HEAD(&blc_list);
 

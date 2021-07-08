@@ -51,7 +51,9 @@ FPSFO_DECLARE_SYSTRACE(x, sched_switch)
 static DEFINE_MUTEX(xgf_main_lock);
 static int xgf_enable;
 static int xgf_ko_ready;
+#ifdef CONFIG_DEBUG_FS
 static struct dentry *debugfs_xgf_dir;
+#endif
 static unsigned long long last_check2recycle_ts;
 static atomic_t xgf_atomic_val_0 = ATOMIC_INIT(0);
 static atomic_t xgf_atomic_val_1 = ATOMIC_INIT(0);
@@ -1646,6 +1648,7 @@ FPSGO_DEBUGFS_ENTRY(deplist);
 
 int __init init_xgf(void)
 {
+#ifdef CONFIG_DEBUG_FS
 	if (!fpsgo_debugfs_dir)
 		return -ENODEV;
 
@@ -1659,6 +1662,6 @@ int __init init_xgf(void)
 			    debugfs_xgf_dir,
 			    NULL,
 			    &fpsgo_deplist_fops);
-
+#endif
 	return 0;
 }

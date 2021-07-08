@@ -49,7 +49,9 @@ static int __cooldn_order;
 static int __thrs_heavy;
 
 static DEFINE_MUTEX(minitop_mlock);
+#ifdef CONFIG_DEBUG_FS
 static struct dentry *debugfs_minitop_dir;
+#endif
 static unsigned int minitop_life;
 
 static int nr_cpus __read_mostly;
@@ -1002,7 +1004,7 @@ void __exit minitop_exit(void)
 int __init minitop_init(void)
 {
 	int i;
-
+#ifdef CONFIG_DEBUG_FS
 	if (!fpsgo_debugfs_dir)
 		return -ENODEV;
 
@@ -1010,7 +1012,7 @@ int __init minitop_init(void)
 						 fpsgo_debugfs_dir);
 	if (!debugfs_minitop_dir)
 		return -ENODEV;
-
+#endif
 	/* Configurable */
 	__minitop_n    = 3;
 	__warmup_order = 3;
@@ -1027,7 +1029,7 @@ int __init minitop_init(void)
 		list_add_tail(&mwa[i].link, &minitop_mws);
 	}
 
-
+#ifdef CONFIG_DEBUG_FS
 	debugfs_create_file("list",
 			    0664,
 			    debugfs_minitop_dir,
@@ -1064,7 +1066,7 @@ int __init minitop_init(void)
 			    debugfs_minitop_dir,
 			    NULL,
 			    &minitop_enable_fops);
-
+#endif
 	/* once everything is ready, hook into scheduler */
 #ifdef CONFIG_MTK_SCHED_RQAVG_KS
 	fpsgo_sched_nominate_fp = fpsgo_sched_nominate;
