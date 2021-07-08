@@ -37,6 +37,7 @@
 #include "xgf.h"
 #include "fpsgo_base.h"
 
+#ifdef CONFIG_TRACING
 FPSFO_DECLARE_SYSTRACE(x, irq_handler_entry)
 FPSFO_DECLARE_SYSTRACE(x, irq_handler_exit)
 FPSFO_DECLARE_SYSTRACE(x, softirq_entry)
@@ -47,6 +48,7 @@ FPSFO_DECLARE_SYSTRACE(x, ipi_exit)
 FPSFO_DECLARE_SYSTRACE(x, sched_wakeup)
 FPSFO_DECLARE_SYSTRACE(x, sched_wakeup_new)
 FPSFO_DECLARE_SYSTRACE(x, sched_switch)
+#endif
 
 static DEFINE_MUTEX(xgf_main_lock);
 static int xgf_enable;
@@ -106,6 +108,7 @@ EXPORT_SYMBOL(xgf_lockprove);
 
 void xgf_trace(const char *fmt, ...)
 {
+#ifdef CONFIG_TRACING
 	char log[256];
 	va_list args;
 	int len;
@@ -118,6 +121,7 @@ void xgf_trace(const char *fmt, ...)
 		log[255] = '\0';
 	va_end(args);
 	trace_xgf_log(log);
+#endif
 }
 EXPORT_SYMBOL(xgf_trace);
 
@@ -1343,6 +1347,7 @@ static char *xgf_strcat(char *dest, const char *src,
 
 static void xgf_log_trace(const char *fmt, ...)
 {
+#ifdef CONFIG_TRACING
 	char log[1024];
 	va_list args;
 	int len;
@@ -1354,6 +1359,7 @@ static void xgf_log_trace(const char *fmt, ...)
 		log[1023] = '\0';
 	va_end(args);
 	trace_xgf_log(log);
+#endif
 }
 
 static void xgf_print_debug_log(int rpid,
