@@ -53,7 +53,7 @@ enum {
 		return tracepoint_probe_unregister( \
 			&__tracepoint_##name, (void *)probe, data); \
 	}
-
+#ifdef CONFIG_DEBUG_FS
 extern uint32_t fpsgo_systrace_mask;
 extern struct dentry *fpsgo_debugfs_dir;
 extern int game_ppid;
@@ -100,6 +100,47 @@ void __fpsgo_systrace_e(void);
 
 #define fpsgo_systrace_c_fbt(pid, val, fmt...) \
 	fpsgo_systrace_c(FPSGO_DEBUG_MANDATORY, pid, val, fmt)
+#else
+static inline void fpsgo_systrace_c(int mask, pid_t pid, int val, ...)
+{
+}
+
+static inline void fpsgo_systrace_b(int mask, int tgid, const char *fmt, ...)
+{
+}
+
+static inline void fpsgo_systrace_e(int mask)
+{
+}
+
+static inline void fpsgo_systrace_c_fbt_gm(pid_t pid, int val, ...)
+{
+}
+
+static inline void fpsgo_systrace_c_fbt_ux(pid_t pid, int val, ...)
+{
+}
+
+static inline void fpsgo_systrace_c_fstb(pid_t pid, int val, ...)
+{
+}
+
+static inline void fpsgo_systrace_c_xgf(pid_t pid, int val, ...)
+{
+}
+
+static inline void fpsgo_systrace_c_ntfr(pid_t pid, int val, ...)
+{
+}
+
+static inline void fpsgo_systrace_c_log(int val, ...)
+{
+}
+
+static inline void fpsgo_systrace_c_fbt(pid_t pid, int val, ...)
+{
+}
+#endif /* CONFIG_DEBUG_FS */
 
 int fpsgo_is_fstb_enable(void);
 int fpsgo_switch_fstb(int enable);
