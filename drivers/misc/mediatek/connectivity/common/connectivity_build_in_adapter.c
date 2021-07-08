@@ -147,7 +147,9 @@ EXPORT_SYMBOL(connectivity_export_show_stack);
 
 void connectivity_export_tracing_record_cmdline(struct task_struct *tsk)
 {
+#ifdef CONFIG_TRACING
 	tracing_record_cmdline(tsk);
+#endif
 }
 EXPORT_SYMBOL(connectivity_export_tracing_record_cmdline);
 
