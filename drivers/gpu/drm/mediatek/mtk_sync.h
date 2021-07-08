@@ -38,6 +38,7 @@ struct fence_data {
 	__s32 fence; /* fd of new fence */
 };
 
+#ifdef CONFIG_DEBUG_FS
 /*
  * sync_timeline, sync_fence API
  */
@@ -56,6 +57,9 @@ extern struct sync_timeline *sync_timeline_create(const char *name);
  * which represents a 32-bit monotonically increasing counter.
  */
 struct sync_timeline *mtk_sync_timeline_create(const char *name);
+#else
+void mtk_sync_timeline_create(const char *name);
+#endif
 
 /**
  * mtk_sync_timeline_destroy() - releases a sync object

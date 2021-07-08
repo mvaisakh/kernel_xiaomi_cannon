@@ -172,6 +172,7 @@ _get_session_sync_info(unsigned int session_id)
 				layer_info->inc = 0;
 				layer_info->cur_idx = 0;
 				layer_info->inited = 1;
+			#ifdef CONFIG_DEBUG_FS
 				layer_info->timeline =
 					mtk_sync_timeline_create(name);
 				if (layer_info->timeline) {
@@ -180,6 +181,7 @@ _get_session_sync_info(unsigned int session_id)
 						name, layer_info->timeline,
 						layer_info);
 				}
+			#endif
 
 				INIT_LIST_HEAD(&layer_info->buf_list);
 			}

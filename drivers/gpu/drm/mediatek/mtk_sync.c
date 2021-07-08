@@ -232,10 +232,17 @@ static void mtk_sync_timeline_signal(struct sync_timeline *obj,
 	spin_unlock_irq(&obj->lock);
 }
 
+#ifdef CONFIG_DEBUG_FS
 struct sync_timeline *mtk_sync_timeline_create(const char *name)
 {
+
 	return sync_timeline_create(name);
 }
+#else
+void mtk_sync_timeline_create(const char *name)
+{
+}
+#endif
 
 void mtk_sync_timeline_destroy(struct sync_timeline *obj)
 {
