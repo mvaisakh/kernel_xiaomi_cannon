@@ -1012,4 +1012,9 @@ int init_fpsgo_common(void)
 
 	return 0;
 }
+#else
+int init_fpsgo_common(void)
+{
+	return 0;
+}
 #endif /* CONFIG_DEBUG_FS */
