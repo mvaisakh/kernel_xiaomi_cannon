@@ -101,7 +101,7 @@ int prepare_regulator(enum DVFS_BUCK buck, struct device *dev)
 #else
 		vvpu_reg_id = regulator_get(dev, "vvpu");
 #endif
-		if (IS_ERR(vvpu_reg_id)) {
+		if (IS_ERR(vvpu_reg_id) | IS_ENABLED(CONFIG_DEBUG_FS)) {
 			ret = PTR_ERR(vvpu_reg_id);
 			LOG_ERR("regulator_get vpu failed, ret: %d\n", ret);
 			return ret;

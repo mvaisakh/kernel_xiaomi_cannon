@@ -36,9 +36,10 @@ enum APUSYS_POWER_PARAM {
 	POWER_PARAM_LOG_LEVEL,
 };
 
-
+#ifdef CONFIG_DEBUG_FS
 void apusys_power_debugfs_init(void);
 void apusys_power_debugfs_exit(void);
+#endif
 void fix_dvfs_debug(void);
 
 #endif

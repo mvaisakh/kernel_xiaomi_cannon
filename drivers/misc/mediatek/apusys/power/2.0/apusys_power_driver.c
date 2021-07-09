@@ -799,8 +799,9 @@ static int apu_power_probe(struct platform_device *pdev)
 	pmic_buck_vproc2_lp(SRCLKEN2, 1, 1, HW_OFF);
 	pmic_ldo_vsram_md_lp(SRCLKEN2, 1, 1, HW_OFF);
 	#endif
-
+#ifdef CONFIG_DEBUG_FS
 	apusys_power_debugfs_init();
+#endif
 	#ifdef APUPWR_TAG_TP
 	apupwr_init_drv_tags();
 	#endif
@@ -872,7 +873,9 @@ static int apu_power_resume(struct platform_device *pdev)
 
 static int apu_power_remove(struct platform_device *pdev)
 {
+#ifdef CONFIG_DEBUG_FS
 	apusys_power_debugfs_exit();
+#endif
 	#ifdef APUPWR_TAG_TP
 	apupwr_exit_drv_tags();
 	#endif

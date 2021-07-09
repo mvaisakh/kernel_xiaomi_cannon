@@ -574,6 +574,7 @@ static const struct file_operations apusys_debug_power_fops = {
 	.write = apusys_debug_power_write,
 };
 
+#ifdef CONFIG_DEBUG_FS
 struct dentry *apusys_power_dir;
 
 void apusys_power_debugfs_init(void)
@@ -603,4 +604,4 @@ void apusys_power_debugfs_exit(void)
 {
 	debugfs_remove(apusys_power_dir);
 }
-
+#endif
