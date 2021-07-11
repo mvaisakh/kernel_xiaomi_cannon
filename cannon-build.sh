@@ -166,6 +166,10 @@ DATE=$(TZ=Asia/Kolkata date +"%Y%m%d-%s")
 
  clone() {
 	echo " "
+	if [ $COMPILER = "host-gcc"]
+	then
+		echo " Using host Cross Compiler, nothing to clone..... "
+	fi
 	if [ $COMPILER = "gcc" ]
 	then
 		msg "|| Cloning GCC 9.3.0 baremetal ||"
@@ -209,6 +213,9 @@ exports() {
 	then
 		KBUILD_COMPILER_STRING=$("$GCC64_DIR"/bin/aarch64-elf-gcc --version | head -n 1)
 		PATH=$GCC64_DIR/bin/:$GCC32_DIR/bin/:/usr/bin:$PATH
+	elif [ $COMPILER = "host-gcc" ]
+	then
+		KBUILD_COMPILE_STRING=$(aarch64-linux-gnu-gcc --version | head -n 1)
 	fi
 
 	BOT_MSG_URL="https://api.telegram.org/bot$token/sendMessage"
@@ -287,7 +294,12 @@ build_kernel() {
 			OBJDUMP=aarch64-elf-objdump \
 			STRIP=aarch64-elf-strip
 		)
-	fi
+	elif
+	then
+		MAKE+=(
+			CROSS_COMPILE_ARM32=arm-none-eabi- \
+			CROSS_COMPILE=aarch64-linux-gnu-
+		)
 	
 	if [ $SILENCE = "1" ]
 	then
