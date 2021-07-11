@@ -68,7 +68,7 @@ DEFCONFIG=cannong_user_defconfig
 
 # Specify compiler. 
 # 'clang' or 'gcc'
-COMPILER=clang
+COMPILER=host-gcc
 
 # Clean source prior building. 1 is NO(default) | 0 is YES
 INCREMENTAL=1
@@ -294,13 +294,14 @@ build_kernel() {
 			OBJDUMP=aarch64-elf-objdump \
 			STRIP=aarch64-elf-strip
 		)
-	elif
+	elif [ $COMPILER = "host-gcc" ]
 	then
 		MAKE+=(
 			CROSS_COMPILE_ARM32=arm-none-eabi- \
 			CROSS_COMPILE=aarch64-linux-gnu-
 		)
-	
+	fi
+
 	if [ $SILENCE = "1" ]
 	then
 		MAKE+=( -s )
