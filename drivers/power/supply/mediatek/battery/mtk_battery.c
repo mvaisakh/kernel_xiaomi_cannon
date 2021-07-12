@@ -389,6 +389,9 @@ static int bms_get_property(struct power_supply *psy,
 
 		val->intval = fgcurrent * 100;
 		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+		val->intval = battery_get_bat_voltage() * 1000;
+		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_OCV:
 		val->intval = battery_get_bat_voltage();
 		break;
@@ -428,6 +431,7 @@ static int bms_get_property(struct power_supply *psy,
 static enum power_supply_property bms_properties[] = {
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_CURRENT_NOW,
+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 	POWER_SUPPLY_PROP_VOLTAGE_OCV,
 	POWER_SUPPLY_PROP_TEMP,
 	POWER_SUPPLY_PROP_RESISTANCE_ID,
