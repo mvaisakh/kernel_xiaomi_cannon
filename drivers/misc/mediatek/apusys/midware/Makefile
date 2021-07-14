@@ -42,7 +42,6 @@ apusys-objs += $(APUSYS_VERSION_MIDWARE)/cmd_parser.o
 apusys-objs += $(APUSYS_VERSION_MIDWARE)/cmd_parser_mdla.o
 apusys-objs += $(APUSYS_VERSION_MIDWARE)/resource_mgt.o
 apusys-objs += $(APUSYS_VERSION_MIDWARE)/scheduler.o
-apusys-objs += $(APUSYS_VERSION_MIDWARE)/apusys_dbg.o
 apusys-objs += $(APUSYS_VERSION_MIDWARE)/memory_mgt.o
 apusys-objs += $(APUSYS_VERSION_MIDWARE)/thread_pool.o
 apusys-objs += $(APUSYS_VERSION_MIDWARE)/memory_ion.o
@@ -50,6 +49,7 @@ apusys-objs += $(APUSYS_VERSION_MIDWARE)/memory_dma.o
 apusys-objs += $(APUSYS_VERSION_MIDWARE)/sched_deadline.o
 apusys-objs += $(APUSYS_VERSION_MIDWARE)/sched_normal.o
 apusys-$(CONFIG_MTK_APUSYS_DEBUG) += $(APUSYS_VERSION_MIDWARE)/mdw_tag.o
+apusys-$(CONFIG_MTK_APUSYS_DEBUG) += $(APUSYS_VERSION_MIDWARE)/apusys_dbg.o
 
 apusys-objs += $(MTK_PLATFORM)/dump_reg.o
 apusys-objs += $(MTK_PLATFORM)/secure_perf.o
