@@ -9,7 +9,9 @@
 #include <linux/printk.h>
 #include <linux/seq_file.h>
 
+#ifdef CONFIG_MTK_APUSYS_DEBUG
 extern u32 g_mdw_klog;
+#endif
 
 enum {
 	MDW_DBG_DRV = 0x01,
@@ -21,7 +23,7 @@ enum {
 };
 
 #define APUSYS_PREFIX "[apusys]"
-
+#ifdef CONFIG_MTK_APUSYS_DEBUG
 static inline
 int mdw_debug_on(int mask)
 {
@@ -55,5 +57,35 @@ int mdw_debug_on(int mask)
 		else \
 			mdw_drv_debug(x, ##args); \
 	}
-
+#else
+static inline void mdw_debug(int mask, const char *x, ...)
+{
+}
+static inline void mdw_drv_err(const char *x, ...)
+{
+}
+static inline void mdw_drv_warn(const char *x, ...)
+{
+}
+static inline void mdw_drv_info(const char *x, ...)
+{
+}
+static inline void mdw_drv_debug(const char *x, ...)
+{
+}
+static inline void mdw_flw_debug(const char *x, ...)
+{
+}
+static inline void mdw_cmd_debug(const char *x, ...)
+{
+}
+static inline void mdw_mem_debug(const char *x, ...)
+{
+}
+static inline void mdw_pef_debug(const char *x, ...)
+{
+}
+static inline void mdw_lne_debug(const char *x, ...)
+{
+}
 #endif
