@@ -143,8 +143,10 @@ static int mem_alloc_ctx(uint8_t tcm_force, uint32_t req_size,
 	return ctx;
 #else
 	if (req_size == 0) {
+#ifdef CONFIG_MTK_APUSYS_DEBUG
 		req_size = dbg_get_prop(DBG_PROP_TCM_DEFAULT);
 		mdw_flw_debug("tcm default request size(0x%x)\n", req_size);
+#endif
 	}
 	return reviser_get_vlm(req_size, tcm_force, ctx, allocated_size);
 #endif

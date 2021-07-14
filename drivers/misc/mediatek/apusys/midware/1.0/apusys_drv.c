@@ -454,10 +454,12 @@ static int apusys_probe(struct platform_device *pdev)
 		ret = -EINVAL;
 		goto mem_init_fail;
 	}
+#ifdef CONFIG_MTK_APUSYS_DEBUG
 	if (apusys_dbg_init()) {
 		ret = -EINVAL;
 		goto dbg_init_fail;
 	}
+#endif
 	if (mdw_tags_init()) {
 		ret = -EINVAL;
 		goto tag_init_fail;
@@ -470,7 +472,9 @@ static int apusys_probe(struct platform_device *pdev)
 	return 0;
 
 tag_init_fail:
+#ifdef CONFIG_MTK_APUSYS_DEBUG
 	apusys_dbg_destroy();
+#endif
 dbg_init_fail:
 	apusys_mem_destroy();
 mem_init_fail:
@@ -504,7 +508,9 @@ static int apusys_remove(struct platform_device *pdev)
 	mdw_flw_debug("+\n");
 	/* release logical resource */
 	mdw_tags_destroy();
+#ifdef CONFIG_MTK_APUSYS_DEBUG
 	apusys_dbg_destroy();
+#endif
 	apusys_mem_destroy();
 	apusys_sched_destroy();
 	res_mgt_destroy();

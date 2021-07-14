@@ -32,8 +32,9 @@
 #include "scheduler.h"
 #include "sched_deadline.h"
 #include "sched_normal.h"
-
+#ifdef CONFIG_MTK_APUSYS_DEBUG
 extern struct dentry *apusys_dbg_device;
+#endif
 struct apusys_res_mgr g_res_mgr;
 
 static char dev_type_string[APUSYS_DEVICE_RT][APUSYS_DEV_NAME_SIZE] = {
@@ -127,21 +128,23 @@ int res_dbg_tab_init(struct apusys_res_table *tab)
 	/* check argument */
 	if (tab == NULL)
 		return -EINVAL;
-
+#ifdef CONFIG_MTK_APUSYS_DEBUG
 	/* check queue dir */
 	ret = IS_ERR_OR_NULL(apusys_dbg_device);
 	if (ret) {
 		mdw_drv_err("failed to get queue dir.\n");
 		return -EINVAL;
 	}
-
+#endif
 	/* check device and dbg dir */
 	if (tab->dev_list[0].dev == NULL || tab->dbg_dir != NULL)
 		return -ENODEV;
 
+#ifdef CONFIG_MTK_APUSYS_DEBUG
 	/* create with dev type */
 	tab->dbg_dir = debugfs_create_dir(tab->name,
 		apusys_dbg_device);
+#endif
 
 	ret = IS_ERR_OR_NULL(tab->dbg_dir);
 	if (ret) {

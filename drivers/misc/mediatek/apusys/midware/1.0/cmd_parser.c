@@ -128,7 +128,7 @@ static int _get_multicore_sched(struct apusys_cmd *cmd)
 		mdw_drv_warn("invalid arg\n");
 		return CMD_SCHED_NORMAL;
 	}
-
+#ifdef CONFIG_MTK_APUSYS_DEBUG
 	dbg_multi = dbg_get_prop(DBG_PROP_MULTICORE);
 	switch (dbg_multi) {
 	case 1:
@@ -155,7 +155,19 @@ static int _get_multicore_sched(struct apusys_cmd *cmd)
 			multicore_sched = CMD_SCHED_NORMAL;
 		break;
 	}
-
+#else
+	mdw_drv_debug("multicore policy: sched decide\n");
+	multi0 = cmd->hdr->flag_bitmap &
+		(1ULL << CMD_FLAG_BITMAP_MULTI0);
+	multi1 = cmd->hdr->flag_bitmap &
+		(1ULL << CMD_FLAG_BITMAP_MULTI1);
+	if (!multi0 && multi1) /* bit62 = 0 bit63 = 1, multi */
+		multicore_sched = CMD_SCHED_FORCE_MULTI;
+	else if (multi0 && !multi1) /* bit62 = 1 bit63 = 0, single */
+		multicore_sched = CMD_SCHED_FORCE_SINGLE;
+	else /* ohter, scheduler decide */
+		multicore_sched = CMD_SCHED_NORMAL;
+#endif
 	return multicore_sched;
 }
 

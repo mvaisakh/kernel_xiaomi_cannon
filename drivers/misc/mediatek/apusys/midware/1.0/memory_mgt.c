@@ -79,7 +79,7 @@ int apusys_mem_alloc(struct apusys_kmem *mem)
 	}
 	if (!ret) {
 		mem->property = APUSYS_MEM_PROP_ALLOC;
-
+#ifdef CONFIG_MTK_APUSYS_DEBUG
 		/* debug purpose */
 		if (dbg_get_prop(DBG_PROP_QUERY_MEM) > 0) {
 			mr = vmalloc(sizeof(struct mem_record));
@@ -100,6 +100,7 @@ int apusys_mem_alloc(struct apusys_kmem *mem)
 				mutex_unlock(&g_mem_mgr.list_mtx);
 			}
 		}
+#endif
 	}
 
 	return ret;
@@ -123,7 +124,7 @@ int apusys_mem_free(struct apusys_kmem *mem)
 		ret = -EINVAL;
 		break;
 	}
-
+#ifdef CONFIG_MTK_APUSYS_DEBUG
 	/* debug purpose */
 	if (!ret && dbg_get_prop(DBG_PROP_QUERY_MEM) > 0) {
 		mutex_lock(&g_mem_mgr.list_mtx);
@@ -143,7 +144,7 @@ int apusys_mem_free(struct apusys_kmem *mem)
 		}
 		mutex_unlock(&g_mem_mgr.list_mtx);
 	}
-
+#endif
 	return ret;
 }
 
@@ -167,7 +168,7 @@ int apusys_mem_import(struct apusys_kmem *mem)
 
 	if (!ret) {
 		mem->property = APUSYS_MEM_PROP_IMPORT;
-
+#ifdef CONFIG_MTK_APUSYS_DEBUG
 		/* debug purpose */
 		if (dbg_get_prop(DBG_PROP_QUERY_MEM) > 0) {
 			mr = vmalloc(sizeof(struct mem_record));
@@ -188,6 +189,7 @@ int apusys_mem_import(struct apusys_kmem *mem)
 				mutex_unlock(&g_mem_mgr.list_mtx);
 			}
 		}
+#endif
 	}
 	return ret;
 }
@@ -209,7 +211,7 @@ int apusys_mem_unimport(struct apusys_kmem *mem)
 		ret = -EINVAL;
 		break;
 	}
-
+#ifdef CONFIG_MTK_APUSYS_DEBUG
 	/* debug purpose */
 	if (!ret && dbg_get_prop(DBG_PROP_QUERY_MEM) > 0) {
 		mutex_lock(&g_mem_mgr.list_mtx);
@@ -229,6 +231,7 @@ int apusys_mem_unimport(struct apusys_kmem *mem)
 		}
 		mutex_unlock(&g_mem_mgr.list_mtx);
 	}
+#endif
 
 	return ret;
 }
