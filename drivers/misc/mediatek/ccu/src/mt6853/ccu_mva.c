@@ -170,7 +170,7 @@ int ccu_allocate_mem(struct CcuMemHandle *memHandle, int size, bool cached)
 		0, (size_t)size, (cached)?3:0);
 
 	if (!memHandle->ionHandleKd) {
-		LOG_ERR("fail to get ion buffer handle (size=0x%lx)\n", size);
+		LOG_ERR("fail to get ion buffer handle (size=0x%d)\n", size);
 		return -1;
 	}
 
