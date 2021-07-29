@@ -1596,15 +1596,15 @@ static void ISP_DumpDmaDeepDbg(enum ISP_IRQ_TYPE_ENUM module)
 	switch (module) {
 	case ISP_IRQ_TYPE_INT_CAM_A_ST:
 		regModule = ISP_CAM_A_IDX;
-		strncpy(cam, "CAM_A", sizeof("CAM_A"));
+		strncpy(cam, "CAM_A", sizeof(*"CAM_A"));
 		break;
 	case ISP_IRQ_TYPE_INT_CAM_B_ST:
 		regModule = ISP_CAM_B_IDX;
-		strncpy(cam, "CAM_B", sizeof("CAM_B"));
+		strncpy(cam, "CAM_B", sizeof(*"CAM_B"));
 		break;
 	case ISP_IRQ_TYPE_INT_CAM_C_ST:
 		regModule = ISP_CAM_C_IDX;
-		strncpy(cam, "CAM_C", sizeof("CAM_C"));
+		strncpy(cam, "CAM_C", sizeof(*"CAM_C"));
 		break;
 	default:
 		LOG_NOTICE("unsupported module:0x%x\n", module);
@@ -11563,7 +11563,7 @@ irqreturn_t ISP_Irq_CAM(enum ISP_IRQ_TYPE_ENUM irq_module)
 			else
 				IRQ_LOG_KEEPER(
 				module, m_CurrentPPB, _LOG_INF,
-				"%s,%s,CAM_%c P1_SOF_%d_%d(0x%08x_0x%08x,0x%08x_0x%08x,0x%08x,0x%08x,0x%x),int_us:%d,cq:0x%08x_0x%08x_0x%08x,DMA(0x%x_0x%x,0x%x_0x%x,0x%x_0x%x,0x%x_0x%x),YUVO(0x%x_0x%x 0x%x_0x%x, 0x%x_0x%x 0x%x_0x%x, 0x%x_0x%x 0x%x_0x%x)\n",
+				"%s,%s,CAM_%c P1_SOF_%d_%d(0x%08x_0x%08x,0x%08x_0x%08x,0x%08x,0x%08x,0x%x),int_us:%d,cq:0x%08x_0x%08x_0x%08x,DMA(0x%x_0x%x,0x%x_0x%x,0x%x_0x%x,0x%x_0x%x),YUVO(0x%x_0x%x 0x%x_0x%x, 0x%x_0x%x 0x%x_0x%x, 0x%x_0x%x 0x%x_0x%x) %x%x%x%x%x\n",
 				gPass1doneLog[module]._str,
 				gLostPass1doneLog[module]._str,
 				'A' + cardinalNum, sof_count[module], cur_v_cnt,
