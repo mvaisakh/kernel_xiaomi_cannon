@@ -283,7 +283,7 @@ exit_2:
 			wave_phy);
 exit_1:
 	if (put_ir_transmit() < 0)
-		pr_info("%s, irtx is not transmitting\n");
+		pr_info("%s, irtx is not transmitting\n", __func__);
 exit_0:
 	return ret;
 }
