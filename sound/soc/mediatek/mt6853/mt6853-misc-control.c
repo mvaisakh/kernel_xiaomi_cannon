@@ -42,7 +42,7 @@ static const char * const mt6853_sgen_mode_str[] = {
 	"O4",
 };
 
-static const int const mt6853_sgen_mode_idx[] = {
+static const int mt6853_sgen_mode_idx[] = {
 	0, 1, 2, 3,
 	4, 5, 6, 7,
 	8, 9, 10, 11,
@@ -68,7 +68,7 @@ static const char * const mt6853_sgen_rate_str[] = {
 	"192k"
 };
 
-static const int const mt6853_sgen_rate_idx[] = {
+static const int mt6853_sgen_rate_idx[] = {
 	0, 1, 2, 4,
 	5, 6, 8, 9,
 	10, 11, 12, 13,
