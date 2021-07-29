@@ -31,7 +31,7 @@ else
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/sspm/v1
 ccflags-y += -DUSE_SSMP_VER_V1
 endif
-
+subdir-ccflags-y += -Wno-error
 
 
 ifneq ($(wildcard $(srctree)/drivers/misc/mediatek/met_drv/),)
