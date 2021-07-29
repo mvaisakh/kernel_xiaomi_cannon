@@ -4497,7 +4497,7 @@ int dsi_display_set_doze_brightness(struct drm_connector *connector,
 	mutex_lock(&dsi->dsi_lock);
 	pr_info("%s mutex lock\n", __func__);
 	if (!(panel_ext && panel_ext->funcs && panel_ext->funcs->set_doze_brightness)) {
-		pr_info("%s set_doze_brightness func not defined");
+		pr_info("%s set_doze_brightness func not defined", __func__);
 		ret = 0;
 	} else {
 		ret = panel_ext->funcs->set_doze_brightness(dsi->panel, doze_brightness);
@@ -4524,7 +4524,7 @@ ssize_t dsi_display_get_doze_brightness(struct drm_connector *connector,
 	mutex_lock(&dsi->dsi_lock);
 	pr_info("%s mutex lock\n", __func__);
 	if (!(panel_ext && panel_ext->funcs && panel_ext->funcs->get_doze_brightness)) {
-		pr_info("%s get_doze_brightness func not defined");
+		pr_info("%s get_doze_brightness func not defined", __func__);
 		ret = 0;
 	} else {
 		ret = panel_ext->funcs->get_doze_brightness(dsi->panel, buf);
@@ -4595,7 +4595,7 @@ ssize_t dsi_display_get_panel_info(struct drm_connector *connector,
 	panel_ext = mtk_dsi_get_panel_ext(comp);
 
 	if (!(panel_ext && panel_ext->funcs && panel_ext->funcs->get_panel_info)) {
-		pr_info("%s get_panel_info func not defined");
+		pr_info("%s get_panel_info func not defined", __func__);
 		return 0;
 	} else {
 		return panel_ext->funcs->get_panel_info(dsi->panel, buf);

@@ -1490,7 +1490,7 @@ static void mtk_ovl_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
 
 	DDPINFO("%s+ id %d, idx:%d, enable:%d, fmt:0x%x, ",
 		__func__, comp->id, idx, pending->enable, pending->format);
-	DDPINFO("addr 0x%lx, compr %d, con 0x%x\n",
+	DDPINFO("addr 0x%llx, compr %d, con 0x%x\n",
 		pending->addr, pending->prop_val[PLANE_PROP_COMPRESS], con);
 
 	if (rotate) {
