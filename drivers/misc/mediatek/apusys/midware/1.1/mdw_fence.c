@@ -65,7 +65,7 @@ static unsigned int apu_file_poll(struct file *file, poll_table *wait)
 	mutex_lock(&u->mtx);
 	list_for_each_safe(list_ptr, tmp, &u->cmd_list) {
 		c = list_entry(list_ptr, struct mdw_apu_cmd, u_item);
-		mdw_flw_debug("poll cmd(0x%llx/0x%llx) matching...\n", c, d->c);
+		mdw_flw_debug("poll cmd(0x%p/0x%p) matching...\n", c, d->c);
 
 		if (c == d->c)
 			break;
