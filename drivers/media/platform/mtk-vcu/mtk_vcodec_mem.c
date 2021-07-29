@@ -72,7 +72,7 @@ void mtk_vcu_mem_release(struct mtk_vcu_queue *vcu_queue)
 			vcu_queue->cmdq_dev,
 			(void *)(unsigned long)tmp->kva,
 			(dma_addr_t)tmp->pa);
-		pr_info("Free cmdq pa %llx ref_cnt = %d\n", tmp->pa,
+		pr_info("Free cmdq pa %lx ref_cnt = %d\n", tmp->pa,
 			atomic_read(&tmp->ref_cnt));
 		list_del(p);
 		kfree(tmp);
