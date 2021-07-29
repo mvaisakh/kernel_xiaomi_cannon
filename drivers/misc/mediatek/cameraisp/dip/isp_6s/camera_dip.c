@@ -6184,13 +6184,14 @@ static long DIP_ioctl(
 	}
 	/*  */
 EXIT:
-	if (Ret != 0)
+	if (Ret != 0) {
 		LOG_ERR("Fail, Cmd(%d), Pid(%d),",
 			Cmd, pUserInfo->Pid);
 		LOG_ERR("(process, pid, tgid) = (%s, %d, %d)\n",
 			current->comm,
 			current->pid,
 			current->tgid);
+	}
 	/*  */
 	return Ret;
 }
