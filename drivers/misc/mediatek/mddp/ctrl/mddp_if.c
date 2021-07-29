@@ -179,16 +179,16 @@ int32_t mddp_on_set_data_limit(
 		uint8_t *buf,
 		uint32_t buf_len)
 {
-	int32_t                 ret;
+	int32_t ret = 0;
 
 	if (type != MDDP_APP_TYPE_ALL)
 		return -EINVAL;
-
+#ifdef CONFIG_MTK_MDDP_WH_SUPPORT
 	/*
 	 * MDDP GET_OFFLOAD_STATISTICS command.
 	 */
 	ret = mddp_u_set_data_limit(buf, buf_len);
-
+#endif
 	return ret;
 }
 
@@ -232,11 +232,11 @@ static int __init mddp_init(void)
 	ret = mddp_filter_init();
 	if (ret < 0)
 		goto _init_fail;
-
+#ifdef CONFIG_MTK_MDDP_WH_SUPPORT
 	ret = mddp_usage_init();
 	if (ret < 0)
 		goto _init_fail;
-
+#endif
 
 _init_fail:
 	return ret;
@@ -245,8 +245,9 @@ _init_fail:
 static void __exit mddp_exit(void)
 {
 	synchronize_net();
-
+#ifdef CONFIG_MTK_MDDP_WH_SUPPORT
 	mddp_usage_uninit();
+#endif
 	mddp_filter_uninit();
 	mddp_dev_uninit();
 	mddp_ipc_uninit();
