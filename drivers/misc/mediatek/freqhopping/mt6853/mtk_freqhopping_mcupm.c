@@ -915,7 +915,7 @@ static int __reg_base_addr_init(void)
 		return -ENODEV;
 	}
 
-	g_reg_tr = g_fhctl_base + (unsigned int)reg_tr;
+	g_reg_tr = g_fhctl_base + (unsigned long)reg_tr;
 
 	FH_MSG("g_fhctl_base:0x%lx", (unsigned long)g_fhctl_base);
 	FH_MSG("g_apmixed_base:0x%lx", (unsigned long)g_apmixed_base);
