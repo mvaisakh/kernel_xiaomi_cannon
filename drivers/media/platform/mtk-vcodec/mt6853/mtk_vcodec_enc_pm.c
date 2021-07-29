@@ -271,7 +271,7 @@ void mtk_venc_dvfs_begin(struct mtk_vcodec_ctx *ctx)
 				venc_freq = target_freq_64;
 
 			venc_cur_job->mhz = (int)target_freq_64;
-			mtk_v4l2_debug(2, "operationrate %d, target_freq %d, target_freq_64 %d, start %lld",
+			mtk_v4l2_debug(2, "operationrate %d, target_freq %d, target_freq_64 %llu, start %lld",
 				ctx->enc_params.operationrate,
 				target_freq, target_freq_64,
 				venc_cur_job->start);
@@ -280,7 +280,7 @@ void mtk_venc_dvfs_begin(struct mtk_vcodec_ctx *ctx)
 	} else {
 		target_freq_64 = match_freq(DEFAULT_MHZ, &venc_freq_steps[0],
 						venc_freq_step_size);
-		mtk_v4l2_debug(2, "operationrate %d, DEFAULT_MHZ %d, target_freq_64 %d",
+		mtk_v4l2_debug(2, "operationrate %d, DEFAULT_MHZ %d, target_freq_64 %llu",
 			ctx->enc_params.operationrate,
 			DEFAULT_MHZ, target_freq_64);
 		pm_qos_update_request(&venc_qos_req_f, target_freq_64);
@@ -341,7 +341,7 @@ void mtk_venc_dvfs_end(struct mtk_vcodec_ctx *ctx)
 					(int)(ctx->enc_params.framerate_num /
 					ctx->enc_params.framerate_denom));
 				}
-				mtk_v4l2_debug(2, "operationrate %d, framerate_num %d, framerate_denom %d, hw_kcy %d, interval %d",
+				mtk_v4l2_debug(2, "operationrate %d, framerate_num %d, framerate_denom %u, hw_kcy %d, interval %lld",
 					ctx->enc_params.operationrate,
 					ctx->enc_params.framerate_num,
 					ctx->enc_params.framerate_denom,
