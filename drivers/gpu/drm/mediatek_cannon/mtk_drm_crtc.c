@@ -2006,7 +2006,7 @@ static void mtk_crtc_update_ddp_state(struct drm_crtc *crtc,
 						   cmdq_handle);
 			if (lyeblob_ids->lye_idx == 2 && !already_free) {
 				/*free fb buf in second query valid*/
-				DDPMSG("%s, %d release frame buffer\n");
+				DDPMSG("%s, %d release frame buffer\n", __func__, index);
 				mtk_drm_fb_gem_release(dev);
 				free_fb_buf();
 				already_free = true;
@@ -2280,7 +2280,7 @@ void mtk_crtc_pkt_create(struct cmdq_pkt **cmdq_handle, struct drm_crtc *crtc,
 {
 	*cmdq_handle = cmdq_pkt_create(cl);
 	if (IS_ERR_OR_NULL(*cmdq_handle)) {
-		DDPPR_ERR("%s create handle fail, %x\n",
+		DDPPR_ERR("%s create handle fail, %p\n",
 				__func__, *cmdq_handle);
 		return;
 	}
@@ -6926,7 +6926,7 @@ void mtk_need_vds_path_switch(struct drm_crtc *crtc)
 	int comp_nr = 0;
 
 	if (!(priv && mtk_crtc && (index >= 0))) {
-		DDPPR_ERR("%s:%d:Error Invalid params\n");
+		DDPPR_ERR("%s:%d:Error Invalid params\n", __func__, index);
 		return;
 	}
 
