@@ -266,7 +266,7 @@ static void slv_irq(unsigned int slv, bool enable)
 
 	if (slv > cfg->slv_cnt) {
 		pr_info("%s: slv: %d is out of index, max: %d\n",
-			slv, cfg->slv_cnt);
+			__func__, slv, cfg->slv_cnt);
 		return;
 	}
 
@@ -317,7 +317,7 @@ static uint32_t check_vio_status(unsigned int slv)
 
 	if (slv > cfg->slv_cnt) {
 		pr_info("%s: slv: %d is out of index, max: %d\n",
-			slv, cfg->slv_cnt);
+			__func__, slv, cfg->slv_cnt);
 		return -EINVAL;
 	}
 
@@ -336,7 +336,7 @@ static void clear_vio_status(unsigned int slv)
 
 	if (slv > cfg->slv_cnt) {
 		pr_info("%s: slv: %d is out of index, max: %d\n",
-			slv, cfg->slv_cnt);
+			__func__, slv, cfg->slv_cnt);
 		return;
 	}
 
@@ -368,7 +368,7 @@ static int shift_vio_dbg(int shift_bit)
 		dapc_reg_r(d, sel), dapc_reg_r(d, con));
 
 	if ((dapc_reg_r(d, con) & mask) != mask) {
-		pr_info("%s: shift bit %d failed\n", shift_bit);
+		pr_info("%s: shift bit %d failed\n", __func__, shift_bit);
 		return -EFAULT;
 	}
 
