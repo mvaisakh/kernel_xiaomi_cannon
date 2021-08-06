@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -57,7 +58,7 @@
 	 * eint deb(debounce0, debounce1, debounce2, debounce3), inv_debounce
 	 */
 	headset-mode-setting = <0x500 0x500 1 0x1f0
-				0x800 0x800 0x20 0x44
+				0x800 0x1000 0x20 0x44
 				0x4 0x1
 				0x5 0x3 0x3 0x5 0xe>;
 	accdet-plugout-debounce = <1>;
@@ -70,7 +71,7 @@
 	headset-four-key-threshold = <0 58 121 192 400>;
 
 	/* select VTH to 2v and 500k, use internal resitance */
-	eint_use_ext_res = <0>;
+	eint_use_ext_res = <4>;
 	status = "okay";
 };
 /* accdet end */
@@ -116,7 +117,8 @@
 		compatible = "mediatek,lcd-backlight";
 		led_mode = <5>;
 		data = <1>;
-		pwm_config = <0 1 0 0 0>;
+		pwm_config = <0 6 0 0 0>;
+		led_bits = <11>;
 	};
 	vibrator0:vibrator@0 {
 		compatible = "mediatek,vibrator";
@@ -356,7 +358,7 @@
 	};
 	gpslna_pins_init: gpslna@0 {
 		pins_cmd_dat {
-			pinmux = <PINMUX_GPIO155__FUNC_GPIO155>;
+			pinmux = <PINMUX_GPIO74__FUNC_GPIO74>;
 			slew-rate = <0>;
 			bias-disable;
 			output-low;
@@ -364,14 +366,14 @@
 	};
 	gpslna_pins_oh: gpslna@1 {
 		pins_cmd_dat {
-			pinmux = <PINMUX_GPIO155__FUNC_GPIO155>;
+			pinmux = <PINMUX_GPIO74__FUNC_GPIO74>;
 			slew-rate = <1>;
 			output-high;
 		};
 	};
 	gpslna_pins_ol: gpslna@2 {
 		pins_cmd_dat {
-			pinmux = <PINMUX_GPIO155__FUNC_GPIO155>;
+			pinmux = <PINMUX_GPIO74__FUNC_GPIO74>;
 			slew-rate = <1>;
 			output-low;
 		};
@@ -387,12 +389,6 @@
 	status = "okay";
 };
 /* CONSYS end */
-
-/* CAMERA specify sensor */
-&kd_camera_hw1 {
-	cam2_enable_sensor = "imx350_mipi_raw imx386_mipi_mono";
-};
-/* CAMERA specify sensor end */
 
 /* IRTX GPIO Start */
 &irtx_pwm {
@@ -424,6 +420,5 @@
 }; /* IRTX GPIO Settings -End */
 
 #include <k85v1_64/cust.dtsi>
-#include "mediatek/cust_mt6785_camera.dtsi"
 #include "mediatek/cust_mt6785_touch_1080x2160.dtsi"
 /*End of this file, DO NOT ADD ANYTHING HERE*/
