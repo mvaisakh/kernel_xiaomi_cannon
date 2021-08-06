@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -31,7 +32,7 @@
 #define HDCP1X_REP_RDY_WDT                      5000
 
 #define HDCP1X_REP_MAXDEVS            128
-#define HDCP1X_REAUNTH_COUNT          3
+#define HDCP1X_REAUNTH_COUNT          1
 
 enum DPTX_DRV_HDCP1X_MainStates {
 	HDCP1X_MainState_H2 = 0,

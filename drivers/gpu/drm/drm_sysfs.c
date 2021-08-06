@@ -5,6 +5,7 @@
  *               does not allow adding attributes.
  *
  * Copyright (c) 2004 Jon Smirl <jonsmirl@gmail.com>
+ * Copyright (C) 2021 XiaoMi, Inc.
  * Copyright (c) 2003-2004 Greg Kroah-Hartman <greg@kroah.com>
  * Copyright (c) 2003-2004 IBM Corp.
  *
@@ -17,13 +18,18 @@
 #include <linux/gfp.h>
 #include <linux/err.h>
 #include <linux/export.h>
+#include <linux/string.h>
 
 #include <drm/drm_sysfs.h>
 #include <drm/drmP.h>
 #include "drm_internal.h"
-
+//#include "mediatek/mtk_drm_ddp_comp.h"
+//struct mtk_dsi;
 #define to_drm_minor(d) dev_get_drvdata(d)
 #define to_drm_connector(d) dev_get_drvdata(d)
+//#define to_mtk_dsi(x)  container_of(x, struct mtk_dsi, conn)
+
+#define PANEL_MAX_LUMINANCE_READ_OFFSET 12
 
 /**
  * DOC: overview
@@ -229,16 +235,240 @@ static ssize_t modes_show(struct device *device,
 	return written;
 }
 
+static ssize_t panel_info_show(struct device *device,
+			   struct device_attribute *attr,
+			   char *buf)
+{
+    int ret = 0;
+    const char *panel_name_prefix = "panel_name=dsi_";
+    struct drm_connector *connector = to_drm_connector(device);
+    if (!connector) {
+        pr_info("%s-%d connector is NULL \r\n",__func__, __LINE__);
+        return ret;
+    }
+
+    return snprintf(buf, PAGE_SIZE, "%s%s\n", panel_name_prefix, connector->display_info.name);
+}
+
+extern ssize_t panel_disp_param_send_lock(struct drm_connector* connector, int32_t param);
+static ssize_t disp_param_store(struct device *device,
+			   struct device_attribute *attr,
+			   const char *buf, size_t count)
+{
+	ssize_t ret = 0;
+	int32_t param;
+	struct drm_connector *connector = to_drm_connector(device);
+	if (!connector) {
+		pr_info("%s-%d connector is NULL \r\n",__func__, __LINE__);
+		return ret;
+	}
+
+	sscanf(buf, "0x%x", &param);
+	ret = panel_disp_param_send_lock(connector, param);
+	return count;
+}
+
+static ssize_t disp_param_show(struct device *device,
+			   struct device_attribute *attr,
+			   char *buf)
+{
+    ssize_t ret = 0;
+    unsigned char* p_temp;
+    struct drm_connector *connector = to_drm_connector(device);
+    if (!connector) {
+        pr_info("%s-%d connector is NULL\r\n",__func__, __LINE__);
+        return ret;
+    }
+
+    p_temp =  connector->panel_read_data;
+
+	if (connector->read_flag == 0x1) {
+		ret = scnprintf(buf, 13, "%s", p_temp);
+		pr_info("dsi panel read data flag: 0x1, buf: %s\n", buf);
+	} else if (connector->read_flag == 0x2) {
+		ret = scnprintf(buf, 7, "%s", p_temp + PANEL_MAX_LUMINANCE_READ_OFFSET );
+		pr_info("dsi panel read data flag: 0x2, buf: %s\n", buf);
+	} else {
+		pr_info("dai panel read data flag 0x%x can't use !\n", connector->read_flag);
+	}
+	
+    return ret;
+}
+
+static ssize_t fod_ui_ready_show(struct device *device,
+			   struct device_attribute *attr,
+			   char *buf)
+{
+	struct drm_connector *connector = to_drm_connector(device);
+	return snprintf(buf, PAGE_SIZE, "%d\n", connector->fod_ui_ready);
+}
+
+static ssize_t panel_id_show(struct device *device,
+			   struct device_attribute *attr,
+			   char *buf)
+{
+	ssize_t ret = 0;
+	struct drm_connector *connector = to_drm_connector(device);
+	if (!connector) {
+		pr_info("%s-%d connector is NULL \r\n",__func__, __LINE__);
+		return ret;
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", connector->panel_id);
+}
+
+extern ssize_t lcm_mipi_reg_write(char *buf, size_t count);
+extern ssize_t lcm_mipi_reg_read(char *buf);
+
+static ssize_t mipi_reg_show(struct device *device,
+			    struct device_attribute *attr,
+			   char *buf)
+{
+	return lcm_mipi_reg_read(buf);
+}
+
+static ssize_t mipi_reg_store(struct device *device,
+			   struct device_attribute *attr,
+			   const char *buf, size_t count)
+{
+	int rc = 0;
+	rc = lcm_mipi_reg_write((char *)buf, count);
+	return rc;
+}
+
+static ssize_t panel_event_show(struct device *device,
+                           struct device_attribute *attr,
+                           char *buf)
+{
+        ssize_t ret = 0;
+        struct drm_connector *connector = to_drm_connector(device);
+        if (!connector) {
+                pr_info("%s-%d connector is NULL \r\n",__func__, __LINE__);
+                return ret;
+        }
+
+        return snprintf(buf, PAGE_SIZE, "%d\n", connector->panel_event);
+}
+
+extern ssize_t dsi_display_set_doze_brightness(struct drm_connector *connector, int doze_brightness);
+extern ssize_t dsi_display_get_doze_brightness(struct drm_connector *connector, char *buf);
+
+static ssize_t doze_brightness_store(struct device *device,
+			   struct device_attribute *attr,
+			   const char *buf, size_t count)
+{
+	int doze_brightness;
+	int ret;
+	struct drm_connector *connector = to_drm_connector(device);
+	pr_info("%s +\n", __func__);
+	if (!connector) {
+		pr_err("%s, the connector is null\n", __func__);
+		return 0;
+	}
+
+	ret = kstrtoint(buf, 0, &doze_brightness);;
+	if (ret)
+		return ret;
+
+	ret = dsi_display_set_doze_brightness(connector, doze_brightness);
+
+	return ret ? ret : count;
+}
+
+static ssize_t doze_brightness_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct drm_connector *connector = to_drm_connector(dev);
+
+	if (!connector) {
+		pr_err("%s, the connector is null\n", __func__);
+		return 0;
+	}
+
+	return dsi_display_get_doze_brightness(connector, buf);
+}
+
+extern int dsi_display_panel_set_thermal_hbm_disabled(struct drm_connector *connector, bool thermal_hbm_disabled);
+extern int dsi_display_panel_get_thermal_hbm_disabled(struct drm_connector *connector, bool *thermal_hbm_disabled);
+
+static bool g_thermal_hbm_disabled = 0;
+
+static ssize_t thermal_hbm_disabled_store(struct device *device,
+			   struct device_attribute *attr,
+			   const char *buf, size_t count)
+{
+	struct drm_connector *connector = to_drm_connector(device);
+	char *input_copy, *input_dup = NULL;
+	bool thermal_hbm_disabled;
+	int ret;
+	int32_t param;
+
+	input_copy = kstrdup(buf, GFP_KERNEL);
+	if (!input_copy) {
+		DRM_ERROR("can not allocate memory\n");
+		ret = -ENOMEM;
+		goto exit;
+	}
+	input_dup = input_copy;
+	/* removes leading and trailing whitespace from input_copy */
+	input_copy = strim(input_copy);
+	ret = kstrtobool(input_copy, &thermal_hbm_disabled);
+	if (ret) {
+		DRM_ERROR("input buffer conversion failed\n");
+		ret = -EAGAIN;
+		goto exit_free;
+	}
+
+	DRM_INFO("set thermal_hbm_disabled %d\n", thermal_hbm_disabled);
+	if (thermal_hbm_disabled) {
+		param = 0x50000000; /*DISPPARAM_THERMAL_HBM_DISABLE*/
+	} else {
+		param = 0x40000000; /*DISPPARAM_THERMAL_HBM_ENABLE;*/
+	}
+
+	g_thermal_hbm_disabled = thermal_hbm_disabled;
+
+	ret = panel_disp_param_send_lock(connector, param);
+
+exit_free:
+	kfree(input_dup);
+exit:
+	return ret ? ret : count;
+}
+
+static ssize_t thermal_hbm_disabled_show(struct device *device,
+			   struct device_attribute *attr,
+			   char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", g_thermal_hbm_disabled);
+}
+
 static DEVICE_ATTR_RW(status);
 static DEVICE_ATTR_RO(enabled);
 static DEVICE_ATTR_RO(dpms);
 static DEVICE_ATTR_RO(modes);
+static DEVICE_ATTR_RW(disp_param);
+static DEVICE_ATTR_RO(panel_info);
+static DEVICE_ATTR_RO(fod_ui_ready);
+static DEVICE_ATTR_RO(panel_id);
+static DEVICE_ATTR_RW(mipi_reg);
+static DEVICE_ATTR_RO(panel_event);
+static DEVICE_ATTR_RW(doze_brightness);
+static DEVICE_ATTR_RW(thermal_hbm_disabled);
 
 static struct attribute *connector_dev_attrs[] = {
 	&dev_attr_status.attr,
 	&dev_attr_enabled.attr,
 	&dev_attr_dpms.attr,
 	&dev_attr_modes.attr,
+	&dev_attr_disp_param.attr,
+	&dev_attr_panel_info.attr,
+	&dev_attr_fod_ui_ready.attr,
+	&dev_attr_panel_id.attr,
+	&dev_attr_mipi_reg.attr,
+	&dev_attr_panel_event.attr,
+	&dev_attr_doze_brightness.attr,
+	&dev_attr_thermal_hbm_disabled.attr,
 	NULL
 };
 

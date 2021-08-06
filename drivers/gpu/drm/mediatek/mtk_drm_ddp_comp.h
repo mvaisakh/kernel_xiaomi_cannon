@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -20,6 +21,7 @@
 #include "mtk_rect.h"
 #include "mtk_disp_pmqos.h"
 #include "mtk_drm_ddp_addon.h"
+#include "dsi_panel_mi.h"
 
 struct device;
 struct device_node;
@@ -68,72 +70,67 @@ enum mtk_ddp_comp_type {
 	EXPR(DDP_COMPONENT_BLS)                                             \
 	EXPR(DDP_COMPONENT_CCORR0)                                          \
 	EXPR(DDP_COMPONENT_CCORR1)                                          \
-/*5*/	EXPR(DDP_COMPONENT_COLOR0)                                          \
+	EXPR(DDP_COMPONENT_COLOR0)                                          \
 	EXPR(DDP_COMPONENT_COLOR1)                                          \
 	EXPR(DDP_COMPONENT_COLOR2)                                          \
 	EXPR(DDP_COMPONENT_DITHER0)                                         \
 	EXPR(DDP_COMPONENT_DITHER1)                                         \
-/*10*/	EXPR(DDP_COMPONENT_DPI0)                                            \
+	EXPR(DDP_COMPONENT_DPI0)                                            \
 	EXPR(DDP_COMPONENT_DPI1)                                            \
 	EXPR(DDP_COMPONENT_DSI0)                                            \
 	EXPR(DDP_COMPONENT_DSI1)                                            \
 	EXPR(DDP_COMPONENT_GAMMA0)                                          \
-/*15*/	EXPR(DDP_COMPONENT_GAMMA1)                                          \
+	EXPR(DDP_COMPONENT_GAMMA1)                                          \
 	EXPR(DDP_COMPONENT_OD)                                              \
 	EXPR(DDP_COMPONENT_OD1)                                             \
 	EXPR(DDP_COMPONENT_OVL0)                                            \
 	EXPR(DDP_COMPONENT_OVL1)                                            \
-/*20*/	EXPR(DDP_COMPONENT_OVL2)                                            \
+	EXPR(DDP_COMPONENT_OVL2)                                            \
 	EXPR(DDP_COMPONENT_OVL0_2L)                                         \
 	EXPR(DDP_COMPONENT_OVL1_2L)                                         \
 	EXPR(DDP_COMPONENT_OVL2_2L)                                         \
 	EXPR(DDP_COMPONENT_OVL3_2L)                                         \
-/*25*/	EXPR(DDP_COMPONENT_OVL0_2L_VIRTUAL0)                                \
+	EXPR(DDP_COMPONENT_OVL0_2L_VIRTUAL0)                                \
 	EXPR(DDP_COMPONENT_OVL1_2L_VIRTUAL0)                                \
 	EXPR(DDP_COMPONENT_OVL0_VIRTUAL0)                                   \
 	EXPR(DDP_COMPONENT_OVL1_VIRTUAL0)                                   \
 	EXPR(DDP_COMPONENT_OVL0_OVL0_2L_VIRTUAL0)                           \
-/*30*/	EXPR(DDP_COMPONENT_PWM0)                                            \
+	EXPR(DDP_COMPONENT_PWM0)                                            \
 	EXPR(DDP_COMPONENT_PWM1)                                            \
 	EXPR(DDP_COMPONENT_PWM2)                                            \
 	EXPR(DDP_COMPONENT_RDMA0)                                           \
 	EXPR(DDP_COMPONENT_RDMA1)                                           \
-/*35*/	EXPR(DDP_COMPONENT_RDMA2)                                           \
+	EXPR(DDP_COMPONENT_RDMA2)                                           \
 	EXPR(DDP_COMPONENT_RDMA3)                                           \
 	EXPR(DDP_COMPONENT_RDMA4)                                           \
 	EXPR(DDP_COMPONENT_RDMA5)                                           \
 	EXPR(DDP_COMPONENT_RDMA0_VIRTUAL0)                                  \
-/*40*/	EXPR(DDP_COMPONENT_RDMA1_VIRTUAL0)                                  \
+	EXPR(DDP_COMPONENT_RDMA1_VIRTUAL0)                                  \
 	EXPR(DDP_COMPONENT_RDMA2_VIRTUAL0)                                  \
 	EXPR(DDP_COMPONENT_RSZ0)                                            \
 	EXPR(DDP_COMPONENT_RSZ1)                                            \
 	EXPR(DDP_COMPONENT_UFOE)                                            \
-/*45*/	EXPR(DDP_COMPONENT_WDMA0)                                           \
+	EXPR(DDP_COMPONENT_WDMA0)                                           \
 	EXPR(DDP_COMPONENT_WDMA1)                                           \
 	EXPR(DDP_COMPONENT_UFBC_WDMA0)                                      \
 	EXPR(DDP_COMPONENT_WDMA_VIRTUAL0)                                   \
 	EXPR(DDP_COMPONENT_WDMA_VIRTUAL1)                                   \
-/*50*/	EXPR(DDP_COMPONENT_POSTMASK0)                                       \
+	EXPR(DDP_COMPONENT_POSTMASK0)                                       \
 	EXPR(DDP_COMPONENT_POSTMASK1)                                       \
 	EXPR(DDP_COMPONENT_DMDP_RDMA0)                                      \
 	EXPR(DDP_COMPONENT_DMDP_HDR0)                                       \
 	EXPR(DDP_COMPONENT_DMDP_AAL0)                                       \
-/*55*/	EXPR(DDP_COMPONENT_DMDP_RSZ0)                                       \
+	EXPR(DDP_COMPONENT_DMDP_RSZ0)                                       \
 	EXPR(DDP_COMPONENT_DMDP_TDSHP0)                                     \
-	EXPR(DDP_COMPONENT_DMDP_RDMA1)                                      \
-	EXPR(DDP_COMPONENT_DMDP_HDR1)                                       \
-	EXPR(DDP_COMPONENT_DMDP_AAL1)                                       \
-/*60*/	EXPR(DDP_COMPONENT_DMDP_RSZ1)                                       \
-	EXPR(DDP_COMPONENT_DMDP_TDSHP1)                                     \
 	EXPR(DDP_COMPONENT_DSC0)                                            \
 	EXPR(DDP_COMPONENT_MERGE0)                                          \
 	EXPR(DDP_COMPONENT_DPTX)                                            \
-/*65*/	EXPR(DDP_COMPONENT_DP_INTF0)                                        \
+	EXPR(DDP_COMPONENT_DP_INTF0)                                        \
 	EXPR(DDP_COMPONENT_RDMA4_VIRTUAL0)                                  \
 	EXPR(DDP_COMPONENT_RDMA5_VIRTUAL0)                                  \
 	EXPR(DDP_COMPONENT_MERGE1)                                          \
 	EXPR(DDP_COMPONENT_SPR0_VIRTUAL)                                    \
-/*70*/	EXPR(DDP_COMPONENT_CM0)                                          \
+	EXPR(DDP_COMPONENT_CM0)                                          \
 	EXPR(DDP_COMPONENT_SPR0)                                          \
 	EXPR(DDP_COMPONENT_ID_MAX)
 
@@ -191,64 +188,65 @@ enum mtk_ddp_comp_trigger_flag {
 };
 
 enum mtk_ddp_io_cmd {
-	REQ_PANEL_EXT,
-	MTK_IO_CMD_RDMA_GOLDEN_SETTING,
-	MTK_IO_CMD_OVL_GOLDEN_SETTING,
-	DSI_START_VDO_MODE,
-	DSI_STOP_VDO_MODE,
-	ESD_CHECK_READ,
-	ESD_CHECK_CMP,
-	REQ_ESD_EINT_COMPAT,
-	COMP_REG_START,
-	CONNECTOR_ENABLE,
-	CONNECTOR_DISABLE,
-	CONNECTOR_RESET,
-	CONNECTOR_READ_EPILOG,
-	CONNECTOR_IS_ENABLE,
-	CONNECTOR_PANEL_ENABLE,
-	CONNECTOR_PANEL_DISABLE,
-	OVL_ALL_LAYER_OFF,
-	IRQ_LEVEL_ALL,
-	IRQ_LEVEL_IDLE,
-	DSI_VFP_IDLE_MODE,
-	DSI_VFP_DEFAULT_MODE,
-	DSI_GET_TIMING,
-	DSI_GET_MODE_BY_MAX_VREFRESH,
-	PMQOS_SET_BW,
-	PMQOS_SET_HRT_BW,
-	PMQOS_UPDATE_BW,
-	OVL_REPLACE_BOOTUP_MVA,
-	BACKUP_INFO_CMP,
-	LCM_RESET,
-	DSI_SET_BL,
-	DSI_SET_BL_AOD,
-	DSI_SET_BL_GRP,
-	DSI_HBM_SET,
-	DSI_HBM_GET_STATE,
-	DSI_HBM_GET_WAIT_STATE,
-	DSI_HBM_SET_WAIT_STATE,
-	DSI_HBM_WAIT,
-	LCM_ATA_CHECK,
-	DSI_SET_CRTC_AVAIL_MODES,
-	DSI_TIMING_CHANGE,
-	GET_PANEL_NAME,
-	DSI_CHANGE_MODE,
-	BACKUP_OVL_STATUS,
-	MIPI_HOPPING,
-	PANEL_OSC_HOPPING,
-	DYN_FPS_INDEX,
-	SET_MMCLK_BY_DATARATE,
-	GET_FRAME_HRT_BW_BY_DATARATE,
-	DSI_SEND_DDIC_CMD,
-	DSI_READ_DDIC_CMD,
-	DSI_GET_VIRTUAL_HEIGH,
-	DSI_GET_VIRTUAL_WIDTH,
-	FRAME_DIRTY,
-	DSI_LFR_SET,
-	DSI_LFR_UPDATE,
-	DSI_LFR_STATUS_CHECK,
-	WDMA_WRITE_DST_ADDR0,
-	WDMA_READ_DST_SIZE,
+	REQ_PANEL_EXT = 0,
+	MTK_IO_CMD_RDMA_GOLDEN_SETTING = 1,
+	MTK_IO_CMD_OVL_GOLDEN_SETTING = 2,
+	DSI_START_VDO_MODE = 3,
+	DSI_STOP_VDO_MODE = 4,
+	ESD_CHECK_READ = 5,
+	ESD_CHECK_CMP = 6,
+	REQ_ESD_EINT_COMPAT = 7,
+	COMP_REG_START = 8,
+	CONNECTOR_ENABLE = 9,
+	CONNECTOR_DISABLE = 10,
+	CONNECTOR_RESET = 11,
+	CONNECTOR_READ_EPILOG = 12,
+	CONNECTOR_IS_ENABLE = 13,
+	CONNECTOR_PANEL_ENABLE = 14,
+	CONNECTOR_PANEL_DISABLE = 15,
+	OVL_ALL_LAYER_OFF = 16,
+	IRQ_LEVEL_ALL = 17,
+	IRQ_LEVEL_IDLE = 18,
+	DSI_VFP_IDLE_MODE = 19,
+	DSI_VFP_DEFAULT_MODE = 20,
+	DSI_GET_TIMING = 21,
+	DSI_GET_MODE_BY_MAX_VREFRESH = 22,
+	PMQOS_SET_BW = 23,
+	PMQOS_SET_HRT_BW = 24,
+	PMQOS_UPDATE_BW = 25,
+	OVL_REPLACE_BOOTUP_MVA = 26,
+	BACKUP_INFO_CMP = 27,
+	LCM_RESET = 28,
+	DSI_SET_BL = 29,
+	DSI_SET_BL_GRP = 30,
+	DSI_HBM_SET = 31,
+	DSI_HBM_GET_STATE = 32,
+	DSI_HBM_GET_WAIT_STATE = 33,
+	DSI_HBM_SET_WAIT_STATE = 34,
+	DSI_HBM_WAIT = 35,
+	LCM_ATA_CHECK = 36,
+	DSI_SET_CRTC_AVAIL_MODES = 37,
+	DSI_TIMING_CHANGE = 38,
+	GET_PANEL_NAME = 39,
+	DSI_CHANGE_MODE = 40,
+	BACKUP_OVL_STATUS = 41,
+	MIPI_HOPPING = 42,
+	PANEL_OSC_HOPPING = 43,
+	DYN_FPS_INDEX = 44,
+	SET_MMCLK_BY_DATARATE = 45,
+	GET_FRAME_HRT_BW_BY_DATARATE = 46,
+	DSI_SEND_DDIC_CMD = 47,
+	DSI_READ_DDIC_CMD = 48,
+	DSI_GET_VIRTUAL_HEIGH = 49,
+	DSI_GET_VIRTUAL_WIDTH = 50,
+	FRAME_DIRTY = 51,
+	DSI_SET_IDLE_FPS = 52,
+	DSI_SET_NON_IDLE_FPS = 53,
+	DSI_SET_BL_AOD = 54,
+	DSI_HBM_NEED_DELAY = 55,
+	DSI_LFR_SET = 56,
+	DSI_LFR_UPDATE = 57,
+	DSI_LFR_STATUS_CHECK = 58,
 };
 
 struct golden_setting_context {
@@ -311,6 +309,8 @@ struct mtk_ddp_comp_funcs {
 			     struct cmdq_pkt *handle);
 	int (*io_cmd)(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		      enum mtk_ddp_io_cmd cmd, void *params);
+	int (*io_cmd_dispparam)(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
+		      enum DISPPARAM_MODE cmd, void *params);
 	int (*user_cmd)(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		      unsigned int cmd, void *params);
 	void (*connect)(struct mtk_ddp_comp *comp, enum mtk_ddp_comp_id prev,
@@ -343,6 +343,8 @@ struct mtk_ddp_comp {
 	u32 qos_bw;
 	u32 fbdc_bw;
 	u32 hrt_bw;
+
+	struct mutex panel_lock;
 };
 
 static inline void mtk_ddp_comp_config(struct mtk_ddp_comp *comp,
@@ -485,6 +487,18 @@ static inline int mtk_ddp_comp_io_cmd(struct mtk_ddp_comp *comp,
 	return ret;
 }
 
+static inline int mtk_ddp_comp_io_cmd_dispparam(struct mtk_ddp_comp *comp,
+				      struct cmdq_pkt *handle,
+				      enum DISPPARAM_MODE io_cmd, void *params)
+{
+	int ret = -EINVAL;
+
+	if (comp && comp->funcs && comp->funcs->io_cmd)
+		ret = comp->funcs->io_cmd_dispparam(comp, handle, io_cmd, params);
+
+	return ret;
+}
+
 static inline int
 mtk_ddp_comp_is_busy(struct mtk_ddp_comp *comp)
 {
@@ -519,6 +533,8 @@ int mtk_ddp_comp_register(struct drm_device *drm, struct mtk_ddp_comp *comp);
 void mtk_ddp_comp_unregister(struct drm_device *drm, struct mtk_ddp_comp *comp);
 int mtk_ddp_comp_get_type(enum mtk_ddp_comp_id comp_id);
 bool mtk_dsi_is_cmd_mode(struct mtk_ddp_comp *comp);
+void mtk_dsi_esd_recovery_flag(struct mtk_ddp_comp *comp, struct drm_crtc *crtc);
+int mtk_show_brightness_clone(struct mtk_ddp_comp *comp);
 bool mtk_ddp_comp_is_output(struct mtk_ddp_comp *comp);
 void mtk_ddp_comp_get_name(struct mtk_ddp_comp *comp, char *buf, int buf_len);
 int mtk_ovl_layer_num(struct mtk_ddp_comp *comp);

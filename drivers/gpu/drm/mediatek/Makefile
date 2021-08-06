@@ -42,6 +42,7 @@ mediatek-drm-y := mtk_drm_drv.o \
 		  mtk_drm_arr.o \
 		  mtk_disp_merge.o \
 		  mtk_dmdp_aal.o \
+	          dsi_panel_mi_count.o \
 		  mtk_fbconfig_kdebug.o
 
 ifeq ($(CONFIG_DRM_MEDIATEK_DEBUG_FS),y)
@@ -81,7 +82,6 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/dramc/$(MTK_PLATFORM)	\
              -I$(srctree)/drivers/misc/mediatek/smi/			\
              -I$(srctree)/drivers/misc/mediatek/mmp/			\
              -I$(srctree)/drivers/misc/mediatek/mmdvfs/			\
-             -I$(srctree)/drivers/misc/mediatek/pmic/			\
              -I$(srctree)/drivers/iommu/				\
              -I$(srctree)/drivers/devfreq/				\
              -I$(srctree)/drivers/gpu/drm/				\

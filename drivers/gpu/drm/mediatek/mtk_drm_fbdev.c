@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -266,9 +267,6 @@ bool mtk_drm_lcm_is_connect(void)
 int _parse_tag_videolfb(unsigned int *vramsize, phys_addr_t *fb_base,
 			unsigned int *fps)
 {
-#ifdef CONFIG_MTK_DISP_NO_LK
-		return -1;
-#else
 	struct device_node *chosen_node;
 
 	*fps = 6000;
@@ -302,7 +300,6 @@ found:
 	DDPINFO("[DT][videolfb] fps	   = %d\n", *fps);
 
 	return 0;
-#endif
 }
 
 int free_fb_buf(void)

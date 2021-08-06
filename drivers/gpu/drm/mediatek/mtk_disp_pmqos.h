@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -47,6 +48,7 @@ struct mtk_drm_crtc;
 
 struct mtk_drm_qos_ctx {
 	unsigned int last_hrt_req;
+	unsigned int cur_hrt_req;
 	atomic_t last_hrt_idx;
 	atomic_t hrt_cond_sig;
 	wait_queue_head_t hrt_cond_wq;

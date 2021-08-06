@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -116,7 +117,6 @@ int mtk_session_set_mode(struct drm_device *dev, unsigned int session_mode)
 	int i;
 	struct mtk_drm_private *private = dev->dev_private;
 	const struct mtk_session_mode_tb *mode_tb = private->data->mode_tb;
-	unsigned int session_id;
 
 	mutex_lock(&private->commit.lock);
 	if (session_mode >= MTK_DRM_SESSION_NUM) {
@@ -164,11 +164,6 @@ int mtk_session_set_mode(struct drm_device *dev, unsigned int session_mode)
 		mtk_need_vds_path_switch(private->crtc[0]);
 	}
 
-	/* has memory session. need disconnect wdma from cwb*/
-	session_id = mtk_get_session_id(private->crtc[2]);
-	if (session_id != -1)
-		mtk_crtc_cwb_path_disconnect(private->crtc[0]);
-
 	/* For releasing HW resource purpose, the ddp mode should
 	 * switching reversely in some situation.
 	 * CRTC2 -> CRTC1 ->CRTC0
@@ -191,13 +186,6 @@ int mtk_session_set_mode(struct drm_device *dev, unsigned int session_mode)
 					mode_tb[session_mode].ddp_mode[i], 1);
 		}
 	}
-
-	/* has no memory session. need disconnect wdma from cwb*/
-	if (session_id == -1) {
-		private->need_cwb_path_disconnect = false;
-		private->cwb_is_preempted = false;
-	}
-
 	private->session_mode = session_mode;
 	DRM_MMP_EVENT_END(set_mode, private->session_mode,
 			session_mode);

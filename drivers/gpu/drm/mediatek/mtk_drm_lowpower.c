@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -24,10 +25,115 @@
 #include "mtk_drm_ddp_comp.h"
 #include "mtk_drm_mmp.h"
 
-#define MAX_ENTER_IDLE_RSZ_RATIO 300
+#define MAX_ENTER_IDLE_RSZ_RATIO 250
+
+#ifdef CONFIG_DRM_DFPS
+#define MAX_TOUCH_FPS_BRIGHTNESS 486
+#define MAX_SET_TOUCH_EVENT_TIME 300
+
+static struct drm_device *drm_dev;
+#endif
 
 static void mtk_drm_idlemgr_enable_crtc(struct drm_crtc *crtc);
 static void mtk_drm_idlemgr_disable_crtc(struct drm_crtc *crtc);
+
+#ifdef CONFIG_DRM_DFPS
+static void mtk_touch_up_event_delay_work(struct work_struct *work)
+{
+	struct mtk_drm_idlemgr *idlemgr = container_of(work, struct mtk_drm_idlemgr,
+					touch_up_event_delay_work.work);
+
+	struct drm_crtc *crtc;
+	struct mtk_drm_crtc *mtk_crtc;
+	struct mtk_crtc_state *mtk_state;
+	struct mtk_ddp_comp *output_comp;
+	int src_idx;
+
+	if(!drm_dev) {
+		DDPPR_ERR("idlemgr is not ready!\n");
+		return;
+	}
+
+	crtc = list_first_entry(&(drm_dev)->mode_config.crtc_list,
+				typeof(*crtc), head);
+
+	if (!crtc) {
+		DDPPR_ERR("find crtc fail\n");
+		return;
+	}
+
+	mtk_crtc = to_mtk_crtc(crtc);
+	mtk_state = to_mtk_crtc_state(crtc->state);
+	src_idx = mtk_state->prop_val[CRTC_PROP_DISP_MODE_IDX];
+	idlemgr = mtk_crtc->idlemgr;
+	output_comp = mtk_ddp_comp_request_output(mtk_crtc);
+
+	if (!output_comp || !idlemgr->idlemgr_ctx->dfps_en)
+		return;
+
+	if (!mtk_drm_is_idle_fps(crtc)) {
+		mtk_ddp_comp_io_cmd(output_comp, NULL, DSI_SET_IDLE_FPS, &src_idx);
+		idlemgr->idlemgr_ctx->is_idle_fps = 1;
+		DDPINFO("%s finish touch_up_event_delay_work\n", __func__);
+	}
+}
+
+void mtk_drm_crtc_touch_notify(void)
+{
+	struct drm_crtc *crtc;
+	struct mtk_drm_crtc *mtk_crtc;
+	struct mtk_crtc_state *mtk_state;
+	struct mtk_drm_idlemgr *idlemgr;
+	struct mtk_ddp_comp *output_comp;
+	int src_idx;
+
+	if(!drm_dev) {
+		DDPPR_ERR("idlemgr is not ready!\n");
+		return;
+	}
+
+	crtc = list_first_entry(&(drm_dev)->mode_config.crtc_list,
+				typeof(*crtc), head);
+
+	if (!crtc) {
+		DDPPR_ERR("find crtc fail\n");
+		return;
+	}
+
+	mtk_crtc = to_mtk_crtc(crtc);
+	mtk_state = to_mtk_crtc_state(crtc->state);
+	src_idx = mtk_state->prop_val[CRTC_PROP_DISP_MODE_IDX];
+	idlemgr = mtk_crtc->idlemgr;
+
+	output_comp = mtk_ddp_comp_request_output(mtk_crtc);
+
+	if (!output_comp || !idlemgr->idlemgr_ctx->dfps_en) {
+		return;
+
+		DDPINFO("%s: src_idx = %d\n", __func__, src_idx);
+
+		if (mtk_drm_is_idle_fps(crtc)) {
+			mtk_ddp_comp_io_cmd(output_comp, NULL, DSI_SET_NON_IDLE_FPS, &src_idx);
+			idlemgr->idlemgr_ctx->is_idle_fps = 0;
+		}
+        }
+}
+EXPORT_SYMBOL(mtk_drm_crtc_touch_notify);
+
+bool mtk_drm_idlemgr_enable_dfps(struct drm_crtc *crtc, bool en)
+{
+	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+	bool old_en = 0;
+
+	if (!(mtk_crtc && mtk_crtc->idlemgr && mtk_crtc->idlemgr->idlemgr_ctx))
+		return 0;
+
+	old_en = mtk_crtc->idlemgr->idlemgr_ctx->dfps_en;
+	mtk_crtc->idlemgr->idlemgr_ctx->dfps_en = en;
+
+	return old_en;
+}
+#endif
 
 static void mtk_drm_vdo_mode_enter_idle(struct drm_crtc *crtc)
 {
@@ -56,17 +162,12 @@ static void mtk_drm_vdo_mode_enter_idle(struct drm_crtc *crtc)
 	}
 
 	comp = mtk_ddp_comp_request_output(mtk_crtc);
-	if (comp) {
+	if (comp)
 		mtk_ddp_comp_io_cmd(comp, handle, DSI_VFP_IDLE_MODE, NULL);
-		if (mtk_drm_helper_get_opt(priv->helper_opt, MTK_DRM_OPT_LFR)) {
-			int en = 0;
 
-			mtk_ddp_comp_io_cmd(comp, handle, DSI_LFR_SET, &en);
-		}
-	}
 	cmdq_pkt_flush(handle);
 	cmdq_pkt_destroy(handle);
-	drm_crtc_vblank_off(crtc);
+	lcm_fps_ctx_reset(crtc);
 }
 
 static void mtk_drm_cmd_mode_enter_idle(struct drm_crtc *crtc)
@@ -94,18 +195,12 @@ static void mtk_drm_vdo_mode_leave_idle(struct drm_crtc *crtc)
 	}
 
 	comp = mtk_ddp_comp_request_output(mtk_crtc);
-	if (comp) {
+	if (comp)
 		mtk_ddp_comp_io_cmd(comp, handle, DSI_VFP_DEFAULT_MODE, NULL);
-		if (mtk_drm_helper_get_opt(priv->helper_opt, MTK_DRM_OPT_LFR)) {
-			int en = 1;
-
-			mtk_ddp_comp_io_cmd(comp, handle, DSI_LFR_SET, &en);
-		}
-	}
 
 	cmdq_pkt_flush(handle);
 	cmdq_pkt_destroy(handle);
-	drm_crtc_vblank_on(crtc);
+	lcm_fps_ctx_reset(crtc);
 }
 
 static void mtk_drm_cmd_mode_leave_idle(struct drm_crtc *crtc)
@@ -119,6 +214,7 @@ static void mtk_drm_idlemgr_enter_idle_nolock(struct drm_crtc *crtc)
 	struct mtk_drm_private *priv = crtc->dev->dev_private;
 	struct mtk_ddp_comp *output_comp;
 	int index = drm_crtc_index(crtc);
+
 	bool mode;
 
 	output_comp = priv->ddp_comp[DDP_COMPONENT_DSI0];
@@ -129,10 +225,11 @@ static void mtk_drm_idlemgr_enter_idle_nolock(struct drm_crtc *crtc)
 	mode = mtk_dsi_is_cmd_mode(output_comp);
 	CRTC_MMP_EVENT_START(index, enter_idle, mode, 0);
 
-	if (mode)
+	if (mode) {
 		mtk_drm_cmd_mode_enter_idle(crtc);
-	else
+	} else {
 		mtk_drm_vdo_mode_enter_idle(crtc);
+	}
 
 	CRTC_MMP_EVENT_END(index, enter_idle, mode, 0);
 }
@@ -152,10 +249,11 @@ static void mtk_drm_idlemgr_leave_idle_nolock(struct drm_crtc *crtc)
 	mode = mtk_dsi_is_cmd_mode(output_comp);
 	CRTC_MMP_EVENT_START(index, leave_idle, mode, 0);
 
-	if (mode)
+	if (mode) {
 		mtk_drm_cmd_mode_leave_idle(crtc);
-	else
+	} else {
 		mtk_drm_vdo_mode_leave_idle(crtc);
+	}
 
 	CRTC_MMP_EVENT_END(index, leave_idle, mode, 0);
 }
@@ -170,6 +268,19 @@ bool mtk_drm_is_idle(struct drm_crtc *crtc)
 
 	return idlemgr->idlemgr_ctx->is_idle;
 }
+
+#ifdef CONFIG_DRM_DFPS
+bool mtk_drm_is_idle_fps(struct drm_crtc *crtc)
+{
+	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+	struct mtk_drm_idlemgr *idlemgr = mtk_crtc->idlemgr;
+
+	if (!idlemgr)
+		return false;
+
+	return idlemgr->idlemgr_ctx->is_idle_fps;
+}
+#endif
 
 void mtk_drm_idlemgr_kick(const char *source, struct drm_crtc *crtc,
 			  int need_lock)
@@ -192,8 +303,6 @@ void mtk_drm_idlemgr_kick(const char *source, struct drm_crtc *crtc,
 
 	if (idlemgr_ctx->is_idle) {
 		DDPINFO("[LP] kick idle from [%s]\n", source);
-		if (mtk_crtc->esd_ctx)
-			atomic_set(&mtk_crtc->esd_ctx->target_time, 0);
 		mtk_drm_idlemgr_leave_idle_nolock(crtc);
 		idlemgr_ctx->is_idle = 0;
 
@@ -410,7 +519,7 @@ static int mtk_drm_idlemgr_monitor_thread(void *data)
 			} else {
 				idlemgr_ctx->idlemgr_last_kick_time =
 					sched_clock();
-				idlemgr_vblank_check_internal = 50;
+				idlemgr_vblank_check_internal = 10;
 			}
 		}
 
@@ -453,6 +562,10 @@ int mtk_drm_idlemgr_init(struct drm_crtc *crtc, int index)
 
 	idlemgr_ctx->session_mode_before_enter_idle = MTK_DRM_SESSION_INVALID;
 	idlemgr_ctx->is_idle = 0;
+	idlemgr_ctx->is_idle_fps = 0;
+#ifdef CONFIG_DRM_DFPS
+	idlemgr_ctx->dfps_en = 1;
+#endif
 	idlemgr_ctx->enterulps = 0;
 	idlemgr_ctx->idlemgr_last_kick_time = ~(0ULL);
 	idlemgr_ctx->cur_lp_cust_mode = 0;
@@ -463,6 +576,11 @@ int mtk_drm_idlemgr_init(struct drm_crtc *crtc, int index)
 		kthread_create(mtk_drm_idlemgr_monitor_thread, crtc, name);
 	init_waitqueue_head(&idlemgr->idlemgr_wq);
 	atomic_set(&idlemgr->idlemgr_task_active, 1);
+
+#ifdef CONFIG_DRM_DFPS
+	INIT_DELAYED_WORK(&idlemgr->touch_up_event_delay_work, mtk_touch_up_event_delay_work);
+	drm_dev = crtc->dev;
+#endif
 
 	wake_up_process(idlemgr->idlemgr_task);
 
@@ -495,6 +613,12 @@ static void mtk_drm_idlemgr_disable_crtc(struct drm_crtc *crtc)
 	unsigned int crtc_id = drm_crtc_index(&mtk_crtc->base);
 	bool mode = mtk_crtc_is_dc_mode(crtc);
 
+#ifdef CONFIG_DRM_DFPS
+	struct mtk_crtc_state *mtk_state = to_mtk_crtc_state(crtc->state);
+	int src_idx = mtk_state->prop_val[CRTC_PROP_DISP_MODE_IDX];
+	struct mtk_drm_idlemgr *idlemgr = mtk_crtc->idlemgr;
+	struct mtk_ddp_comp *output_comp;
+#endif
 	DDPINFO("%s, crtc%d+\n", __func__, crtc_id);
 
 	if (mode) {
@@ -502,6 +626,18 @@ static void mtk_drm_idlemgr_disable_crtc(struct drm_crtc *crtc)
 		DDPINFO("crtc%d do %s-\n", crtc_id, __func__);
 		return;
 	}
+
+#ifdef CONFIG_DRM_DFPS
+	output_comp = mtk_ddp_comp_request_output(mtk_crtc);
+	if (src_idx && output_comp && idlemgr->idlemgr_ctx->dfps_en
+		&& mtk_show_brightness_clone(output_comp) > MAX_TOUCH_FPS_BRIGHTNESS) {
+		if (!mtk_drm_is_idle_fps(crtc)) {
+			schedule_delayed_work(&idlemgr->touch_up_event_delay_work,
+				msecs_to_jiffies(MAX_SET_TOUCH_EVENT_TIME));
+			DDPINFO("start touch_up_event_delay_work");
+		}
+	}
+#endif
 
 	/* 1. stop CRTC */
 	mtk_crtc_stop(mtk_crtc, true);
@@ -542,6 +678,13 @@ static void mtk_drm_idlemgr_enable_crtc(struct drm_crtc *crtc)
 	struct mtk_ddp_comp *comp;
 	unsigned int i, j;
 
+#ifdef CONFIG_DRM_DFPS
+	struct mtk_crtc_state *mtk_state = to_mtk_crtc_state(crtc->state);
+	int src_idx = mtk_state->prop_val[CRTC_PROP_DISP_MODE_IDX];
+	struct mtk_drm_idlemgr *idlemgr = mtk_crtc->idlemgr;
+	struct mtk_ddp_comp *output_comp;
+#endif
+
 	DDPINFO("crtc%d do %s+\n", crtc_id, __func__);
 
 	if (mode) {
@@ -573,6 +716,17 @@ static void mtk_drm_idlemgr_enable_crtc(struct drm_crtc *crtc)
 
 	/* 5. config ddp engine & set dirty for cmd mode */
 	mtk_crtc_config_default_path(mtk_crtc);
+
+#ifdef CONFIG_DRM_DFPS
+	output_comp = mtk_ddp_comp_request_output(mtk_crtc);
+	if (src_idx && output_comp && idlemgr->idlemgr_ctx->dfps_en
+		&& mtk_show_brightness_clone(output_comp) > MAX_TOUCH_FPS_BRIGHTNESS) {
+		if (!mtk_drm_is_idle_fps(crtc)) {
+			cancel_delayed_work(&idlemgr->touch_up_event_delay_work);
+			DDPINFO("cancel touch_up_event_delay_work");
+		}
+	}
+#endif
 
 	/* 6. conect addon module and config */
 	mtk_crtc_connect_addon_module(crtc);

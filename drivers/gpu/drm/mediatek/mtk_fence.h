@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -54,7 +55,6 @@ enum MTK_TIMELINE_ENUM {
 	MTK_TIMELINE_PRIMARY_PRESENT_TIMELINE_ID,
 	MTK_TIMELINE_OUTPUT_INTERFACE_TIMELINE_ID,
 	MTK_TIMELINE_SECONDARY_PRESENT_TIMELINE_ID,
-	MTK_TIMELINE_SF_PRIMARY_PRESENT_TIMELINE_ID,
 	MTK_TIMELINE_COUNT,
 };
 
@@ -154,8 +154,6 @@ void mtk_release_fence(unsigned int session_id, unsigned int layer_id,
 		       int fence);
 void mtk_release_layer_fence(unsigned int session_id, unsigned int layer_id);
 int mtk_release_present_fence(unsigned int session_id, unsigned int fence_idx);
-int mtk_release_sf_present_fence(unsigned int session_id,
-				 unsigned int fence_idx);
 int mtk_fence_get_output_timeline_id(void);
 int mtk_fence_get_interface_timeline_id(void);
 
@@ -182,7 +180,6 @@ unsigned int mtk_fence_query_buf_info(unsigned int session_id,
 
 int mtk_fence_get_ovl_timeline_id(int layer_id);
 int mtk_fence_get_present_timeline_id(unsigned int session_id);
-int mtk_fence_get_sf_present_timeline_id(unsigned int session_id);
 struct mtk_fence_session_sync_info *
 disp_get_session_sync_info(unsigned int session_id);
 
