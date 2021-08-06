@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -66,6 +67,19 @@ int larb_bound_table[HRT_BOUND_NUM][HRT_LEVEL_NUM] = {
  * primary and secondary display.Each table has 16 elements which
  * represent the layer mapping rule by the number of input layers.
  */
+#ifdef MTK_HIGH_FRAME_RATE /*todo: use lcm_height to decide table*/
+static int layer_mapping_table[HRT_TB_NUM][TOTAL_OVL_LAYER_NUM] = {
+	/* HRT_TB_TYPE_GENERAL */
+	{0x00010001, 0x00030003, 0x00030007, 0x0003000F, 0x0003001F, 0x0003003F,
+	0x0003003F, 0x0003003F, 0x0003003F, 0x0003003F, 0x0003003F, 0x0003003C},
+	/* HRT_TB_TYPE_RPO_L0 */
+	{0x00010001, 0x00030005, 0x0003000D, 0x0003001D, 0x0003003D, 0x0003003D,
+	0x0003003D, 0x0003003D, 0x0003003D, 0x0003003D, 0x0003003D, 0x0003003D},
+	/* HRT_TB_TYPE_RPO_L0L1 */
+	{0x00010001, 0x00030003, 0x00030007, 0x0003000F, 0x0003001F, 0x0003003F,
+	0x0003003F, 0x0003003F, 0x0003003F, 0x0003003F, 0x0003003F, 0x0003003F},
+};
+#else
 static int layer_mapping_table[HRT_TB_NUM][TOTAL_OVL_LAYER_NUM] = {
 	/* HRT_TB_TYPE_GENERAL */
 	{0x00010001, 0x00030003, 0x00030007, 0x0003000F, 0x0003001F, 0x0003003F,
@@ -77,6 +91,7 @@ static int layer_mapping_table[HRT_TB_NUM][TOTAL_OVL_LAYER_NUM] = {
 	{0x00010001, 0x00030003, 0x00030007, 0x0003000F, 0x0003001F, 0x0003003F,
 	0x0003003F, 0x0003003F, 0x0003003F, 0x0003003F, 0x0003003F, 0x0003003F},
 };
+#endif
 
 /**
  * The larb mapping table represent the relation between LARB and OVL.
@@ -95,6 +110,34 @@ static int ovl_mapping_table[HRT_TB_NUM] = {
 
 #define GET_SYS_STATE(sys_state) \
 	((l_rule_info.hrt_sys_state >> sys_state) & 0x1)
+static inline bool support_color_format(enum DISP_FORMAT src_fmt)
+{
+	switch (src_fmt) {
+	case DISP_FORMAT_RGB565:
+	case DISP_FORMAT_RGB888:
+	case DISP_FORMAT_BGR888:
+	case DISP_FORMAT_ARGB8888:
+	case DISP_FORMAT_ABGR8888:
+	case DISP_FORMAT_RGBA8888:
+	case DISP_FORMAT_BGRA8888:
+	case DISP_FORMAT_YUV422:
+	case DISP_FORMAT_XRGB8888:
+	case DISP_FORMAT_XBGR8888:
+	case DISP_FORMAT_RGBX8888:
+	case DISP_FORMAT_BGRX8888:
+	case DISP_FORMAT_UYVY:
+	case DISP_FORMAT_PARGB8888:
+	case DISP_FORMAT_PABGR8888:
+	case DISP_FORMAT_PRGBA8888:
+	case DISP_FORMAT_PBGRA8888:
+	case DISP_FORMAT_DIM:
+		return true;
+	default:
+		return false;
+	}
+
+	return false;
+}
 
 static bool has_rsz_layer(struct disp_layer_info *disp_info, int disp_idx)
 {
@@ -342,7 +385,7 @@ static void filter_by_yuv_layers(struct disp_layer_info *disp_info)
 	struct layer_config *info;
 	unsigned int yuv_cnt;
 
-	/* ovl support total 2 yuv layer */
+	/* ovl support total 1 yuv layer ,align to mt6853*/
 	for (disp_idx = 0 ; disp_idx < 2 ; disp_idx++) {
 		yuv_cnt = 0;
 		for (i = 0; i < disp_info->layer_num[disp_idx]; i++) {
@@ -351,10 +394,13 @@ static void filter_by_yuv_layers(struct disp_layer_info *disp_info)
 				continue;
 			if (is_yuv(info->src_fmt)) {
 				yuv_cnt++;
-				if (yuv_cnt > 2)
+				if (yuv_cnt > 1)
 					rollback_layer_to_GPU(disp_info,
 						disp_idx, i);
 			}
+			if (support_color_format(info->src_fmt) != true)
+				rollback_layer_to_GPU(disp_info,
+						disp_idx, i);
 		}
 	}
 }
@@ -971,6 +1017,53 @@ static void fbdc_restore_layout(struct disp_layer_info *dst_info,
 	}
 }
 
+static void clear_layer(struct disp_layer_info *disp_info)
+{
+	int di = 0;
+	int i = 0;
+	struct layer_config *c;
+
+	for (di = 0; di < 2; di++) {
+		int g_head = disp_info->gles_head[di];
+		int top = -1;
+
+		if (disp_info->layer_num[di] <= 0)
+			continue;
+		if (g_head == -1)
+			continue;
+
+		for (i = disp_info->layer_num[di] - 1; i >= g_head; i--) {
+			c = &disp_info->input_config[di][i];
+			if (has_layer_cap(c, LAYERING_OVL_ONLY) &&
+			    has_layer_cap(c, CLIENT_CLEAR_LAYER)) {
+				top = i;
+				break;
+			}
+		}
+		if (top == -1)
+			continue;
+		if (!is_gles_layer(disp_info, di, top))
+			continue;
+
+		c = &disp_info->input_config[di][top];
+		c->layer_caps |= DISP_CLIENT_CLEAR_LAYER;
+		DISPMSG("%s:D%d:L%d\n", __func__, di, top);
+
+		disp_info->gles_head[di] = 0;
+		disp_info->gles_tail[di] = disp_info->layer_num[di] - 1;
+		for (i = 0; i < disp_info->layer_num[di]; i++) {
+			c = &disp_info->input_config[di][i];
+
+			c->ext_sel_layer = -1;
+
+			if (i == top)
+				c->ovl_id = 0;
+			else
+				c->ovl_id = 1;
+		}
+	}
+}
+
 static struct layering_rule_ops l_rule_ops = {
 	.resizing_rule = lr_rsz_layout,
 	.rsz_by_gpu_info_change = lr_gpu_change_rsz_info,
@@ -991,4 +1084,5 @@ static struct layering_rule_ops l_rule_ops = {
 	.fbdc_adjust_layout = fbdc_adjust_layout,
 	.fbdc_restore_layout = fbdc_restore_layout,
 	.fbdc_rule = filter_by_fbdc,
+	.clear_layer = clear_layer,
 };

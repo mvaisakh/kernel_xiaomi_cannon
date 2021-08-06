@@ -13,6 +13,11 @@
 #
 # Makefile for misc devices that really don't fit anywhere else.
 #
+
+ifeq ($(CONFIG_MTK_PLATFORM), "mt6785")
+subdir-ccflags-y += -D_XIAOMI_BEGONIA_
+endif
+
 MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
 ARCH_MTK_PROJECT := $(subst ",,$(CONFIG_ARCH_MTK_PROJECT))
 IMGSENSOR_DRIVER_PATH  := $(srctree)/drivers/misc/mediatek/imgsensor/src
