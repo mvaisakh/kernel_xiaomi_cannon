@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2018 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -44,17 +45,18 @@ struct mt_gpufreq_power_table_info {
  */
 #define CFG_THERM_LVTS				(1)
 #define CFG_THERM_NO_AUXADC			(1)
+#define CFG_THERM_MCU_LVTS				(1)
 
 #if CFG_THERM_LVTS
 #define	CFG_LVTS_DOMINATOR			(1)
 #define	LVTS_THERMAL_CONTROLLER_HW_FILTER	(1) /* 1, 2, 4, 8, 16 */
-#define	LVTS_DEVICE_AUTO_RCK			(1)
+#define	LVTS_DEVICE_AUTO_RCK			(0)
 /*Use bootup "count RC", no need to get "count RC" again after resume*/
 #define CFG_THERM_USE_BOOTUP_COUNT_RC
 #else
 #define	CFG_LVTS_DOMINATOR			(0)
 #define	LVTS_THERMAL_CONTROLLER_HW_FILTER	(0)
-#define	LVTS_DEVICE_AUTO_RCK			(1)
+#define	LVTS_DEVICE_AUTO_RCK			(0)
 #endif
 
 /*
