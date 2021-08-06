@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright (c) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #ifndef __MTK_CMDQ_MAILBOX_H__
@@ -14,6 +15,8 @@
 #if !IS_ENABLED(CONFIG_MTK_CMDQ_MBOX_EXT)
 #define cmdq_util_msg(f, args...) cmdq_msg(f, ##args)
 #define cmdq_util_err(f, args...) cmdq_dump(f, ##args)
+#define cmdq_util_user_msg(chan, f, args...) cmdq_util_msg(f, ##args)
+#define cmdq_util_user_err(chan, f, args...) cmdq_util_err(f, ##args)
 #endif
 
 /* see also gce platform binding header */
@@ -224,8 +227,6 @@ void cmdq_thread_set_spr(struct mbox_chan *chan, u8 id, u32 val);
 void cmdq_init_cmds(void *dev_cmdq);
 void cmdq_mbox_channel_stop(struct mbox_chan *chan);
 void cmdq_dump_core(struct mbox_chan *chan);
-void cmdq_pkt_poll_gpr_check(struct cmdq_pkt *pkt,
-	const u16 gpr_idx, const s32 start);
 void cmdq_thread_dump_spr(struct cmdq_thread *thread);
 void cmdq_thread_dump(struct mbox_chan *chan, struct cmdq_pkt *cl_pkt,
 	u64 **inst_out, dma_addr_t *pc_out);
