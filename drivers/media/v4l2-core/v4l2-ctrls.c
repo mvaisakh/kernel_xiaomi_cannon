@@ -999,7 +999,8 @@ const char *v4l2_ctrl_get_name(u32 id)
 		return "P-Frame QP Value";
 	case V4L2_CID_MPEG_MTK_ENCODE_RC_B_FRAME_QP:
 		return "B-Frame QP Value";
-	case V4L2_CID_MPEG_MTK_FORCE_RES_CHANGE: return "Video Res Change";
+	case V4L2_CID_MPEG_MTK_FORCE_RES_CHANGE:
+		return "Video Res Change";
 	default:
 		return NULL;
 	}
