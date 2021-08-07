@@ -2,6 +2,7 @@
  * Universal Flash Storage Turbo Write
  *
  * Copyright (C) 2017-2018 Samsung Electronics Co., Ltd.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * Authors:
  *	Yongmyung Lee <ymhungry.lee@samsung.com>
@@ -1117,8 +1118,6 @@ void ufstw_reset_work_fn(struct work_struct *work)
 	int ret;
 
 	ufsf = container_of(work, struct ufsf_feature, tw_reset_work);
-
-	down(&ufsf->hba->eh_sem);
 	TW_DEBUG(ufsf, "reset tw_kref.refcount=%d",
 		 atomic_read(&ufsf->tw_kref.refcount.refs));
 
@@ -1130,14 +1129,12 @@ void ufstw_reset_work_fn(struct work_struct *work)
 	if (ret == 0) {
 		ERR_MSG("UFSTW kref is not init_value(=1). kref count = %d ret = %d. So, TW_RESET_FAIL",
 			atomic_read(&ufsf->tw_kref.refcount.refs), ret);
-		up(&ufsf->hba->eh_sem);
 		return;
 	}
 
 	INIT_INFO("TW_RESET_START");
 
 	ufstw_reset(ufsf);
-	up(&ufsf->hba->eh_sem);
 }
 
 /* protected by mutex mode_lock  */
@@ -1510,7 +1507,7 @@ static ssize_t ufstw_sysfs_show_##_name(struct ufstw_lu *tw, char *buf) \
 /* SYSFS FUNCTION */
 define_sysfs_attr_r_function(flush_status, QUERY_ATTR_IDN_TW_FLUSH_STATUS)
 define_sysfs_attr_r_function(available_buffer_size, QUERY_ATTR_IDN_TW_BUF_SIZE)
-define_sysfs_attr_r_function(current_tw_buffer_size, QUERY_ATTR_CUR_TW_BUF_SIZE)
+define_sysfs_attr_r_function(current_tw_buffer_size, QUERY_ATTR_IDN_TW_CUR_BUF_SIZE)
 define_sysfs_attr_r_function(lifetime_est, QUERY_ATTR_IDN_TW_BUF_LIFETIME_EST)
 
 static ssize_t ufstw_sysfs_show_tw_enable(struct ufstw_lu *tw, char *buf)
