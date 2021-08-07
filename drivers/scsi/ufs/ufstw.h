@@ -2,6 +2,7 @@
  * Universal Flash Storage tw Write
  *
  * Copyright (C) 2017-2018 Samsung Electronics Co., Ltd.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * Authors:
  *	Yongmyung Lee <ymhungry.lee@samsung.com>
@@ -46,7 +47,7 @@
 
 #include "../../../block/blk.h"
 
-#define UFSTW_VER					0x0101
+#define UFSTW_VER					0x0110
 #define UFSTW_DD_VER					0x0103
 
 #define UFSTW_FLUSH_CHECK_PERIOD_MS			1000
