@@ -78,8 +78,10 @@ obj-y += ddp_drv.o
 obj-y += ddp_path.o
 obj-y += ddp_mutex.o
 obj-y += ddp_m4u.o
+ifeq ($(CONFIG_DDP_DEBUG),y)
 obj-y += ddp_debug.o
 obj-y += ddp_dump.o
+endif
 
 obj-y += ddp_manager.o
 obj-y += ddp_irq.o
