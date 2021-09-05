@@ -66,7 +66,7 @@ DEFCONFIG=cannon_user_defconfig
 
 # Specify compiler. 
 # 'clang' or 'gcc'
-COMPILER=clang
+COMPILER=gcc
 
 # Clean source prior building. 1 is NO(default) | 0 is YES
 INCREMENTAL=1
@@ -166,13 +166,13 @@ DATE=$(TZ=Asia/Kolkata date +"%Y%m%d-%T")
 	echo " "
 	if [ $COMPILER = "gcc" ]
 	then
-		msg "|| Cloning GCC 9.3.0 baremetal ||"
-		git clone --depth=1 https://github.com/mvaisakh/gcc-arm64.git gcc64
-		git clone --depth=1 https://github.com/mvaisakh/gcc-arm.git gcc32
+		msg "|| Cloning GCC baremetal ||"
+		git clone --depth=1 --single-branch https://github.com/mvaisakh/gcc-arm64.git gcc64
+		git clone --depth=1 --single-branch https://github.com/mvaisakh/gcc-arm.git gcc32
 		GCC64_DIR=$KERNEL_DIR/gcc64
 		GCC32_DIR=$KERNEL_DIR/gcc32
 	fi
-	
+
 	if [ $COMPILER = "clang" ]
 	then
 		msg "|| Cloning Clang-13 ||"
