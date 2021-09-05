@@ -11,6 +11,7 @@
 # GNU General Public License for more details.
 #
 subdir-ccflags-y += -Werror
+subdir-ccflags-y += -D__linux__
 
 #scp smartpa related code
 obj-$(CONFIG_SND_SOC_MTK_SCP_SMARTPA) += scp_spk/
