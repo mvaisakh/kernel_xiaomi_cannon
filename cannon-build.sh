@@ -97,7 +97,7 @@ BUILD_DTBO=0
 
 # Sign the zipfile
 # 1 is YES | 0 is NO
-SIGN=1
+SIGN=0
 	if [ $SIGN = 1 ]
 	then
 		#Check for java
