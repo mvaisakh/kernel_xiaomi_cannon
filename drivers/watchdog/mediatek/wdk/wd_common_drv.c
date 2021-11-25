@@ -117,10 +117,8 @@ static struct notifier_block wdt_pm_nb;
 #ifdef KWDT_KICK_TIME_ALIGN
 static unsigned long g_nxtKickTime;
 #endif
-static int g_hang_detected;
 
 static char cmd_buf[256];
-
 
 static int wk_proc_cmd_read(struct seq_file *s, void *v)
 {
@@ -508,67 +506,12 @@ static void kwdt_print_utc(char *msg_buf, int msg_buf_size)
 		tm_android.tm_min, tm_android.tm_sec,
 		(unsigned int)tv_android.tv_usec);
 }
-static void kwdt_process_kick(int local_bit, int cpu,
-				unsigned long curInterval, char msg_buf[])
-{
-	unsigned int dump_timeout = 0;
-
-	local_bit = kick_bit;
-	if ((local_bit & (1 << cpu)) == 0) {
-		/* pr_debug("[wdk] set kick_bit\n"); */
-		local_bit |= (1 << cpu);
-		/* aee_rr_rec_wdk_kick_jiffies(jiffies); */
-	} else if (g_hang_detected == 0) {
-		g_hang_detected = 1;
-		dump_timeout = 1;
-	}
-
-	/*
-	 * do not print message with spinlock held to
-	 *  avoid bulk of delayed printk happens here
-	 */
-	wk_tsk_kick_time[cpu] = sched_clock();
-	snprintf(msg_buf, WK_MAX_MSG_SIZE,
-	 "[wdk-c] cpu=%d,lbit=0x%x,cbit=0x%x,%d,%d,%lld,%lld,%lld,[%lld,%ld]\n",
-	 cpu, local_bit, wk_check_kick_bit(), lasthpg_cpu, lasthpg_act,
-	 lasthpg_t, lastsuspend_t, lastresume_t, wk_tsk_kick_time[cpu],
-	 curInterval);
-
-	if (local_bit == wk_check_kick_bit()) {
-		msg_buf[5] = 'k';
-		mtk_wdt_restart(WD_TYPE_NORMAL);/* for KICK external wdt */
-		local_bit = 0;
-	}
-
-	kick_bit = local_bit;
-	spin_unlock(&lock);
-
-	/*
-	 * [wdt-c]: mark local bit only.
-	 * [wdt-k]: kick watchdog actaully, this log is more important thus
-	 *	    using printk_deferred to ensure being printed.
-	 */
-	if (msg_buf[5] != 'k')
-		pr_info("%s", msg_buf);
-	else
-		printk_deferred("%s", msg_buf);
-
-	if (dump_timeout)
-		dump_wdk_bind_info();
-
-#ifdef CONFIG_LOCAL_WDT
-	printk_deferred("[wdk] cpu:%d, kick local wdt,RT[%lld]\n",
-			cpu, sched_clock());
-	/* kick local wdt */
-	mpcore_wdt_restart(WD_TYPE_NORMAL);
-#endif
-}
 
 static int kwdt_thread(void *arg)
 {
 	struct sched_param param = {.sched_priority = 99 };
 	int cpu = 0;
-	int local_bit = 0, loc_need_config = 0, loc_timeout = 0;
+	int loc_need_config = 0, loc_timeout = 0;
 	unsigned long curInterval = 0;
 	struct wd_api *loc_wk_wdt = NULL;
 	char msg_buf[WK_MAX_MSG_SIZE];
@@ -640,8 +583,6 @@ static int kwdt_thread(void *arg)
 						curInterval =
 							g_kinterval*1000*1000;
 #endif
-					kwdt_process_kick(local_bit, cpu,
-						curInterval, msg_buf);
 				} else
 					spin_unlock(&lock);
 			} else
