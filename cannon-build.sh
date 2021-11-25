@@ -19,6 +19,7 @@
  #
 
 #Kernel building script
+set -e
 
 # Function to show an informational message
 msg() {
