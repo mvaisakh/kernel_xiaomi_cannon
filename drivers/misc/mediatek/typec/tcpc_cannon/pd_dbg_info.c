@@ -34,7 +34,7 @@ static struct {
 	char buf[PD_INFO_BUF_SIZE + 1 + OUT_BUF_MAX];
 } pd_dbg_buffer[2];
 
-static bool dbg_log_en = true;
+static bool dbg_log_en = false;
 module_param(dbg_log_en, bool, 0644);
 
 static struct mutex buff_lock;
