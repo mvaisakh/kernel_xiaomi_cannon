@@ -165,7 +165,7 @@ int xiaomitouch_register_modedata(struct xiaomi_touch_interface *data)
 
 	touch_data->setModeValue = data->setModeValue;
 	touch_data->getModeValue = data->getModeValue;
-	touch_data->resetMode= data->resetMode;
+	touch_data->resetMode = data->resetMode;
 	touch_data->getModeAll = data->getModeAll;
 	touch_data->palm_sensor_read = data->palm_sensor_read;
 	touch_data->palm_sensor_write = data->palm_sensor_write;
@@ -224,9 +224,9 @@ struct device_attribute *attr, const char *buf, size_t count)
 	struct xiaomi_touch_pdata *pdata = dev_get_drvdata(dev);
 
 	if (sscanf(buf, "%d", &input) < 0)
-			return -EINVAL;
+		return -EINVAL;
 
-	if(input == 3) {
+	if (input == 3) {
 		touch_pdata->palm_value = 3;
 		touch_pdata->palm_changed = true;
 		wake_up(&touch_pdata->device->wait_queue);
@@ -286,7 +286,7 @@ struct device_attribute *attr, const char *buf, size_t count)
 	struct xiaomi_touch_pdata *pdata = dev_get_drvdata(dev);
 
 	if (sscanf(buf, "%d", &input) < 0)
-			return -EINVAL;
+		return -EINVAL;
 
 	if (pdata->touch_data->p_sensor_write)
 		pdata->touch_data->p_sensor_write(!!input);
@@ -302,6 +302,7 @@ static ssize_t xiaomi_touch_vendor_show(struct device *dev, struct device_attrib
 {
 	char value = '0';
 	struct xiaomi_touch_pdata *pdata = dev_get_drvdata(dev);
+
 	if (pdata->touch_data->touch_vendor_read)
 		value = pdata->touch_data->touch_vendor_read();
 	else
@@ -313,6 +314,7 @@ static ssize_t xiaomi_panel_color_show(struct device *dev, struct device_attribu
 {
 	char value = '0';
 	struct xiaomi_touch_pdata *pdata = dev_get_drvdata(dev);
+
 	if (pdata->touch_data->panel_color_read)
 		value = pdata->touch_data->panel_color_read();
 	else
@@ -326,6 +328,7 @@ static ssize_t xiaomi_panel_vendor_show(struct device *dev, struct device_attrib
 {
 	char value = '0';
 	struct xiaomi_touch_pdata *pdata = dev_get_drvdata(dev);
+
 	if (pdata->touch_data->panel_vendor_read)
 		value = pdata->touch_data->panel_vendor_read();
 	else
@@ -339,6 +342,7 @@ static ssize_t xiaomi_panel_display_show(struct device *dev, struct device_attri
 {
 	char value = '0';
 	struct xiaomi_touch_pdata *pdata = dev_get_drvdata(dev);
+
 	if (pdata->touch_data->panel_display_read)
 		value = pdata->touch_data->panel_display_read();
 	else
@@ -358,6 +362,7 @@ static ssize_t log_debug_store(struct device *dev,
 struct device_attribute *attr, const char *buf, size_t count)
 {
 	unsigned int input;
+
 	if (sscanf(buf, "%d", &input) < 0)
 		return -EINVAL;
 
@@ -368,10 +373,10 @@ struct device_attribute *attr, const char *buf, size_t count)
 }
 
 
-static DEVICE_ATTR(palm_sensor, (S_IRUGO | S_IWUSR | S_IWGRP),
+static DEVICE_ATTR(palm_sensor, (0664),
 		   palm_sensor_show, palm_sensor_store);
 
-static DEVICE_ATTR(p_sensor, (S_IRUGO | S_IWUSR | S_IWGRP),
+static DEVICE_ATTR(p_sensor, (0664),
 		   p_sensor_show, p_sensor_store);
 
 static DEVICE_ATTR(touch_vendor, 0644, xiaomi_touch_vendor_show, NULL);
@@ -379,7 +384,7 @@ static DEVICE_ATTR(panel_display, 0644, xiaomi_panel_display_show, NULL);
 static DEVICE_ATTR(panel_vendor, 0644, xiaomi_panel_vendor_show, NULL);
 static DEVICE_ATTR(panel_color, 0644, xiaomi_panel_color_show, NULL);
 
-static DEVICE_ATTR(log_debug, (S_IRUGO | S_IWUSR | S_IWGRP),
+static DEVICE_ATTR(log_debug, (0664),
 		log_debug_show, log_debug_store);
 
 static struct attribute *touch_attr_group[] = {
@@ -421,6 +426,7 @@ static int xiaomi_touch_probe(struct platform_device *pdev)
 	int ret = 0;
 	struct device *dev = &pdev->dev;
 	struct xiaomi_touch_pdata *pdata;
+
 	mi_log_level = TOUCH_INFO;
 	pdata = devm_kzalloc(dev, sizeof(struct xiaomi_touch_pdata), GFP_KERNEL);
 	if (!pdata)
@@ -519,6 +525,7 @@ static struct platform_driver xiaomi_touch_device_driver = {
 static int __init xiaomi_touch_init(void)
 {
 	int ret;
+
 	MI_TOUCH_LOGI(1, "enter ++");
 	ret = platform_driver_register(&xiaomi_touch_device_driver);
 	MI_TOUCH_LOGI(1, "out --");
