@@ -11,9 +11,10 @@ jobs:
       image: panchajanya1999/archlinux:latest
     steps:
       - uses: actions/checkout@v2
+      - name: Setup env
+        run: pacman -Syu --needed --noconfirm wget base-devel xmlto inetutils bc cpio python-sphinx python-sphinx_rtd_theme graphviz imagemagick git python2 python zip 
       - name: Build Kernel
         run: |
-          pacman -Syu --needed --noconfirm wget base-devel xmlto inetutils bc cpio python-sphinx python-sphinx_rtd_theme graphviz imagemagick git python2 python zip
           export token=${TELEGRAM_BOT_TOKEN}
           bash cannon-build.sh
         env:
