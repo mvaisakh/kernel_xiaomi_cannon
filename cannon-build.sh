@@ -124,7 +124,7 @@ LOG_DEBUG=0
 # set KBUILD_BUILD_VERSION and KBUILD_BUILD_HOST and CI_BRANCH
 
 ## Set defaults first
-DISTRO=$(cat /etc/issue)
+DISTRO=$(cat /etc/issue | awk '{ print substr( $0, 1, length($0)-8 ) }')
 KBUILD_BUILD_HOST=$(uname -a | awk '{print $2}')
 CI_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 TERM=xterm
