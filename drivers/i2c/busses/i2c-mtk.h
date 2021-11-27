@@ -453,7 +453,6 @@ struct mt_i2c {
 #endif
 
 extern void gpio_dump_regs_range(int start, int end);
-extern void i2c_dump_info(struct mt_i2c *i2c);
 #if defined(CONFIG_MTK_GIC_EXT)
 extern void mt_irq_dump_status(unsigned int irq);
 #endif
