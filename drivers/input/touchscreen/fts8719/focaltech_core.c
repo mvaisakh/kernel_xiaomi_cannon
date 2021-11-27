@@ -801,7 +801,7 @@ static int fts_input_event(struct input_dev *dev, unsigned int type,
 													unsigned int code, int value)
 {
 	struct fts_ts_data *ts_data = input_get_drvdata(dev);
-	struct fts_mode_switch *sw;
+	struct fts_mode_switch sw[value];
 
 	if (!ts_data) {
 		FTS_ERROR("ts_data is NULL");
@@ -810,11 +810,7 @@ static int fts_input_event(struct input_dev *dev, unsigned int type,
 
 	if (type == EV_SYN && code == SYN_CONFIG) {
 		if (value >= INPUT_EVENT_START && value <= INPUT_EVENT_END) {
-			sw = (struct fts_mode_switch *)kzalloc(sizeof(*sw), GFP_ATOMIC);
-			if (!sw) {
-				FTS_ERROR("alloc memory failed");
-				return -ENOMEM;
-			}
+			memset(sw, 0, sizeof(sw));
 			sw->ts_data = ts_data;
 			sw->mode = (unsigned char)value;
 			INIT_WORK(&sw->switch_mode_work, fts_switch_mode_work);
