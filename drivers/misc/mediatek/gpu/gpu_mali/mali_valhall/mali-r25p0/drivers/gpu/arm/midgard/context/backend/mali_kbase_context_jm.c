@@ -222,7 +222,7 @@ void kbase_destroy_context(struct kbase_context *kctx)
 	kbase_mem_pool_group_mark_dying(&kctx->mem_pools);
 
 	kbase_jd_zap_context(kctx);
-	flush_workqueue(kctx->jctx.job_done_wq);
+	kthread_flush_worker(&kctx->kbdev->job_done_worker);
 
 	kbase_context_term_partial(kctx, ARRAY_SIZE(context_init));
 
