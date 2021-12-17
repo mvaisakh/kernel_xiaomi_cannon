@@ -10,7 +10,6 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
-subdir-ccflags-y += -Werror
 subdir-ccflags-y += -D__linux__
 
 #scp smartpa related code
@@ -45,8 +44,8 @@ MTK_CODEC := $(subst ",,$(CONFIG_MTK_SND_SOC_CODEC))
 
 # PMIC include path
 ifneq  ($(MTK_CODEC),)
-subdir-ccflags-y += -Werror -Werror -Icodec/$(MTK_CODEC)/
-subdir-ccflags-y += -Werror -I$(src)/common_int
+subdir-ccflags-y += -Icodec/$(MTK_CODEC)/
+subdir-ccflags-y += -I$(src)/common_int
 
 # Update pmic built flow to avoid codec init later than codec probe
 obj-y += codec/$(MTK_CODEC)/
@@ -56,8 +55,8 @@ MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
 # flags for not ready feature, uncomment after ready
 subdir-ccflags-y += -D_GIT318_PMIC_READY
 subdir-ccflags-y += -DAUDIO_USING_WRAP_DRIVER
-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/
+subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/
 endif
 endif
 
@@ -92,16 +91,16 @@ subdir-ccflags-y += -D_MT_IDLE_HEADER
 subdir-ccflags-y += -D_REG_SYNC_WRITE
 
 # include path
-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/accdet/mt6358
-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include
-subdir-ccflags-${CONFIG_MACH_MT6833} += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/mt6833/include
-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat
-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/base/power/include
-subdir-ccflags-${CONFIG_MACH_MT6833} += -Werror -I$(srctree)/drivers/misc/mediatek/base/power/mt6833/
-subdir-ccflags-${CONFIG_MACH_MT6833} += -Werror -I$(srctree)/drivers/misc/mediatek/dramc/mt6833/
-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/base/power/$(MTK_PLATFORM)
-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/dramc/$(MTK_PLATFORM)/
+subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/accdet/mt6358
+subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include
+subdir-ccflags-${CONFIG_MACH_MT6833} +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat/mt6833/include
+subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat
+subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/base/power/include
+subdir-ccflags-${CONFIG_MACH_MT6833} +=  -I$(srctree)/drivers/misc/mediatek/base/power/mt6833/
+subdir-ccflags-${CONFIG_MACH_MT6833} +=  -I$(srctree)/drivers/misc/mediatek/dramc/mt6833/
+subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/base/power/$(MTK_PLATFORM)
+subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/dramc/$(MTK_PLATFORM)/
 
 ifeq ($(CONFIG_MACH_MT6833),y)
 AUDIO_PLATFORM := mt6833
@@ -109,19 +108,19 @@ else
 AUDIO_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
 endif
 
-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/scp/$(AUDIO_PLATFORM)/
-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/audio_ipi/$(AUDIO_PLATFORM)/
+subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/scp/$(AUDIO_PLATFORM)/
+subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/audio_ipi/$(AUDIO_PLATFORM)/
 
 
 # Common include path
-subdir-ccflags-y += -Werror -I$(src)/common_int
+subdir-ccflags-y +=  -I$(src)/common_int
 
 # PMIC include path
 ifneq  ($(MTK_CODEC),)
-subdir-ccflags-y += -Werror -I$(src)/codec/$(MTK_CODEC)
+subdir-ccflags-y +=  -I$(src)/codec/$(MTK_CODEC)
 endif
 
-subdir-ccflags-y += -Werror -Wno-incompatible-pointer-types
+subdir-ccflags-y +=  -Wno-incompatible-pointer-types
 
 # Update pmic built flow to avoid codec init later than codec probe
 ifneq  ($(MTK_CODEC),)
@@ -133,5 +132,5 @@ obj-y += common_int/
 obj-y += $(AUDIO_PLATFORM)/
 
 # AP include path
-subdir-ccflags-y += -Werror -I$(src)/$(AUDIO_PLATFORM)
+subdir-ccflags-y +=  -I$(src)/$(AUDIO_PLATFORM)
 endif
