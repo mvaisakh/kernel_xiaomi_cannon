@@ -218,33 +218,6 @@ static ssize_t wakeup_enable_set(struct device *dev,
 
 static DEVICE_ATTR(wakeup_enable, 0200, NULL, wakeup_enable_set);
 
-/*
- * sysfs node for sending event to make the system interactive,
- * i.e. waking up
- */
-static ssize_t do_wakeup_set(struct device *dev,
-			     struct device_attribute *attr, const char *buf,
-			     size_t count)
-{
-	struct fpc1022_data *fpc1022 = dev_get_drvdata(dev);
-
-	if (count > 0) {
-		/*
-		 * Sending power key event creates a toggling
-		 * effect that may be desired. It could be
-		 * replaced by another event such as KEY_WAKEUP.
-		 */
-		input_report_key(fpc1022->idev, KEY_POWER, 1);
-		input_report_key(fpc1022->idev, KEY_POWER, 0);
-		input_sync(fpc1022->idev);
-	} else
-		return -EINVAL;
-
-	return count;
-}
-
-static DEVICE_ATTR(do_wakeup, 0200, NULL, do_wakeup_set);
-
 static ssize_t clk_enable_set(struct device *dev,
 			      struct device_attribute *attr, const char *buf,
 			      size_t count)
@@ -334,7 +307,6 @@ static DEVICE_ATTR(fpid_get, 0600, fpc_ic_is_exist, NULL);
 static struct attribute *attributes[] = {
 	&dev_attr_hw_reset.attr,
 	&dev_attr_wakeup_enable.attr,
-	&dev_attr_do_wakeup.attr,
 	&dev_attr_clk_enable.attr,
 	&dev_attr_irq.attr,
 	&dev_attr_fpid_get.attr,
@@ -462,11 +434,6 @@ static int fpc1022_platform_probe(struct platform_device *pldev)
 		fpc1022->idev->name = fpc1022->idev_name;
 	}
 
-	/* Also register the key for wake up */
-	set_bit(EV_KEY, fpc1022->idev->evbit);
-	set_bit(EV_PWR, fpc1022->idev->evbit);
-	set_bit(KEY_WAKEUP, fpc1022->idev->keybit);
-	set_bit(KEY_POWER, fpc1022->idev->keybit);
 	ret = input_register_device(fpc1022->idev);
 	atomic_set(&fpc1022->wakeup_enabled, 1);
 
