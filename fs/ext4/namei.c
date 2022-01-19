@@ -2588,11 +2588,7 @@ int ext4_generic_delete_entry(handle_t *handle,
 	de = (struct ext4_dir_entry_2 *)entry_buf;
 	while (i < buf_size - csum_size) {
 		if (ext4_check_dir_entry(dir, NULL, de, bh,
-<<<<<<< HEAD
-					 bh->b_data, bh->b_size, lblk, i))
-=======
 					 entry_buf, buf_size, i))
->>>>>>> e761f59736bafbf095575565f82ef82652aca4ba
 			return -EFSCORRUPTED;
 		if (de == de_del)  {
 			if (pde)
