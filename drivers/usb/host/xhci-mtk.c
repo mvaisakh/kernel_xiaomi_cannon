@@ -977,8 +977,6 @@ static int xhci_mtk_remove(struct platform_device *dev)
 	pm_runtime_put_noidle(&dev->dev);
 	pm_runtime_disable(&dev->dev);
 
-	xhci->xhc_state |= XHCI_STATE_REMOVING;
-
 #if IS_ENABLED(CONFIG_MACH_MT6853)
 	if (mtk->last_speed == DEV_SPEED_FULL) {
 		ssusb_set_phy_mode(DEV_SPEED_INACTIVE);
