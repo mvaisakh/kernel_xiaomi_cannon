@@ -878,18 +878,7 @@ static ssize_t aw8622_duration_store(struct device *dev,
 	if (val <= 0)
 		return count;
 
-	mutex_lock(&haptic->mutex_lock);
-	if (val < 20) { //20ms
-		haptic->effect_idx = 1; //short haptic 1
-	} else if (val >= 20 && val < 40) {
-		haptic->effect_idx = 2; //short haptic 2
-	} else if (val >= 40 && val < 60) {
-		haptic->effect_idx = 3; //short haptic 3
-	} else {
-		haptic->effect_idx = 0;
-	}
 	haptic->duration = val;
-	mutex_unlock(&haptic->mutex_lock);
 	return count;
 }
 
