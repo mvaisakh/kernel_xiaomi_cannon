@@ -159,4 +159,3 @@ extern unsigned int hmp_cpu_is_fastest(int cpu);
 static int check_freq_turning(void);
 struct rq *__migrate_task(struct rq *rq, struct rq_flags *rf,
 				struct task_struct *p, int dest_cpu);
-
