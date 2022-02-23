@@ -996,7 +996,6 @@ static int arm_v7s_switch_acp(struct io_pgtable_ops *ops,
 	unsigned long iova_start = iova;
 	unsigned long iova_end = iova + size - 1;
 	unsigned long pte_sz = 0;
-	u32 sz;
 	int lvl;
 
 	while (iova < iova_end) {
