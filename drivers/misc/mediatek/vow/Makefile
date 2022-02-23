@@ -38,5 +38,7 @@ obj-y += v02/
 endif
 endif
 
+subdir-ccflags-y += $(call cc-disable-warning, unused-result)
+
 # MTK vow driver interface
 obj-y += $(MTK_PLATFORM)/
