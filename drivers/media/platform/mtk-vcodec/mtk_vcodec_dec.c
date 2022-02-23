@@ -2212,7 +2212,7 @@ static void vb2ops_vdec_buf_queue(struct vb2_buffer *vb)
 
 		src_buf = v4l2_m2m_src_buf_remove(ctx->m2m_ctx);
 		if (!src_buf) {
-			mtk_v4l2_err("[%d]Error!!src_buf is NULL!");
+			mtk_v4l2_err("[%d]Error!!src_buf is NULL!", __LINE__);
 			return;
 		}
 		v4l2_m2m_buf_done(to_vb2_v4l2_buffer(src_buf),
