@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2018 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -155,6 +156,8 @@
 #else
 #define CONFIG_LVTS_ERROR_AEE_WARNING (0)
 #endif
+
+#define LVTS_REFINE_MANUAL_RCK_WITH_EFUSE  (1)
 
 #define DUMP_LVTS_REGISTER_FOR_ZERO_RAW_ISSUE  (1)
 
