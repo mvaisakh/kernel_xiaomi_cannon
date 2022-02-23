@@ -4059,7 +4059,7 @@ static void mtk_iommu_pg_before_off(enum subsys_id sys)
 				}
 			}
 			if (end)
-				pr_notice("%s pg waiting isr:%lluns, ref:%d\n",
+				pr_notice("%s pg waiting isr:%lluns, ref:%lx\n",
 					  __func__, end - start, data->isr_ref);
 			spin_lock_irqsave(&data->reg_lock, flags);
 		}
@@ -4196,7 +4196,7 @@ static int mtk_iommu_hw_init(struct mtk_iommu_data *data)
 	data->base_sec = of_iomap(node, 0);
 	mtk_irq_sec[m4u_id] = irq_of_parse_and_map(node, 0);
 
-	pr_notice("%s, secure bank, of_iomap: 0x%lx, irq_num: %d, m4u_id:%d\n",
+	pr_notice("%s, secure bank, of_iomap: 0x%p, irq_num: %d, m4u_id:%d\n",
 			__func__, data->base_sec,
 			mtk_irq_sec[m4u_id], m4u_id);
 
@@ -4222,7 +4222,7 @@ static int mtk_iommu_hw_init(struct mtk_iommu_data *data)
 		data->base_bank[i] = of_iomap(node, 0);
 		mtk_irq_bank[m4u_id][i] = irq_of_parse_and_map(node, 0);
 
-		pr_notice("%s, bank:%d, of_iomap: 0x%lx, irq_num: %d, m4u_id:%d\n",
+		pr_notice("%s, bank:%d, of_iomap: 0x%p, irq_num: %d, m4u_id:%d\n",
 				__func__, i + 1, data->base_bank[i],
 				mtk_irq_bank[m4u_id][i], m4u_id);
 
