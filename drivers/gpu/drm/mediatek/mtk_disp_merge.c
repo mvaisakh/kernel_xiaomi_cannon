@@ -163,7 +163,7 @@ int mtk_merge_analysis(struct mtk_ddp_comp *comp)
 	DDPDUMP("== DISP %s ANALYSIS ==\n", mtk_dump_comp_str(comp));
 
 	n = snprintf(msg, len,
-		     "en:%d,swap:%d,dcm_dis:%d,width_L:%d,width_R:%d,h:%d,pix_cnt:%d,line_cnt:%d\n",
+		     "en:%d,swap:%d,dcm_dis:%d,width_L:%d,width_R:%d,h:%d,pix_cnt:%d,merge_state:%d,line_cnt:%d\n",
 		     REG_FLD_VAL_GET(FLD_MERGE_EN, enable),
 		     REG_FLD_VAL_GET(FLD_MERGE_LR_SWAP, enable),
 		     REG_FLD_VAL_GET(FLD_MERGE_DCM_DIS, enable),
