@@ -409,7 +409,7 @@ static dma_addr_t iommu_dma_alloc_iova(struct iommu_domain *domain,
 		 * limit_pfn send from user.
 		 */
 		if (dma_limit <= domain->geometry.aperture_start) {
-			dev_notice(dev, "dma limit:0x%lx, is out of domain boundary(0x%lx~0x%lx)",
+			dev_notice(dev, "dma limit:0x%llx, is out of domain boundary(0x%llx~0x%llx)",
 				   dma_limit, domain->geometry.aperture_start,
 				   domain->geometry.aperture_end);
 			WARN_ON(1);
@@ -418,7 +418,7 @@ static dma_addr_t iommu_dma_alloc_iova(struct iommu_domain *domain,
 
 		if (size > (dma_limit -
 			domain->geometry.aperture_start + 1)) {
-			dev_notice(dev, "size:0x%lx, is out of dma limit(0x%lx~0x%lx)",
+			dev_notice(dev, "size:0x%lx, is out of dma limit(0x%llx~0x%llx)",
 				   size, domain->geometry.aperture_start,
 				   dma_limit);
 			WARN_ON(1);
