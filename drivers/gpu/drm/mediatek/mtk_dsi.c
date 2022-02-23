@@ -4668,7 +4668,7 @@ long lcm_mipi_reg_write(char *buf, size_t count)
 		goto exit;
 	} else {
 		lcm_mipi_read_write.lcm_setting_table.count = (unsigned char)packet_count;
-		memcpy(lcm_mipi_read_write.lcm_setting_table.para_list, "",64);
+		memcpy(lcm_mipi_read_write.lcm_setting_table.para_list, "", dlen);
 		if(count > 8)
 		{
 			data = kzalloc(count - 6, GFP_KERNEL);
