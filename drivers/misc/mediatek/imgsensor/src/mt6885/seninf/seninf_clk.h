@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -25,7 +26,6 @@
 #include "kd_imgsensor_define.h"
 
 #include "seninf_common.h"
-#define TG1_ALWAYS_ON
 
 #ifdef CONFIG_FPGA_EARLY_PORTING
 #define SENINF_CLK_CONTROL 0
@@ -90,7 +90,6 @@ enum SENINF_CLK_TG {
 	SENINF_CLK_TG_2,
 	SENINF_CLK_TG_3,
 	SENINF_CLK_TG_4,
-	SENINF_CLK_TG_5,
 	SENINF_CLK_TG_MAX_NUM
 };
 
@@ -114,42 +113,6 @@ enum SENINF_CLK_MCLK_FREQ {
 struct SENINF_CLK_CTRL {
 	char *pctrl;
 };
-
-static struct SENINF_CLK_CTRL gseninf_mclk_name[SENINF_CLK_IDX_MAX_NUM] = {
-	{"SCP_SYS_MDP"},
-	{"SCP_SYS_CAM"},
-	{"CAMSYS_SENINF_CGPDN"},
-	{"TOP_MUX_SENINF"},
-	{"TOP_MUX_SENINF1"},
-	{"TOP_MUX_SENINF2"},
-	{"TOP_MUX_SENINF3"},
-	{"TOP_MUX_CAMTG"},
-	{"TOP_MUX_CAMTG2"},
-	{"TOP_MUX_CAMTG3"},
-	{"TOP_MUX_CAMTG4"},
-	{"TOP_MUX_CAMTG5"},
-	{"TOP_MUX_CAMTG6"},
-	{"TOP_UNIVP_192M_D32"}, /*   6*/
-	{"TOP_UNIVP_192M_D16"}, /*  12*/
-	{"TOP_F26M_CK_D2"},     /*  13*/
-	{"TOP_UNIVP_192M_D8"},  /*  24*/
-	{"TOP_CLK26M"},         /*  26*/
-	{"TOP_UNIVP_192M_D4"},  /*  48*/
-	{"TOP_UNIVPLL_D6_D8"},  /*  52*/
-};
-
-static enum SENINF_CLK_MCLK_FREQ
-gseninf_clk_freq[SENINF_CLK_IDX_FREQ_IDX_NUM] = {
-	SENINF_CLK_MCLK_FREQ_6MHZ,
-	SENINF_CLK_MCLK_FREQ_12MHZ,
-	SENINF_CLK_MCLK_FREQ_13MHZ,
-	SENINF_CLK_MCLK_FREQ_24MHZ,
-	SENINF_CLK_MCLK_FREQ_26MHZ,
-	SENINF_CLK_MCLK_FREQ_48MHZ,
-	SENINF_CLK_MCLK_FREQ_52MHZ,
-};
-
-
 
 struct SENINF_CLK {
 	struct platform_device *pplatform_device;
