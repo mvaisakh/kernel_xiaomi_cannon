@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -110,7 +111,8 @@ static struct disp_session_sync_info *_get_session_sync_info(
 	if (DISP_SESSION_TYPE(session_id) != DISP_SESSION_PRIMARY &&
 	    DISP_SESSION_TYPE(session_id) != DISP_SESSION_MEMORY &&
 	    DISP_SESSION_TYPE(session_id) != DISP_SESSION_EXTERNAL) {
-		DISPERR("invalid session id:0x%08x\n", session_id);
+		if (printk_ratelimit())
+			DISPERR("invalid session id:0x%08x\n", session_id);
 		return NULL;
 	}
 
@@ -269,19 +271,21 @@ struct disp_sync_info *_get_sync_info(unsigned int session_id,
 	struct disp_sync_info *layer_info = NULL;
 	struct disp_session_sync_info *session_info =
 		_get_session_sync_info(session_id);
+	int prl = printk_ratelimit();
 
 	mutex_lock(&_disp_fence_mutex);
 
 	if (session_info == NULL) {
-		DISPERR("cant get sync info for session_id:0x%08x\n",
+		if (prl)
+			DISPERR("cant get sync info for session_id:0x%08x\n",
 			session_id);
 		goto done;
 	}
 
 	if (timeline_id >= sizeof(session_info->session_layer_info) /
 	    sizeof(session_info->session_layer_info[0])) {
-
-		DISPERR("invalid timeline_id:%d\n",
+		if (prl)
+			DISPERR("invalid timeline_id:%d\n",
 			timeline_id);
 		goto done;
 	} else {
@@ -290,13 +294,15 @@ struct disp_sync_info *_get_sync_info(unsigned int session_id,
 	}
 
 	if (layer_info == NULL) {
-		DISPERR("cant get sync info for timeline_id:%d\n",
+		if (prl)
+			DISPERR("cant get sync info for timeline_id:%d\n",
 			timeline_id);
 		goto done;
 	}
 
 	if (layer_info->inited == 0) {
-		DISPERR("layer_info[%d] not inited\n",
+		if (prl)
+			DISPERR("layer_info[%d] not inited\n",
 			timeline_id);
 		goto done;
 	}
