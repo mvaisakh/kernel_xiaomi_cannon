@@ -23,6 +23,6 @@ ccflags-y += -I$(srctree)/drivers/iommu/
 ccflags-${CONFIG_MACH_MT6833} += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/mt6833/include
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include/
 ccflags-y += -I$(srctree)/drivers/clk/mediatek/
-
+subdir-ccflags-y += $(call cc-disable-warning, format-extra-args)
 obj-y += camera_isp.o
 obj-y += cam_qos.o
