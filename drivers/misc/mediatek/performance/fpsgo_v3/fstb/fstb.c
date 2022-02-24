@@ -1831,7 +1831,7 @@ static ssize_t fstb_tune_window_size_show(struct kobject *kobj,
 		struct kobj_attribute *attr,
 		char *buf)
 {
-	return scnprintf(buf, PAGE_SIZE, "%d\n", FRAME_TIME_WINDOW_SIZE_US);
+	return scnprintf(buf, PAGE_SIZE, "%lld\n", FRAME_TIME_WINDOW_SIZE_US);
 }
 
 static ssize_t fstb_tune_window_size_store(struct kobject *kobj,

@@ -217,7 +217,7 @@ static ssize_t gbe_policy_mask_show(struct kobject *kobj,
 		struct kobj_attribute *attr,
 		char *buf)
 {
-	return scnprintf(buf, PAGE_SIZE, "%d\n", policy_mask);
+	return scnprintf(buf, PAGE_SIZE, "%ld\n", policy_mask);
 }
 
 static ssize_t gbe_policy_mask_store(struct kobject *kobj,
