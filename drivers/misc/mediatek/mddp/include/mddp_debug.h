@@ -84,7 +84,7 @@ struct mddp_dstate_t {
 	uint8_t                 str[MDDP_DSTATE_STR_SZ];
 };
 
-static struct mddp_dstate_t mddp_dstate_temp_s[] = {
+static struct mddp_dstate_t mddp_dstate_temp_s[] __maybe_unused = {
 	{MDDP_DSTATE_ID_START,
 	"==================== [%s] START DSTATE ===================="},
 	{MDDP_DSTATE_ID_STOP,
