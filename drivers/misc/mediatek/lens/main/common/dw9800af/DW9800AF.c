@@ -124,7 +124,7 @@ static inline int moveAF(unsigned long a_u4Position)
 {
 	int ret = 0;
 
-	printk("jianlong moveAF tg pos: %d", a_u4Position);
+	printk("jianlong moveAF tg pos: %lu", a_u4Position);
 	//LOG_INF("move+ [curr] %d [target] %d [ret] %d\n", g_u4CurrPosition, g_u4TargetPosition, ret);
 
 	if ((a_u4Position > g_u4AF_MACRO) || (a_u4Position < g_u4AF_INF)) {
