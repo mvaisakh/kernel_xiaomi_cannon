@@ -2525,7 +2525,7 @@ static void cmdq_mdp_begin_task_virtual(struct cmdqRecStruct *handle,
 		(curr_time.tv_sec == mdp_curr_pmqos->tv_sec &&
 		curr_time.tv_usec > mdp_curr_pmqos->tv_usec);
 	CMDQ_LOG_PMQOS(
-		"%s%s handle:0x%p engine:0x%llx thread:%u cur:%lu.%lu end:%lu.%lu run:%u\n",
+		"%s%s handle:0x%p engine:0x%llx thread:%u cur:%lu.%lu end:%llu.%llu run:%u\n",
 		__func__, expired ? " expired" : "",
 		handle, handle->engineFlag, handle->thread,
 		curr_time.tv_sec, curr_time.tv_usec,
@@ -2843,7 +2843,7 @@ static void cmdq_mdp_end_task_virtual(struct cmdqRecStruct *handle,
 	expired = curr_time.tv_sec > mdp_curr_pmqos->tv_sec ||
 		(curr_time.tv_sec == mdp_curr_pmqos->tv_sec &&
 		curr_time.tv_usec > mdp_curr_pmqos->tv_usec);
-	CMDQ_LOG_PMQOS("%s%s handle:0x%p engine:0x%llx cur:%lu.%lu end:%lu.%lu run:%u\n",
+	CMDQ_LOG_PMQOS("%s%s handle:0x%p engine:0x%llx cur:%lu.%lu end:%llu.%llu run:%u\n",
 		__func__, expired ? " expired" : "",
 		handle, handle->engineFlag,
 		curr_time.tv_sec, curr_time.tv_usec,
