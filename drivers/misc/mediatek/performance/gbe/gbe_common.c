@@ -63,21 +63,26 @@ enum GBE_BOOST_DEVICE {
 static unsigned long __read_mostly tracing_mark_write_addr;
 static inline void __mt_update_tracing_mark_write_addr(void)
 {
+#ifdef CONFIG_TRACING
 	if (unlikely(tracing_mark_write_addr == 0))
 		tracing_mark_write_addr =
 			kallsyms_lookup_name("tracing_mark_write");
+#endif
 }
 void gbe_trace_printk(int pid, char *module, char *string)
 {
+#ifdef CONFIG_TRACING
 	__mt_update_tracing_mark_write_addr();
 	preempt_disable();
 	event_trace_printk(tracing_mark_write_addr, "%d [%s] %s\n",
 			pid, module, string);
 	preempt_enable();
+#endif
 }
 
 void gbe_trace_count(int tid, int val, const char *fmt, ...)
 {
+#ifdef CONFIG_TRACING
 	char log[32];
 	va_list args;
 	int len;
@@ -105,6 +110,7 @@ void gbe_trace_count(int tid, int val, const char *fmt, ...)
 	}
 
 	preempt_enable();
+#endif
 }
 
 static struct miscdevice gbe_object;
