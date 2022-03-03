@@ -26,6 +26,7 @@ static unsigned long __read_mostly mark_addr;
 
 static int rs_update_tracemark(void)
 {
+#ifdef CONFIG_TRACING
 	if (mark_addr)
 		return 1;
 
@@ -35,10 +36,14 @@ static int rs_update_tracemark(void)
 		return 0;
 
 	return 1;
+#else
+	return 0;
+#endif
 }
 
 void __rs_systrace_c(pid_t pid, int val, const char *fmt, ...)
 {
+#ifdef CONFIG_TRACING
 	char log[LOGSIZE];
 	va_list args;
 	int len;
@@ -56,10 +61,12 @@ void __rs_systrace_c(pid_t pid, int val, const char *fmt, ...)
 	preempt_disable();
 	event_trace_printk(mark_addr, "C|%d|%s|%d\n", pid, log, val);
 	preempt_enable();
+#endif
 }
 
 void __rs_systrace_c_uint64(pid_t pid, uint64_t val, const char *fmt, ...)
 {
+#ifdef CONFIG_TRACING
 	char log[LOGSIZE];
 	va_list args;
 	int len;
@@ -77,10 +84,12 @@ void __rs_systrace_c_uint64(pid_t pid, uint64_t val, const char *fmt, ...)
 	preempt_disable();
 	event_trace_printk(mark_addr, "C|%d|%s|%llu\n", pid, log, val);
 	preempt_enable();
+#endif
 }
 
 void __rs_systrace_b(pid_t tgid, const char *fmt, ...)
 {
+#ifdef CONFIG_TRACING
 	char log[LOGSIZE];
 	va_list args;
 	int len;
@@ -98,23 +107,27 @@ void __rs_systrace_b(pid_t tgid, const char *fmt, ...)
 	preempt_disable();
 	event_trace_printk(mark_addr, "B|%d|%s\n", tgid, log);
 	preempt_enable();
+#endif
 }
 
 void __rs_systrace_e(void)
 {
+#ifdef CONFIG_TRACING
 	if (unlikely(!rs_update_tracemark()))
 		return;
 
 	preempt_disable();
 	event_trace_printk(mark_addr, "E\n");
 	preempt_enable();
+#endif
 }
 
 int rs_trace_init(void)
 {
+#ifdef CONFIG_TRACING
 	if (!rs_update_tracemark())
 		return -1;
-
+#endif
 	return 0;
 }
 
