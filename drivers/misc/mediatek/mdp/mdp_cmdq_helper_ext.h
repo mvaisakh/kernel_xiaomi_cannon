@@ -173,6 +173,7 @@ do {if (1) mmprofile_log_ex(args); } while (0);	\
 #define CMDQ_PROF_MMP(args...)
 #endif
 
+#ifdef CONFIG_TRACING
 /* CMDQ FTRACE */
 #define CMDQ_TRACE_FORCE_BEGIN(fmt, args...) do { \
 	preempt_disable(); \
@@ -199,6 +200,26 @@ do {if (1) mmprofile_log_ex(args); } while (0);	\
 		CMDQ_TRACE_FORCE_END(); \
 	} \
 } while (0)
+
+#else
+
+static inline void CMDQ_TRACE_FORCE_BEGIN(const char *fmt, const char args, ...)
+{
+}
+
+static inline void CMDQ_TRACE_FORCE_END(void)
+{
+}
+
+static inline void CMDQ_SYSTRACE_BEGIN(const char *fmt, const char args, ...)
+{
+}
+
+static inline void CMDQ_SYSTRACE_END(void)
+{
+}
+
+#endif /* CONFIG_TRACING */
 
 #define CMDQ_GET_TIME_IN_MS(start, end, duration)	\
 {	\
