@@ -88,10 +88,12 @@ static struct rtnl_debug_btrace_t rtnl_instance = {
 };
 
 static void rtnl_print_btrace(unsigned long data);
+#ifdef CONFIG_TRACING
 static DEFINE_TIMER(rtnl_chk_timer, rtnl_print_btrace, 0, 0);
-
+#endif
 void rtnl_get_btrace(struct task_struct *who)
 {
+#ifdef CONFIG_TRACING
 	struct stack_trace debug_trace;
 
 	debug_trace.max_entries = RTNL_DEBUG_ADDRS_COUNT;
@@ -108,10 +110,13 @@ void rtnl_get_btrace(struct task_struct *who)
 	rtnl_instance.entry_nr = debug_trace.nr_entries;
 	rtnl_instance.flag = 1;
 	mod_timer(&rtnl_chk_timer, jiffies + RTNL_LOCK_MAX_HOLD_TIME * HZ);
+#endif
 }
 
 void rtnl_print_btrace(unsigned long data)
-{	if (rtnl_instance.flag) {
+{
+#ifdef CONFIG_TRACING
+	if (rtnl_instance.flag) {
 		struct stack_trace show_trace;
 
 		show_trace.nr_entries = rtnl_instance.entry_nr;
@@ -130,6 +135,7 @@ void rtnl_print_btrace(unsigned long data)
 	} else {
 		pr_info("[mtk_net][rtnl_lock]There is no process hold rtnl lock\n");
 	}
+#endif
 }
 
 void rtnl_relase_btrace(void)
