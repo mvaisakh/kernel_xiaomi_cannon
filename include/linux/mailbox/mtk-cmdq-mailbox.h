@@ -182,6 +182,7 @@ do { \
 #define cmdq_dump(fmt, args...) \
 	pr_notice("[cmdq][err] "fmt"\n", ##args)
 
+#ifdef CONFIG_TRACING
 /* CMDQ FTRACE */
 #define cmdq_trace_begin(fmt, args...) do { \
 	preempt_disable(); \
@@ -221,6 +222,28 @@ extern int cmdq_trace;
 	preempt_enable(); \
 } while (0)
 
+#else
+
+static inline void cmdq_trace_begin(const char *fmt, const char args, ...)
+{
+}
+static inline void cmdq_trace_end(void)
+{
+}
+
+extern int cmdq_trace;
+static inline void cmdq_trace_ex_begin(const char *fmt, const char args, ...)
+{
+}
+
+static inline void cmdq_trace_ex_end(void)
+{
+}
+
+static inline void cmdq_trace_c(const char *fmt, const char args, ...)
+{
+}
+#endif
 dma_addr_t cmdq_thread_get_pc(struct cmdq_thread *thread);
 dma_addr_t cmdq_thread_get_end(struct cmdq_thread *thread);
 void cmdq_thread_set_spr(struct mbox_chan *chan, u8 id, u32 val);
