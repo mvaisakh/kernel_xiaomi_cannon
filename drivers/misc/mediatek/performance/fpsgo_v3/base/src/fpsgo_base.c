@@ -106,6 +106,7 @@ static int fpsgo_update_tracemark(void)
 void __fpsgo_systrace_c(pid_t pid, unsigned long long bufID,
 	int val, const char *fmt, ...)
 {
+#ifdef CONFIG_TRACING
 	char log[256];
 	va_list args;
 	int len;
@@ -133,10 +134,12 @@ void __fpsgo_systrace_c(pid_t pid, unsigned long long bufID,
 			pid, log, val, bufID);
 		preempt_enable();
 	}
+#endif
 }
 
 void __fpsgo_systrace_b(pid_t tgid, const char *fmt, ...)
 {
+#ifdef CONFIG_TRACING
 	char log[256];
 	va_list args;
 	int len;
@@ -157,20 +160,24 @@ void __fpsgo_systrace_b(pid_t tgid, const char *fmt, ...)
 	preempt_disable();
 	event_trace_printk(mark_addr, "B|%d|%s\n", tgid, log);
 	preempt_enable();
+#endif
 }
 
 void __fpsgo_systrace_e(void)
 {
+#ifdef CONFIG_TRACING
 	if (unlikely(!fpsgo_update_tracemark()))
 		return;
 
 	preempt_disable();
 	event_trace_printk(mark_addr, "E\n");
 	preempt_enable();
+#endif
 }
 
 void fpsgo_main_trace(const char *fmt, ...)
 {
+#ifdef CONFIG_TRACING
 	char log[256];
 	va_list args;
 	int len;
@@ -183,6 +190,7 @@ void fpsgo_main_trace(const char *fmt, ...)
 		log[255] = '\0';
 	va_end(args);
 	trace_fpsgo_main_log(log);
+#endif
 }
 EXPORT_SYMBOL(fpsgo_main_trace);
 
