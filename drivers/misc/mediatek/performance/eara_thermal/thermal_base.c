@@ -11,10 +11,13 @@
 #define EARA_THRM_SYSFS_DIR_NAME "eara_thermal"
 
 struct kobject *thrm_kobj;
+#ifdef CONFIG_TRACING
 static unsigned long __read_mostly mark_addr;
+#endif
 
 static int eara_thrm_update_tracemark(void)
 {
+#ifdef CONFIG_TRACING
 	if (mark_addr)
 		return 1;
 
@@ -24,10 +27,14 @@ static int eara_thrm_update_tracemark(void)
 		return 0;
 
 	return 1;
+#else
+	return 0;
+#endif
 }
 
 void eara_thrm_systrace(pid_t pid, int val, const char *fmt, ...)
 {
+#ifdef CONFIG_TRACING
 	char log[256];
 	va_list args;
 	int len;
@@ -48,10 +55,12 @@ void eara_thrm_systrace(pid_t pid, int val, const char *fmt, ...)
 	preempt_disable();
 	event_trace_printk(mark_addr, "C|%d|%s|%d\n", pid, log, val);
 	preempt_enable();
+#endif
 }
 
 void eara_thrm_tracelog(const char *fmt, ...)
 {
+#ifdef CONFIG_TRACING
 	char log[256];
 	va_list args;
 	int len;
@@ -63,6 +72,7 @@ void eara_thrm_tracelog(const char *fmt, ...)
 	va_end(args);
 
 	trace_eara_thrm_log(log);
+#endif
 }
 
 void eara_thrm_sysfs_create_file(struct kobj_attribute *kobj_attr)
