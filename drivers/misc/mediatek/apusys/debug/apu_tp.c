@@ -47,7 +47,9 @@ void apu_tp_exit(struct apu_tp_tbl *tbl)
 	apu_tp_foreach(tbl, t) {
 		if (!t->tp)
 			continue;
+#ifdef CONFIG_TRACING
 		tracepoint_probe_unregister(t->tp, t->func, NULL);
+#endif
 		t->registered = false;
 	}
 }
@@ -63,16 +65,19 @@ void apu_tp_exit(struct apu_tp_tbl *tbl)
 int apu_tp_init(struct apu_tp_tbl *tbl)
 {
 	struct apu_tp_tbl *t;
-
+#ifdef CONFIG_TRACING
 	/* install tracepoints */
 	for_each_kernel_tracepoint(apu_tp_lookup, tbl);
+#endif
 	apu_tp_foreach(tbl, t) {
 		if (!t->tp) {
 			pr_info("%s: %s was not found\n", __func__, t->name);
 			apu_tp_exit(tbl);  /* free registered entries */
 			return -EINVAL;
 		}
+#ifdef CONFIG_TRACING
 		tracepoint_probe_register(t->tp, t->func, NULL);
+#endif
 		t->registered = true;
 	}
 	return 0;
