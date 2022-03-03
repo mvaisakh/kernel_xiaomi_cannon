@@ -22,7 +22,7 @@
 #define DRM_TRACE_FENCE_ID (DRM_TRACE_ID + 2)
 #define DRM_TRACE_VSYNC_ID (DRM_TRACE_ID + 3)
 
-
+#ifdef CONFIG_TRACING
 /* MTK_DRM FTRACE */
 extern bool g_trace_log;
 #define mtk_drm_trace_begin(fmt, args...) do { \
@@ -50,6 +50,18 @@ extern bool g_trace_log;
 		preempt_enable();\
 	} \
 } while (0)
+#else
+static inline void mtk_drm_trace_begin(const char *fmt, const char args, ...) 
+{
+}
+static inline void mtk_drm_trace_end(void)
+{
+}
+
+static inline void mtk_drm_trace_c(const char *fmt, const char args, ...)
+{
+}
+#endif
 
 unsigned long mtk_drm_get_tracing_mark(void);
 void drm_trace_tag_start(const char *tag);
