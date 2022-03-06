@@ -105,8 +105,6 @@ struct fpc1022_data {
 
 	struct input_dev *idev;
 	char idev_name[32];
-	int event_type;
-	int event_code;
 	atomic_t wakeup_enabled;	/* Used both in ISR and non-ISR */
 	struct mutex lock;
 	bool prepared;
@@ -173,8 +171,6 @@ static void fpc1022_get_irqNum(struct fpc1022_data *fpc1022)
 
 static int hw_reset(struct fpc1022_data *fpc1022)
 {
-	struct device *dev = fpc1022->dev;
-
 	pinctrl_select_state(fpc1022->pinctrl, fpc1022->st_rst_h);
 	usleep_range(FPC1022_RESET_HIGH1_US, FPC1022_RESET_HIGH1_US + 100);
 
@@ -212,7 +208,6 @@ static ssize_t wakeup_enable_set(struct device *dev,
 				 struct device_attribute *attr, const char *buf,
 				 size_t count)
 {
-	struct fpc1022_data *fpc1022 = dev_get_drvdata(dev);
 	return count;
 }
 
@@ -376,7 +371,6 @@ static int fpc1022_platform_probe(struct platform_device *pldev)
 {
 	int ret = 0;
 	int irqf;
-	u32 val;
 	const char *idev_name;
 	struct device *dev = &pldev->dev;
 	struct device_node *np = dev->of_node;
@@ -438,21 +432,12 @@ static int fpc1022_platform_probe(struct platform_device *pldev)
 	}
 	fpc1022_get_irqNum(fpc1022);
 
-	ret = of_property_read_u32(np, "fpc,event-type", &val);
-	fpc1022->event_type = ret < 0 ? EV_MSC : val;
-
-	ret = of_property_read_u32(np, "fpc,event-code", &val);
-	fpc1022->event_code = ret < 0 ? MSC_SCAN : val;
-
 	fpc1022->idev = devm_input_allocate_device(dev);
 
 	if (!fpc1022->idev) {
 		ret = -ENOMEM;
 		goto err_input_malloc;
 	}
-
-	input_set_capability(fpc1022->idev, fpc1022->event_type,
-			     fpc1022->event_code);
 
 	if (!of_property_read_string(np, "input-device-name", &idev_name)) {
 		fpc1022->idev->name = idev_name;

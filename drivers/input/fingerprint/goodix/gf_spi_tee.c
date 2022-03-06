@@ -105,7 +105,6 @@ static DEFINE_MUTEX(device_list_lock);
 static struct wakeup_source fp_wakesrc;
 static int cluster_num;
 static struct ppm_limit_data *freq_to_set;
-static atomic_t boosted = ATOMIC_INIT(0);
 static struct timer_list release_timer;
 static struct work_struct fp_display_work;
 static struct work_struct fp_freq_work;
@@ -904,35 +903,6 @@ static long gf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			retval = -EFAULT;
 			break;
 		}
-
-		if (GF_KEY_HOME == gf_key.key) {
-			key_input = GF_KEY_INPUT_HOME;
-		} else if (GF_KEY_POWER == gf_key.key) {
-			key_input = GF_KEY_INPUT_HOME;
-		} else if (GF_KEY_CAMERA == gf_key.key) {
-			key_input = GF_KEY_INPUT_CAMERA;
-		} else {
-			/* add special key define */
-			key_input = gf_key.key;
-		}
-		gf_debug(INFO_LOG,
-			 "%s: received key event[%d], key=%d, value=%d\n",
-			 __func__, key_input, gf_key.key, gf_key.value);
-
-		if ((GF_KEY_POWER == gf_key.key || GF_KEY_CAMERA == gf_key.key)
-		    && (gf_key.value == 1)) {
-			input_report_key(gf_dev->input, key_input, 1);
-			input_sync(gf_dev->input);
-			input_report_key(gf_dev->input, key_input, 0);
-			input_sync(gf_dev->input);
-		}
-
-		if (GF_KEY_HOME == gf_key.key) {
-			input_report_key(gf_dev->input, key_input,
-					 gf_key.value);
-			input_sync(gf_dev->input);
-		}
-
 		break;
 
 	case GF_IOC_NAV_EVENT:
