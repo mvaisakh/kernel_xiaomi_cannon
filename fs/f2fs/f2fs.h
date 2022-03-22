@@ -2079,6 +2079,7 @@ void f2fs_printk(struct f2fs_sb_info *sbi, const char *fmt, ...);
 #define f2fs_debug(sbi, fmt, ...)					\
 	f2fs_printk(sbi, KERN_DEBUG fmt, ##__VA_ARGS__)
 
+void f2fs_msg(struct super_block *sb, const char *level, const char *fmt, ...);
 static inline void dec_valid_block_count(struct f2fs_sb_info *sbi,
 						struct inode *inode,
 						block_t count)
@@ -3825,6 +3826,11 @@ extern const struct fsverity_operations f2fs_verityops;
 /*
  * crypto support
  */
+static inline bool f2fs_encrypted_inode(struct inode *inode)
+{
+	return file_is_encrypt(inode);
+}
+
 static inline bool f2fs_encrypted_file(struct inode *inode)
 {
 	return IS_ENCRYPTED(inode) && S_ISREG(inode->i_mode);
