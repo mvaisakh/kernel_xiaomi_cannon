@@ -1082,8 +1082,7 @@ static ssize_t mm_stat_show(struct device *dev,
 			zram->limit_pages << PAGE_SHIFT,
 			max_used << PAGE_SHIFT,
 			(u64)atomic64_read(&zram->stats.same_pages),
-			pool_stats.pages_compacted,
-			(u64)atomic64_read(&zram->stats.huge_pages));
+			atomic_long_read(&pool_stats.pages_compacted));
 	up_read(&zram->init_lock);
 
 	return ret;
@@ -2129,39 +2128,6 @@ static int zraminfo_proc_show(struct seq_file *m, void *v)
 		zs_pool_stats(zram_devices->mem_pool, &pool_stats);
 		up_read(&zram_devices->init_lock);
 
-#define P2K(x) (((unsigned long)x) << (PAGE_SHIFT - 10))
-#define B2K(x) (((unsigned long)x) >> (10))
-		seq_printf(m,
-		"DiskSize:       %8lu kB\n"
-		"OrigSize:       %8lu kB\n"
-		"ComprSize:      %8lu kB\n"
-		"MemUsed:        %8lu kB\n"
-		"ZeroPage:       %8lu kB\n"
-		"NotifyFree:     %8lu kB\n"
-		"FailReads:      %8lu kB\n"
-		"FailWrites:     %8lu kB\n"
-		"NumReads:       %8lu kB\n"
-		"NumWrites:      %8lu kB\n"
-		"InvalidIO:      %8lu kB\n"
-		"MaxUsedPages:   %8lu kB\n"
-		"PageMigrated:	 %8lu kB\n"
-		,
-		B2K(zram_devices->disksize),
-		P2K(atomic64_read(&zram_devices->stats.pages_stored)),
-		B2K(atomic64_read(&zram_devices->stats.compr_data_size)),
-		P2K(zs_get_total_pages(zram_devices->mem_pool)),
-		P2K(atomic64_read(&zram_devices->stats.same_pages)),
-		P2K(atomic64_read(&zram_devices->stats.notify_free)),
-		P2K(atomic64_read(&zram_devices->stats.failed_reads)),
-		P2K(atomic64_read(&zram_devices->stats.failed_writes)),
-		P2K(atomic64_read(&zram_devices->stats.num_reads)),
-		P2K(atomic64_read(&zram_devices->stats.num_writes)),
-		P2K(atomic64_read(&zram_devices->stats.invalid_io)),
-		P2K(atomic_long_read(&zram_devices->stats.max_used_pages)),
-		P2K(pool_stats.pages_compacted));
-#undef P2K
-#undef B2K
-		seq_printf(m, "Algorithm: [%s]\n", zram_devices->compressor);
 	}
 
 	return 0;
