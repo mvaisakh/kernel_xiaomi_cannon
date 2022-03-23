@@ -1621,6 +1621,10 @@ int xhci_bus_suspend(struct usb_hcd *hcd)
 		mtk_xhci_wakelock_unlock(mtk);
 	}
 #endif
+
+	if (bus_state->bus_suspended)
+		usleep_range(5000, 10000);
+
 	return 0;
 }
 
