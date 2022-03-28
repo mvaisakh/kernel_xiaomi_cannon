@@ -443,8 +443,7 @@ static int aw8622_play_wave(struct aw8622_haptic *haptic)
 	int pwm_wave_num = 0;
 
 	struct aw8622_effect_state *p_effect_state = &haptic->effect_state;
-	//struct waveform_data_info *p_waveform_info = &haptic->p_waveform_data[p_effect_state->effect_idx];
-	struct waveform_data_info *p_waveform_info = NULL;
+	struct waveform_data_info *p_waveform_info = &haptic->p_waveform_data[p_effect_state->effect_idx];
 
 	pr_debug("%s entern\n", __func__);
 
@@ -453,7 +452,6 @@ static int aw8622_play_wave(struct aw8622_haptic *haptic)
 		p_effect_state->effect_idx = p_effect_state->effect_idx + SHORT_SHOCK_NUMS;
 	}
 
-	p_waveform_info = &haptic->p_waveform_data[p_effect_state->effect_idx];
 	if (!(p_waveform_info->is_loaded)) {
 		pr_err("%s effect_id = %d wave data is not available\n", __func__, p_effect_state->effect_idx);
 		ret = EINVAL;
