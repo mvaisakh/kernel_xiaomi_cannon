@@ -8452,13 +8452,12 @@ static void perf_event_addr_filters_apply(struct perf_event *event)
 	if (task == TASK_TOMBSTONE)
 		return;
 
-	if (!ifh->nr_file_filters)
-		return;
+	if (ifh->nr_file_filters) {
+		mm = get_task_mm(task);
+		if (!mm)
+			goto restart;
 
-	mm = get_task_mm(task);
-	if (!mm)
-		goto restart;
-
+	}
 	down_read(&mm->mmap_sem);
 
 	raw_spin_lock_irqsave(&ifh->lock, flags);
@@ -8654,6 +8653,9 @@ perf_event_parse_addr_filter(struct perf_event *event, char *fstr,
 						&filter->path);
 				if (ret)
 					goto fail;
+
+				kfree(filename);
+				filename = NULL;
 
 				ret = -EINVAL;
 				if (!filter->path.dentry ||
