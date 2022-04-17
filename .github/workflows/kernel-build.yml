@@ -12,7 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Setup env
-        run: pacman -Syu --needed --noconfirm wget base-devel xmlto inetutils bc cpio python-sphinx python-sphinx_rtd_theme graphviz imagemagick git python2 python zip 
+        run: |
+          pacman -Syu --needed --noconfirm wget base-devel xmlto inetutils bc cpio python-sphinx python-sphinx_rtd_theme graphviz imagemagick git python2 python zip
+          git config --global --add safe.directory /__w/kernel_xiaomi_cannon/kernel_xiaomi_cannon
       - name: Build Kernel
         run: |
           export token=${TELEGRAM_BOT_TOKEN}
