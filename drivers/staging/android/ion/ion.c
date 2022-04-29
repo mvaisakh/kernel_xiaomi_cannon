@@ -438,14 +438,35 @@ static void _ion_buffer_destroy(struct kref *kref)
 		ion_buffer_destroy(buffer);
 }
 
-static void ion_buffer_get(struct ion_buffer *buffer)
+static void *ion_buffer_get(struct ion_buffer *buffer)
 {
-	kref_get(&buffer->ref);
+	void *vaddr;
+
+	if (buffer->kmap_cnt) {
+		if (buffer->kmap_cnt == INT_MAX)
+			return ERR_PTR(-EOVERFLOW);
+
+		buffer->kmap_cnt++;
+		return buffer->vaddr;
+	}
+	vaddr = buffer->heap->ops->map_kernel(buffer->heap, buffer);
+	if (WARN_ONCE(!vaddr,
+		      "heap->ops->map_kernel should return ERR_PTR on error"))
+		return ERR_PTR(-EINVAL);
+	if (IS_ERR(vaddr))
+		return vaddr;
+	buffer->vaddr = vaddr;
+	buffer->kmap_cnt++;
+	return vaddr;
 }
 
 static int ion_buffer_put(struct ion_buffer *buffer)
 {
-	return kref_put(&buffer->ref, _ion_buffer_destroy);
+	buffer->kmap_cnt--;
+	if (!buffer->kmap_cnt) {
+		buffer->heap->ops->unmap_kernel(buffer->heap, buffer);
+		buffer->vaddr = NULL;
+	}
 }
 
 static void ion_buffer_add_to_handle(struct ion_buffer *buffer)
