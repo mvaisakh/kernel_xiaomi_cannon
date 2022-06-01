@@ -1022,5 +1022,14 @@ config REGULATOR_FAN53870
 	  regulators found in ON Semi Technologies Inc. FAN53870
 	  PMIC.
 
+config REGULATOR_PM8008
+	bool "ON Semi Technologies Inc. PM8008 regulator driver"
+	depends on I2C_MTK
+	help
+	  Say Y here to support the PM8008 PMIC chip.
+	  This driver controls QCOM_PM8008 PMIC chip and the voltage
+	  regulators found in ON Semi Technologies Inc. PM8008
+	  PMIC.
+
 endif
 
