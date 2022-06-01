@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -52,6 +53,7 @@
 #include <linux/proc_fs.h>
 #include <linux/of_fdt.h>	/*of_dt API*/
 #include <linux/of.h>
+#include <linux/of_platform.h> /*of_find_node_by_name*/
 #include <linux/vmalloc.h>
 #include <linux/math64.h>
 #include <linux/alarmtimer.h>
@@ -81,6 +83,7 @@
 #include "simulator_kernel.h"
 #endif
 
+#include <linux/iio/consumer.h>
 
 
 /* ============================================================ */
@@ -356,49 +359,52 @@ bool __attribute__ ((weak)) mt_usb_is_device(void)
 /* ============================================================ */
 /* custom setting */
 /* ============================================================ */
+
+struct iio_channel *channel;
 #ifdef MTK_GET_BATTERY_ID_BY_AUXADC
 void fgauge_get_profile_id(void)
 {
 	int id_volt = 0;
 	int id = 0;
 	int ret = 0;
-	int auxadc_voltage = 0;
-	struct iio_channel *channel;
+	int auxadc_voltage;
 	struct device_node *batterty_node;
 	struct platform_device *battery_dev;
 
 	batterty_node = of_find_node_by_name(NULL, "battery");
-	if (!batterty_node) {
-		bm_err("[%s] of_find_node_by_name fail\n", __func__);
-		return;
-	}
+	if (!batterty_node)
+		bm_err("[%s] find battery node fail \n", __func__);
+	else
+		bm_err("[%s] find battery node success \n", __func__);
 
 	battery_dev = of_find_device_by_node(batterty_node);
-	if (!battery_dev) {
-		bm_err("[%s] of_find_device_by_node fail\n", __func__);
-		return;
-	}
+	if (!battery_dev)
+		bm_err("[%s] find battery dev fail \n", __func__);
+	else
+		bm_err("[%s] find battery dev success \n", __func__);
 
 	channel = iio_channel_get(&(battery_dev->dev), "batteryID-channel");
 	if (IS_ERR(channel)) {
 		ret = PTR_ERR(channel);
 		bm_err("[%s] iio channel not found %d\n",
 		__func__, ret);
-		return;
+	} else {
+		bm_err("[%s] get channel success\n", __func__);
 	}
 
 	if (channel)
-		ret = iio_read_channel_processed(channel, &auxadc_voltage);
-
+		ret = iio_read_channel_processed(channel,&auxadc_voltage);
+	else
+		bm_err("[%s] no channel to processed \n", __func__);
 
 	if (ret <= 0) {
-		bm_err("[%s] iio_read_channel_processed failed\n", __func__);
-		return;
+		bm_err("[%s] IIO channel read failed %d \n", __func__, ret);
+	} else {
+		bm_err("[%s] auxadc_voltage is %d\n", __func__, auxadc_voltage);
+		id_volt = auxadc_voltage * 1500 / 4096;
+		id_volt = id_volt * 1000;
+		bm_err("[%s] battery_id_voltage is %d\n", __func__, id_volt);
 	}
-
-	bm_err("[%s]auxadc_voltage is %d\n", __func__, auxadc_voltage);
-	id_volt = auxadc_voltage * 1500 / 4096;
-	bm_err("[%s]battery_id_voltage is %d\n", __func__, id_volt);
 
 	if ((sizeof(g_battery_id_voltage) /
 		sizeof(int)) != TOTAL_BATTERY_NUMBER) {
@@ -420,6 +426,23 @@ void fgauge_get_profile_id(void)
 		__func__,
 		gm.battery_id);
 }
+
+int battery_get_bat_resistance_id(void)
+{
+	int auxadc_voltage;
+	int id_volt;
+
+	if (channel) {
+		iio_read_channel_processed(channel, &auxadc_voltage);
+	} else {
+		bm_err("[%s] no channel to processed \n", __func__);
+	}
+
+	id_volt = auxadc_voltage * 1500 / 4096;
+
+	return id_volt;
+}
+
 #elif defined(MTK_GET_BATTERY_ID_BY_GPIO)
 void fgauge_get_profile_id(void)
 {
@@ -911,69 +934,7 @@ static void fg_custom_parse_table(const struct device_node *np,
 	}
 }
 
-/* struct FUELGAUGE_TEMPERATURE Fg_Temperature_Table[21]; */
-static void fg_custom_part_ntc_table(const struct device_node *np,
-		struct FUELGAUGE_TEMPERATURE *profile_struct)
-{
-	struct FUELGAUGE_TEMPERATURE *p_fg_temp_table;
-	int bat_temp = 0, temperature_r = 0;
-	int saddles = 0, idx = 0, ret = 0, ret_a = 0;
-#if 0
-	int i;
-#endif
-	p_fg_temp_table = profile_struct;
 
-#if 0 /* dump */
-	bm_err("[before]Fg_Temperature_Table - bat_temp : temperature_r\n");
-	for (i = 0; i < 21; i++) {
-		bm_err("%d : %d %d\n", i, Fg_Temperature_Table[i].BatteryTemp,
-			Fg_Temperature_Table[i].TemperatureR);
-	}
-#endif
-
-	ret = fg_read_dts_val(np, "RBAT_TYPE", &(gm.rbat.type), 1);
-	ret_a = fg_read_dts_val(np, "RBAT_PULL_UP_R",
-			&(gm.rbat.rbat_pull_up_r), 1);
-	if ((ret == -1) || (ret_a == -1)) {
-		bm_err("Fail to get ntc type from dts.Keep default value\t");
-		bm_err("RBAT_TYPE=%d, RBAT_PULL_UP_R=%d\n",
-			gm.rbat.type, gm.rbat.rbat_pull_up_r);
-		return;
-	}
-	bm_err("From DTS. RBAT_TYPE = %d, RBAT_PULL_UP_R=%d\n",
-		gm.rbat.type, gm.rbat.rbat_pull_up_r);
-
-	fg_read_dts_val(np, "rbat_temperature_table_num", &saddles, 1);
-	bm_err("%s : rbat_temperature_table_num(%d)\n", __func__, saddles);
-
-	idx = 0;
-
-	while (1) {
-		ret = of_property_read_u32_index(np, "rbat_battery_temperature",
-							idx, &bat_temp);
-
-		idx++;
-		if (!of_property_read_u32_index(
-			np, "rbat_battery_temperature", idx, &temperature_r))
-			bm_debug("bat_temp = %d, temperature_r=%d\n",
-					bat_temp, temperature_r);
-
-		p_fg_temp_table->BatteryTemp = bat_temp;
-		p_fg_temp_table->TemperatureR = temperature_r;
-
-		p_fg_temp_table++;
-		if ((idx++) >= (saddles * 2))
-			break;
-	}
-
-#if 0 /* dump */
-	bm_err("[after]Fg_Temperature_Table - bat_temp : temperature_r\n");
-	for (i = 0; i < saddles; i++) {
-		bm_err("%d : %d %d\n", i, Fg_Temperature_Table[i].BatteryTemp,
-			Fg_Temperature_Table[i].TemperatureR);
-	}
-#endif
-}
 
 void fg_custom_init_from_dts(struct platform_device *dev)
 {
@@ -1029,8 +990,6 @@ void fg_custom_init_from_dts(struct platform_device *dev)
 		&(fg_cust_data.com_r_fg_value), UNIT_TRANS_10);
 	if (ret == -1)
 		fg_cust_data.com_r_fg_value = fg_cust_data.r_fg_value;
-
-	fg_custom_part_ntc_table(np, Fg_Temperature_Table);
 
 	fg_read_dts_val(np, "FULL_TRACKING_BAT_INT2_MULTIPLY",
 		&(fg_cust_data.full_tracking_bat_int2_multiply), 1);
@@ -2182,6 +2141,9 @@ void fg_bat_plugout_int_handler(void)
 		for (i = 0 ; i < 20 ; i++)
 			gauge_dev_dump(gm.gdev, NULL, 0);
 
+		/* TODO debug purpose, remove it!!!!!! */
+		aee_kernel_warning("GAUGE", "BAT_PLUGOUT error!\n");
+
 		if (gm.plug_miss_count >= 3) {
 			gauge_enable_interrupt(FG_BAT_PLUGOUT_NO, 0);
 			bm_err("[%s]disable FG_BAT_PLUGOUT\n",
@@ -2761,17 +2723,6 @@ void fg_daemon_comm_INT_data(char *rcv, char *ret)
 				&soc_setting, sizeof(soc_setting));
 		}
 		break;
-	case FG_GET_IS_FORCE_FULL:
-		{
-			/* 1 = trust customer full condition */
-			/* 0 = using gauge ori full flow */
-			int force_full = gm.is_force_full;
-
-			memcpy(&pret->output,
-				&force_full, sizeof(force_full));
-		}
-		break;
-
 	case FG_SET_SOC:
 		{
 			gm.soc = (prcv->input + 50) / 100;
@@ -4199,27 +4150,6 @@ void bmd_ctrl_cmd_from_user(void *nl_data, struct fgd_nl_msg_t *ret_msg)
 	}
 	break;
 
-	case FG_DAEMON_CMD_SET_BATTERY_CAPACITY:
-	{
-		struct fgd_cmd_param_t_8 param;
-
-		memcpy(&param, &msg->fgd_data[0],
-			sizeof(struct fgd_cmd_param_t_8));
-		bm_debug(
-			"[fr] FG_DAEMON_CMD_SET_BATTERY_CAPACITY = %d %d %d %d %d %d %d %d %d %d RM:%d\n",
-			param.data[0],
-			param.data[1],
-			param.data[2],
-			param.data[3],
-			param.data[4],
-			param.data[5],
-			param.data[6],
-			param.data[7],
-			param.data[8],
-			param.data[9],
-			param.data[4] * param.data[6] / 10000);
-	}
-	break;
 	default:
 		bm_err("bad FG_DAEMON_CTRL_CMD_FROM_USER 0x%x\n", msg->fgd_cmd);
 		break;
