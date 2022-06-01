@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -23,7 +24,6 @@
 #include "imgsensor.h"
 
 
-extern struct mutex oc_mutex;
 extern struct device *gimgsensor_device;
 extern struct IMGSENSOR gimgsensor;
 

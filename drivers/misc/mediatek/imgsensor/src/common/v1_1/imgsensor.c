@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -60,7 +61,6 @@ static DEFINE_MUTEX(gimgsensor_mutex);
 static DEFINE_MUTEX(gimgsensor_open_mutex);
 
 struct IMGSENSOR gimgsensor;
-MUINT32 last_id;
 
 /******************************************************************************
  * Profiling
@@ -445,8 +445,6 @@ MINT32 imgsensor_sensor_close(struct IMGSENSOR_SENSOR *psensor)
 	    psensor_func->SensorClose &&
 	    psensor_inst) {
 
-		IMGSENSOR_PROFILE_INIT(&psensor_inst->profile_time);
-
 		imgsensor_mutex_lock(psensor_inst);
 
 #ifdef IMGSENSOR_OC_ENABLE
@@ -477,8 +475,6 @@ MINT32 imgsensor_sensor_close(struct IMGSENSOR_SENSOR *psensor)
 		}
 
 		imgsensor_mutex_unlock(psensor_inst);
-
-		IMGSENSOR_PROFILE(&psensor_inst->profile_time, "SensorClose");
 	}
 
 	IMGSENSOR_FUNCTION_EXIT();
@@ -573,7 +569,7 @@ int imgsensor_set_driver(struct IMGSENSOR_SENSOR *psensor)
 	(unsigned int)psensor_inst->sensor_idx].i2c_dev);
 	imgsensor_i2c_filter_msg(&psensor_inst->i2c_cfg, true);
 
-	while (i < MAX_NUM_OF_SUPPORT_SENSOR && pimgsensor->psensor_list[i]) {
+	while (pimgsensor->psensor_list[i] && i < MAX_NUM_OF_SUPPORT_SENSOR) {
 		if (pimgsensor->psensor_list[i]->init) {
 			pimgsensor->psensor_list[i]->init(&psensor->pfunc);
 
@@ -731,12 +727,6 @@ static inline int adopt_CAMERA_HW_GetInfo2(void *pBuf)
 	PK_DBG("[CAMERA_HW][VD]w=0x%x, h = 0x%x\n",
 			sensor_resolution.SensorVideoWidth,
 			sensor_resolution.SensorVideoHeight);
-
-	if (pSensorGetInfo->SensorId <= last_id) {
-		memset(mtk_ccm_name, 0, camera_info_size);
-		PK_DBG("memset ok");
-	}
-	last_id = pSensorGetInfo->SensorId;
 
 	/* Add info to proc: camera_info */
 	pmtk_ccm_name = strchr(mtk_ccm_name, '\0');
@@ -2277,11 +2267,13 @@ static void __exit imgsensor_exit(void)
 {
 	platform_driver_unregister(&gimgsensor_platform_driver);
 }
-#ifdef NEED_LATE_INITCALL
-	late_initcall(imgsensor_init);
-#else
-	module_init(imgsensor_init);
-#endif
+
+/* XIAOMI: libin16 change it, otherwise regulator_set_voltage
+   will occur KE when using i2c driver pm8008 or fan53870
+   etc. LDO chips
+*/
+//module_init(imgsensor_init);
+late_initcall(imgsensor_init);
 module_exit(imgsensor_exit);
 
 MODULE_DESCRIPTION("image sensor driver");

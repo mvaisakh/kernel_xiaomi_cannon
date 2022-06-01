@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2020 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -5644,6 +5645,16 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 		case MSDK_SCENARIO_ID_CUSTOM2:
 			memcpy((void *)wininfo,
 			(void *)&imgsensor_winsize_info[6],
+			sizeof(struct SENSOR_WINSIZE_INFO_STRUCT));
+			break;
+		case MSDK_SCENARIO_ID_CUSTOM3:
+			memcpy((void *)wininfo,
+			(void *)&imgsensor_winsize_info[7],
+			sizeof(struct SENSOR_WINSIZE_INFO_STRUCT));
+			break;
+		case MSDK_SCENARIO_ID_CUSTOM4:
+			memcpy((void *)wininfo,
+			(void *)&imgsensor_winsize_info[8],
 			sizeof(struct SENSOR_WINSIZE_INFO_STRUCT));
 			break;
 		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:

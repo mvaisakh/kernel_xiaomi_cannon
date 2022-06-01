@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -88,7 +89,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 		.startx = 0,
 		.starty = 0,
 		.grabwindow_width = 2328,
-		.grabwindow_height = 1746,
+		.grabwindow_height = 1728, /*1746*/
 		.mipi_data_lp2hs_settle_dc = 85,
 		/* following for GetDefaultFramerateByScenario() */
 		.mipi_pixel_rate = 226290000,
@@ -282,7 +283,6 @@ static struct imgsensor_info_struct imgsensor_info = {
 	.video_delay_frame = 2,	/* enter video delay frame num */
 	.hs_video_delay_frame = 2,
 	.slim_video_delay_frame = 2,	/* enter slim video delay frame num */
-	.frame_time_delay_frame = 3,
 	.custom1_delay_frame = 2,	/* enter custom1 delay frame num */
 	.custom2_delay_frame = 2,	/* enter custom2 delay frame num */
 	.custom3_delay_frame = 2,
@@ -331,20 +331,20 @@ static struct imgsensor_struct imgsensor = {
 
 /* Sensor output window information */
 static struct SENSOR_WINSIZE_INFO_STRUCT imgsensor_winsize_info[8] = {
-	{4656, 3496,   0,    2, 4656, 3492, 2328, 1746,
-	0000, 0000, 2328, 1746, 0, 0, 2328, 1746}, /* Preview */
+	{4656, 3496, 000, 000, 4656, 3496, 2328, 1728,
+	0000, 0000, 2328, 1728, 0, 0, 2328, 1728}, /* Preview */
 	{4656, 3496, 000, 000, 4656, 3496, 4656, 3496,
 	0000, 0000, 4656, 3496, 0, 0, 4656, 3496}, /* capture */
-	{4656, 3496, 000, 432, 4656, 2616, 4656, 2616,
+	{4656, 3496, 000, 440, 4656, 2616, 4656, 2616,
 	0000, 0000, 4656, 2616, 0, 0, 4656, 2616}, /* video */
-	{4656, 3496, 000, 658, 4656, 2164, 2328, 1082,
-	 204, 0000, 1920, 1080, 0, 0, 1920, 1080}, /* hight speed video */
-	{4656, 3496, 000, 658, 4656, 2164, 2328, 1082,
-	 204, 0000, 1920, 1080, 0, 0, 1920, 1080}, /* slim video */
-	{4656, 3496, 000, 1026, 4656, 1444, 2328,  722,
-	 0524, 0000, 1280,  720,    0,	  0, 1280,  720}, /*custom1*/
-	{4656, 3496, 000, 1024, 4656, 1448, 2328,  724,
-	  524,    2, 1280,  720,    0,	  0, 1280,  720}, /*custom2*/
+	{4656, 3496, 408, 668, 3840, 2160, 1920, 1080,
+	0000, 0000, 1920, 1080, 0, 0, 1920, 1080}, /* hight speed video */
+	{4656, 3496, 408, 668, 3840, 2160, 1920, 1080,
+	0000, 0000, 1920, 1080, 0, 0, 1920, 1080}, /* slim video */
+	{4656, 3496, 1048, 1028, 2560, 1440, 1280,  720,
+	 0000, 0000, 1280,  720,    0,	  0, 1280,  720}, /*custom1*/
+	{4656, 3496, 1048, 1028, 2560, 1440, 1280,  720,
+	 0000, 0000, 1280,  720,    0,	  0, 1280,  720}, /*custom2*/
 	{4656, 3496,    0,    0, 4656, 3496, 2328, 1748,
 	    0,    0, 2328, 1748,    0,    0, 2328, 1748}, /* custom3 */
 #if 0
@@ -714,8 +714,7 @@ static void set_shutter(kal_uint32 shutter)
  *
  *************************************************************************/
 static void set_shutter_frame_length(kal_uint16 shutter,
-				     kal_uint16 frame_length,
-				     kal_bool auto_extend_en)
+				     kal_uint16 frame_length)
 {
 	unsigned long flags;
 	kal_uint16 realtime_fps = 0;
@@ -781,17 +780,14 @@ static void set_shutter_frame_length(kal_uint16 shutter,
 
 	/* Update Shutter */
 	write_cmos_sensor_8(0x0104, 0x01);
-	if (auto_extend_en)
-		write_cmos_sensor_8(0x0350, 0x01); /* Enable auto extend */
-	else
-		write_cmos_sensor_8(0x0350, 0x00); /* Disable auto extend */
+	write_cmos_sensor_8(0x0350, 0x00); /* Disable auto extend */
 	write_cmos_sensor_8(0x0202, (shutter >> 8) & 0xFF);
 	write_cmos_sensor_8(0x0203, shutter  & 0xFF);
 	write_cmos_sensor_8(0x0104, 0x00);
 	LOG_INF(
 		"Exit! shutter =%d, framelength =%d/%d, dummy_line=%d, auto_extend=%d\n",
 		shutter, imgsensor.frame_length, frame_length,
-		dummy_line, read_cmos_sensor_8(0x0350));
+		dummy_line, read_cmos_sensor(0x0350));
 
 }	/* set_shutter_frame_length */
 
@@ -1802,19 +1798,38 @@ static kal_uint16 imx519_preview_setting[] = {
 	0x0344, 0x00,
 	0x0345, 0x00,
 	0x0346, 0x00,
-	0x0347, 0x02,
+	0x0347, 0x12,
 	0x0348, 0x12,
 	0x0349, 0x2F,
 	0x034A, 0x0D,
-	0x034B, 0xA5,
+	0x034B, 0x95,
 	0x0220, 0x00,
 	0x0221, 0x11,
 	0x0222, 0x01,
 	0x0900, 0x01,
 	0x0901, 0x22,
-	0x0902, 0x0A,
+	0x0902, 0x08, //0x84,
 	0x3F4C, 0x05,
 	0x3F4D, 0x03,
+	/*PDAF Area Config Begin*/
+	0x38A3, 0x02,/*0:Fixed (16x12), 1:Fixed (8x6), 2:Flexible*/
+	0x38B4, 0x02,
+	0x38B5, 0xE2,/*738*/
+	0x38B6, 0x02,
+	0x38B7, 0x10,/*528*/
+	0x38B8, 0x06,
+	0x38B9, 0x36,/*1590*/
+	0x38BA, 0x04,
+	0x38BB, 0xB0,/*1200*/
+	0x38AC, 0x01,/* enable and disable Flexible window,total 8*/
+	0x38AD, 0x00,
+	0x38AE, 0x00,
+	0x38AF, 0x00,
+	0x38B0, 0x00,
+	0x38B1, 0x00,
+	0x38B2, 0x00,
+	0x38B3, 0x00,
+	/*PDAF Area Config End*/
 	0x4254, 0x7F,
 	0x0401, 0x00,
 	0x0404, 0x00,
@@ -1826,11 +1841,11 @@ static kal_uint16 imx519_preview_setting[] = {
 	0x040C, 0x09,
 	0x040D, 0x18,
 	0x040E, 0x06,
-	0x040F, 0xD2,
+	0x040F, 0xC0,
 	0x034C, 0x09,
 	0x034D, 0x18,
 	0x034E, 0x06,
-	0x034F, 0xD2,
+	0x034F, 0xC0,
 	0x0301, 0x06,
 	0x0303, 0x04,
 	0x0305, 0x04,
@@ -1838,20 +1853,24 @@ static kal_uint16 imx519_preview_setting[] = {
 	0x0307, 0xFA,
 	0x0309, 0x0A,
 	0x030B, 0x04,
-	0x030D, 0x03,
+	0x030D, 0x04,
 	0x030E, 0x00,
-	0x030F, 0xA5,
+	0x030F, 0xE6,
 	0x0310, 0x01,
-	0x0820, 0x03,
-	0x0821, 0xDE,
+	0x0820, 0x04,
+	0x0821, 0x0B,
 	0x0822, 0x00,
 	0x0823, 0x00,
+	0x3E20, 0x01,
+	0x3E37, 0x01,
+	0x3E3B, 0x00,
 	0x0106, 0x00,
 	0x0B00, 0x00,
 	0x3230, 0x00,
 	0x3F14, 0x00,
 	0x3F3C, 0x03,
 	0x3F0D, 0x0A,
+	0x3FBC, 0x00,
 	0x3C06, 0x00,
 	0x3C07, 0x00,
 	0x3C0A, 0x00,
@@ -1872,8 +1891,6 @@ static kal_uint16 imx519_preview_setting[] = {
 	0x020F, 0x00,
 	0x0218, 0x01,
 	0x0219, 0x00,
-	0x3E20, 0x01,
-	0x3E37, 0x01,
 };
 
 #if READOUT_TIME_DECREASE
@@ -3282,8 +3299,6 @@ static kal_uint32 get_info(enum MSDK_SCENARIO_ID_ENUM scenario_id,
 		imgsensor_info.hs_video_delay_frame;
 	sensor_info->SlimVideoDelayFrame =
 		imgsensor_info.slim_video_delay_frame;
-	sensor_info->FrameTimeDelayFrame =
-		imgsensor_info.frame_time_delay_frame;
 	sensor_info->Custom1DelayFrame = imgsensor_info.custom1_delay_frame;
 	sensor_info->Custom2DelayFrame = imgsensor_info.custom2_delay_frame;
 	sensor_info->Custom3DelayFrame = imgsensor_info.custom3_delay_frame;
@@ -4051,17 +4066,7 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 		break;
 	case SENSOR_FEATURE_SET_SHUTTER_FRAME_TIME:
 		set_shutter_frame_length((UINT16) (*feature_data),
-					(UINT16) (*(feature_data + 1)),
-					(BOOL) (*(feature_data + 2)));
-		break;
-	case SENSOR_FEATURE_GET_FRAME_CTRL_INFO_BY_SCENARIO:
-		/*
-		 * 1, if driver support new sw frame sync
-		 * set_shutter_frame_length() support third para auto_extend_en
-		 */
-		*(feature_data + 1) = 1;
-		/* margin info by scenario */
-		*(feature_data + 2) = imgsensor_info.margin;
+					(UINT16) (*(feature_data + 1)));
 		break;
 	case SENSOR_FEATURE_SET_AWB_GAIN:
 		break;
