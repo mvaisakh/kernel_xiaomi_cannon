@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -205,6 +206,7 @@ int mtk_disp_set_hrt_bw(struct mtk_drm_crtc *mtk_crtc, unsigned int bw)
 	DRM_MMP_MARK(hrt_bw, 0, tmp);
 	DDPINFO("set HRT bw %u\n", tmp);
 	mm_qos_update_all_request(&priv->hrt_request_list);
+	mtk_crtc->qos_ctx->cur_hrt_req = bw;
 
 	return ret;
 }

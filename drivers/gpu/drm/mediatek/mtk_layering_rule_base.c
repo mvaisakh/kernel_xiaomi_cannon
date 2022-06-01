@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -488,8 +489,6 @@ static void dump_disp_trace(struct drm_mtk_layering_info *disp_info)
 			     disp_info->gles_tail[i]);
 
 		for (j = 0; j < disp_info->layer_num[i]; j++) {
-			if (n >= len)
-				break;
 			c = &disp_info->input_config[i][j];
 			n += snprintf(msg + n, len - n,
 				      "|L%d->%d(%u,%u,%ux%u),f:0x%x,c:%d",
@@ -1881,10 +1880,7 @@ static int check_layering_result(struct drm_mtk_layering_info *info)
 
 static int check_disp_info(struct drm_mtk_layering_info *disp_info)
 {
-	int disp_idx = 0;
-	int ghead = -1;
-	int gtail = -1;
-	int layer_num = 0;
+	int disp_idx, ghead, gtail;
 	int i;
 
 	if (disp_info == NULL) {
@@ -1894,7 +1890,7 @@ static int check_disp_info(struct drm_mtk_layering_info *disp_info)
 
 	for (i = 0; i < 3; i++) {
 		int mode = disp_info->disp_mode[i];
-		layer_num = disp_info->layer_num[i];
+		int layer_num = disp_info->layer_num[i];
 
 		if (mode < 0 || mode >= MTK_DRM_SESSION_NUM) {
 			DDPPR_ERR("[HRT] i %d, invalid mode %d\n", i, mode);
@@ -1918,23 +1914,18 @@ static int check_disp_info(struct drm_mtk_layering_info *disp_info)
 	}
 
 	for (disp_idx = 0; disp_idx < HRT_TYPE_NUM; disp_idx++) {
-		layer_num = disp_info->layer_num[disp_idx];
-		if (layer_num > 0 &&
+		if (disp_info->layer_num[disp_idx] > 0 &&
 		    disp_info->input_config[disp_idx] == NULL) {
 			DDPPR_ERR(
 				"[HRT]input config is empty,disp:%d,l_num:%d\n",
-				disp_idx, layer_num);
+				disp_idx, disp_info->layer_num[disp_idx]);
 			return -1;
 		}
 
 		ghead = disp_info->gles_head[disp_idx];
 		gtail = disp_info->gles_tail[disp_idx];
-		if ((!((ghead == -1) && (gtail == -1)) &&
-			!((ghead >= 0) && (gtail >= 0))) ||
-			(ghead >= layer_num) ||
-			(gtail >= layer_num) ||
-			(ghead > gtail)) {
-			//dump_disp_info(disp_info, DISP_DEBUG_LEVEL_ERR);
+		if ((ghead < 0 && gtail >= 0) || (gtail < 0 && ghead >= 0)) {
+			dump_disp_info(disp_info, DISP_DEBUG_LEVEL_ERR);
 			DDPPR_ERR("[HRT]gles invalid,disp:%d,head:%d,tail:%d\n",
 				  disp_idx, disp_info->gles_head[disp_idx],
 				  disp_info->gles_tail[disp_idx]);

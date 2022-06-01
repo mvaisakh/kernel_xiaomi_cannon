@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  * Author: YT SHEN <yt.shen@mediatek.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -66,6 +67,9 @@
 #define DRIVER_DATE "20150513"
 #define DRIVER_MAJOR 1
 #define DRIVER_MINOR 0
+
+atomic_t resume_pending;
+wait_queue_head_t resume_wait_q;
 
 static atomic_t top_isr_ref; /* irq power status protection */
 static atomic_t top_clk_ref; /* top clk status protection*/
@@ -195,11 +199,14 @@ static void mtk_atomic_disp_rsz_roi(struct drm_device *dev,
 	struct drm_crtc_state *old_crtc_state;
 	int i;
 	struct mtk_rect dst_layer_roi = {0};
-	struct mtk_rect dst_total_roi[MAX_CRTC] = {0};
+	struct mtk_rect dst_total_roi[MAX_CRTC];
 	struct mtk_rect src_layer_roi = {0};
-	struct mtk_rect src_total_roi[MAX_CRTC] = {0};
+	struct mtk_rect src_total_roi[MAX_CRTC];
 	bool rsz_enable[MAX_CRTC] = {false};
 	struct mtk_plane_comp_state comp_state[MAX_CRTC][OVL_LAYER_NR];
+
+	memset(dst_total_roi, 0, sizeof(dst_total_roi));
+	memset(src_total_roi, 0, sizeof(src_total_roi));
 
 	for_each_crtc_in_state(old_state, crtc, old_crtc_state, i) {
 		struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
@@ -401,7 +408,6 @@ static void mtk_atomic_force_doze_switch(struct drm_device *dev,
 	funcs = encoder->helper_private;
 
 	panel_funcs = mtk_drm_get_lcm_ext_funcs(crtc);
-	mtk_drm_idlemgr_kick(__func__, crtc, false);
 	if (panel_funcs && panel_funcs->doze_get_mode_flags) {
 		/* blocking flush before stop trigger loop */
 		mtk_crtc_pkt_create(&handle, &mtk_crtc->base,
@@ -1654,15 +1660,6 @@ void mtk_drm_suspend_release_present_fence(struct device *dev,
 				  atomic_read(&private->crtc_present[index]));
 }
 
-void mtk_drm_suspend_release_sf_present_fence(struct device *dev,
-					      unsigned int index)
-{
-	struct mtk_drm_private *private = dev_get_drvdata(dev);
-
-	mtk_release_sf_present_fence(private->session_id[index],
-			atomic_read(&private->crtc_sf_present[index]));
-}
-
 int mtk_drm_suspend_release_fence(struct device *dev)
 {
 	unsigned int i = 0;
@@ -1674,7 +1671,6 @@ int mtk_drm_suspend_release_fence(struct device *dev)
 	}
 	/* release present fence */
 	mtk_drm_suspend_release_present_fence(dev, 0);
-	mtk_drm_suspend_release_sf_present_fence(dev, 0);
 
 	return 0;
 }
@@ -1987,7 +1983,7 @@ int mtk_drm_get_display_caps_ioctl(struct drm_device *dev, void *data,
 	caps_info->lcm_degree = 180;
 #endif
 
-	caps_info->lcm_color_mode = MTK_DRM_COLOR_MODE_NATIVE;
+	caps_info->lcm_color_mode = MTK_DRM_COLOR_MODE_DISPLAY_P3;
 	if (mtk_drm_helper_get_opt(private->helper_opt, MTK_DRM_OPT_OVL_WCG)) {
 		if (params)
 			caps_info->lcm_color_mode = params->lcm_color_mode;
@@ -2006,11 +2002,6 @@ int mtk_drm_get_display_caps_ioctl(struct drm_device *dev, void *data,
 #ifdef DRM_MMPATH
 	private->HWC_gpid = task_tgid_nr(current);
 #endif
-
-	if (mtk_drm_helper_get_opt(private->helper_opt, MTK_DRM_OPT_SF_PF) &&
-	    !mtk_crtc_is_frame_trigger_mode(private->crtc[0]))
-		caps_info->disp_feature_flag |=
-				DRM_DISP_FEATURE_SF_PRESENT_FENCE;
 
 	return ret;
 }
@@ -2447,9 +2438,6 @@ static const struct drm_ioctl_desc mtk_ioctls[] = {
 	DRM_IOCTL_DEF_DRV(MTK_LAYERING_RULE, mtk_layering_rule_ioctl,
 			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_CRTC_GETFENCE, mtk_drm_crtc_getfence_ioctl,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(MTK_CRTC_GETSFFENCE,
-			  mtk_drm_crtc_get_sf_fence_ioctl,
 			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_WAIT_REPAINT, mtk_drm_wait_repaint_ioctl,
 			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
@@ -3100,6 +3088,20 @@ static int mtk_drm_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM_SLEEP
+
+static int mtk_drm_sys_prepare(struct device *dev)
+{
+	atomic_inc(&resume_pending);
+	return 0;
+}
+
+static void mtk_drm_sys_complete(struct device *dev)
+{
+	atomic_set(&resume_pending, 0);
+	wake_up_all(&resume_wait_q);
+	return;
+}
+
 static int mtk_drm_sys_suspend(struct device *dev)
 {
 	struct mtk_drm_private *private = dev_get_drvdata(dev);
@@ -3142,8 +3144,12 @@ static int mtk_drm_sys_resume(struct device *dev)
 }
 #endif
 
-static SIMPLE_DEV_PM_OPS(mtk_drm_pm_ops, mtk_drm_sys_suspend,
-			 mtk_drm_sys_resume);
+static const struct dev_pm_ops mtk_drm_pm_ops = {
+	.prepare = mtk_drm_sys_prepare,
+	.complete = mtk_drm_sys_complete,
+	.suspend = mtk_drm_sys_suspend,
+	.resume = mtk_drm_sys_resume,
+};
 
 static const struct of_device_id mtk_drm_of_ids[] = {
 	{.compatible = "mediatek,mt2701-mmsys",

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -72,10 +73,6 @@ struct CRTC_MMP_Events {
 	mmp_event release_fence;
 	mmp_event update_present_fence;
 	mmp_event release_present_fence;
-	mmp_event update_sf_present_fence;
-	mmp_event release_sf_present_fence;
-	mmp_event warn_sf_pf_0;
-	mmp_event warn_sf_pf_2;
 	mmp_event atomic_begin;
 	mmp_event atomic_flush;
 	mmp_event enable_vblank;

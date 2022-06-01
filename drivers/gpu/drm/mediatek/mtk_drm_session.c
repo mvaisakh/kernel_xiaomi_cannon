@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -159,10 +160,8 @@ int mtk_session_set_mode(struct drm_device *dev, unsigned int session_mode)
 		mtk_set_layering_opt(LYE_OPT_RPO, 1);
 
 		/* OVL0_2l switch back to main path */
-		if (private->need_vds_path_switch_back) {
-			DDPMSG("Switch vds: crtc2 vds set ddp mode to DL\n");
-			mtk_need_vds_path_switch(private->crtc[0]);
-		}
+		DDPMSG("Switch vds: crtc2 vds set ddp mode to DL\n");
+		mtk_need_vds_path_switch(private->crtc[0]);
 	}
 
 	/* For releasing HW resource purpose, the ddp mode should

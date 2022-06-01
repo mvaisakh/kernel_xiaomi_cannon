@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -516,6 +517,18 @@ void disp_pq_notify_backlight_changed(int bl_1024)
 	}
 }
 
+static struct DRM_DISP_CCORR_COEF_T ccorr_backup = {
+	.hw_id = DRM_DISP_CCORR0,
+	.coef = {{1024, 0, 0}, {0, 1024, 0}, {0, 0, 1024}},
+	.offset = {0, 0, 0},
+};
+
+static struct DRM_DISP_CCORR_COEF_T ccorr_identify = {
+	.hw_id = DRM_DISP_CCORR0,
+	.coef = {{1024, 0, 0}, {0, 1024, 0}, {0, 0, 1024}},
+	.offset = {0, 0, 0},
+};
+
 static int disp_ccorr_set_coef(
 	const struct DRM_DISP_CCORR_COEF_T *user_color_corr,
 	struct mtk_ddp_comp *comp,
@@ -524,6 +537,8 @@ static int disp_ccorr_set_coef(
 	int ret = 0;
 	struct DRM_DISP_CCORR_COEF_T *ccorr, *old_ccorr;
 	int id = index_of_ccorr(comp->id);
+	bool hbm_set = false;
+	static bool hbm_en = false;
 
 	ccorr = kmalloc(sizeof(struct DRM_DISP_CCORR_COEF_T), GFP_KERNEL);
 	if (ccorr == NULL) {
@@ -531,12 +546,39 @@ static int disp_ccorr_set_coef(
 		return -EFAULT;
 	}
 
+	if (user_color_corr != NULL) {
+			if (!strncmp((char*)user_color_corr, "panel_HBM=1", sizeof("panel_HBM=1"))) {
+				pr_info("PCC disp_ccorr_set_coef panel_HBM=1");
+				memcpy(ccorr, &ccorr_identify,
+					sizeof(struct DRM_DISP_CCORR_COEF_T));
+				hbm_set = true;
+				hbm_en = true;
+			} else if (!strncmp((char*)user_color_corr, "panel_HBM=0", sizeof("panel_HBM=0"))) {
+				pr_info("PCC disp_ccorr_set_coef panel_HBM=0");
+				memcpy(ccorr, &ccorr_backup,
+					sizeof(struct DRM_DISP_CCORR_COEF_T));
+				hbm_set = true;
+				hbm_en = false;
+			}
+		}
+
 	if (user_color_corr == NULL) {
 		ret = -EFAULT;
 		kfree(ccorr);
 	} else {
-		memcpy(ccorr, user_color_corr,
-			sizeof(struct DRM_DISP_CCORR_COEF_T));
+		if (!hbm_set) {
+			memcpy(ccorr, user_color_corr,
+				sizeof(struct DRM_DISP_CCORR_COEF_T));
+
+			memcpy(&ccorr_backup, ccorr,
+				sizeof(struct DRM_DISP_CCORR_COEF_T));
+
+			if (hbm_en) {
+				pr_info("PCC disp_ccorr_set_coef ccorr_identify");
+				memcpy(ccorr, &ccorr_identify,
+					sizeof(struct DRM_DISP_CCORR_COEF_T));
+			}
+		}
 
 		if (id >= 0 && id < DISP_CCORR_TOTAL) {
 			mutex_lock(&g_ccorr_global_lock);
@@ -623,12 +665,12 @@ int disp_ccorr_set_color_matrix(struct mtk_ddp_comp *comp,
 		hint, identity_matrix, fte_flag, bypass_color);
 	if (((hint == 0) || ((hint == 1) && identity_matrix)) && (!fte_flag)) {
 		if (bypass_color == true) {
-			mtk_color_setbypass(comp, handle, false);
+			mtk_color_setbypass(comp, false);
 			bypass_color = false;
 		}
 	} else {
 		if (bypass_color == false) {
-			mtk_color_setbypass(comp, handle, true);
+			mtk_color_setbypass(comp, true);
 			bypass_color = true;
 		}
 	}
@@ -775,8 +817,8 @@ int mtk_drm_ioctl_support_color_matrix(struct drm_device *dev, void *data,
 
 	color_transform = data;
 
-#if defined(CONFIG_MACH_MT6885) || defined(CONFIG_MACH_MT6873) \
-	|| defined(CONFIG_MACH_MT6893) || defined(CONFIG_MACH_MT6853) \
+#if defined(CONFIG_MACH_MT6885) \
+	|| defined(CONFIG_MACH_MT6893) \
 	|| defined(CONFIG_MACH_MT6833)
 	// Support matrix:
 	// AOSP is 4x3 matrix. Offset is located at 4th row (not zero)

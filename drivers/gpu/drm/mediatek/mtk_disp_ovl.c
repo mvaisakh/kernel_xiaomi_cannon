@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1115,6 +1116,7 @@ static int mtk_ovl_color_manage(struct mtk_ddp_comp *comp, unsigned int idx,
 	enum mtk_drm_dataspace lcm_ds, plane_ds;
 	struct mtk_panel_params *params;
 	int i;
+	int wcg;
 
 	if (state->comp_state.comp_id) {
 		lye_idx = state->comp_state.lye_id;
@@ -1126,6 +1128,8 @@ static int mtk_ovl_color_manage(struct mtk_ddp_comp *comp, unsigned int idx,
 		goto done;
 
 	priv = crtc->dev->dev_private;
+	wcg = mtk_drm_helper_get_opt(priv->helper_opt, MTK_DRM_OPT_OVL_WCG) ;
+	DDPDBG("%s+ wcg flag:%d\n", __func__, wcg);
 	if (!mtk_drm_helper_get_opt(priv->helper_opt, MTK_DRM_OPT_OVL_WCG) ||
 	    !pending->enable)
 		goto done;
@@ -1140,7 +1144,7 @@ static int mtk_ovl_color_manage(struct mtk_ddp_comp *comp, unsigned int idx,
 	plane_ds =
 		(enum mtk_drm_dataspace)pending->prop_val[PLANE_PROP_DATASPACE];
 
-	DDPDBG("%s+ idx:%d ds:0x%08x->0x%08x\n", __func__, idx, plane_ds,
+	DDPDBG("%s+ wcg flag = %d idx:%d ds:0x%08x->0x%08x\n", __func__, wcg, idx, plane_ds,
 	       lcm_ds);
 
 	mtk_ovl_do_transfer(idx, plane_ds, lcm_ds, &gamma_en, &igamma_en,
@@ -1310,7 +1314,7 @@ static void _ovl_common_config(struct mtk_ddp_comp *comp, unsigned int idx,
 			size = buf_size;
 			regs_addr = comp->regs_pa +
 				DISP_REG_OVL_EL_ADDR(id);
-			if (state->pending.is_sec && pending->addr) {
+			if (state->pending.is_sec) {
 				meta_type = CMDQ_IWC_H_2_MVA;
 				cmdq_sec_pkt_write_reg(handle, regs_addr,
 					pending->addr, meta_type,
@@ -1328,9 +1332,9 @@ static void _ovl_common_config(struct mtk_ddp_comp *comp, unsigned int idx,
 			} else {
 				cmdq_pkt_write(handle, comp->cmdq_base,
 					regs_addr, addr, ~0);
-				DDPDBG("%s:%d, addr:0x%x, size:%d\n",
+				DDPDBG("%s:%d, addr:%pad, size:%d\n",
 					__func__, __LINE__,
-					addr,
+					&addr,
 					size);
 				cmdq_pkt_write(handle, comp->cmdq_base,
 					comp->regs_pa + OVL_SECURE,
@@ -1368,7 +1372,7 @@ static void _ovl_common_config(struct mtk_ddp_comp *comp, unsigned int idx,
 			size = buf_size;
 			regs_addr = comp->regs_pa +
 				DISP_REG_OVL_ADDR(ovl, lye_idx);
-			if (state->pending.is_sec && pending->addr) {
+			if (state->pending.is_sec) {
 				meta_type = CMDQ_IWC_H_2_MVA;
 				cmdq_sec_pkt_write_reg(handle, regs_addr,
 					pending->addr, meta_type,
@@ -1756,7 +1760,7 @@ static bool compr_l_config_PVRIC_V3_1(struct mtk_ddp_comp *comp,
 
 			regs_addr = comp->regs_pa +
 				DISP_REG_OVL_EL_ADDR(id);
-			if (state->pending.is_sec && pending->addr) {
+			if (state->pending.is_sec) {
 				size = buf_size;
 				meta_type = CMDQ_IWC_H_2_MVA;
 				cmdq_sec_pkt_write_reg(handle, regs_addr,
@@ -1811,7 +1815,7 @@ static bool compr_l_config_PVRIC_V3_1(struct mtk_ddp_comp *comp,
 
 			regs_addr = comp->regs_pa +
 				DISP_REG_OVL_ADDR(ovl, lye_idx);
-			if (state->pending.is_sec && pending->addr) {
+			if (state->pending.is_sec) {
 				size = buf_size;
 				meta_type = CMDQ_IWC_H_2_MVA;
 				cmdq_sec_pkt_write_reg(handle, regs_addr,
@@ -1906,8 +1910,8 @@ static bool compr_l_config_AFBC_V1_2(struct mtk_ddp_comp *comp,
 	unsigned int lx_2nd_subbuf = 0;
 	unsigned int lx_pitch_msb = 0;
 
-	DDPDBG("%s:%d, addr:0x%x, pitch:%d, vpitch:%d\n",
-		__func__, __LINE__, addr,
+	DDPDBG("%s:%d, addr:%pad, pitch:%d, vpitch:%d\n",
+		__func__, __LINE__, &addr,
 		pitch, vpitch);
 	DDPDBG("src:(%d,%d,%d,%d), fmt:%d, Bpp:%d, compress:%d\n",
 		src_x, src_y,
@@ -2045,7 +2049,7 @@ static bool compr_l_config_AFBC_V1_2(struct mtk_ddp_comp *comp,
 
 			regs_addr = comp->regs_pa +
 				DISP_REG_OVL_EL_ADDR(id);
-			if (state->pending.is_sec && pending->addr) {
+			if (state->pending.is_sec) {
 				size = buf_size;
 				meta_type = CMDQ_IWC_H_2_MVA;
 				cmdq_sec_pkt_write_reg(handle, regs_addr,
@@ -2107,7 +2111,7 @@ static bool compr_l_config_AFBC_V1_2(struct mtk_ddp_comp *comp,
 
 			regs_addr = comp->regs_pa +
 				DISP_REG_OVL_ADDR(ovl, lye_idx);
-			if (state->pending.is_sec && pending->addr) {
+			if (state->pending.is_sec) {
 				size = buf_size;
 				meta_type = CMDQ_IWC_H_2_MVA;
 				cmdq_sec_pkt_write_reg(handle, regs_addr,
@@ -2530,9 +2534,9 @@ static void mtk_ovl_backup_info_cmp(struct mtk_ddp_comp *comp, bool *compare)
 		cur_info[i].layer = i;
 		cur_info[i].layer_en = src_on & (0x1 << i);
 		if (!cur_info[i].layer_en) {
-			DDPMSG("%s:layer%d,en %d,size 0x%x,addr %lu\n",
+			DDPMSG("%s:layer%d,en %d,size 0x%x,addr %pad\n",
 			       __func__, i, cur_info[i].layer_en,
-			       cur_info[i].src_size, cur_info[i].addr);
+			       cur_info[i].src_size, &cur_info[i].addr);
 			continue;
 		}
 
@@ -2549,9 +2553,9 @@ static void mtk_ovl_backup_info_cmp(struct mtk_ddp_comp *comp, bool *compare)
 		cur_info[i].data_path_con =
 			readl(DISP_REG_OVL_DATAPATH_CON + Lx_base);
 
-		DDPMSG("%s:layer%d,en %d,size 0x%x, addr %lu\n", __func__, i,
+		DDPMSG("%s:layer%d,en %d,size 0x%x, addr %pad\n", __func__, i,
 		       cur_info[i].layer_en, cur_info[i].src_size,
-		       cur_info[i].addr);
+		       &cur_info[i].addr);
 		if (memcmp(&cur_info[i], &ovl->backup_info[i],
 			   sizeof(struct mtk_ovl_backup_info)) != 0)
 			*compare = true;

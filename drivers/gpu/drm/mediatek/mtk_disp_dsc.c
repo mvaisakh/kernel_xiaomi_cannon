@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -338,7 +339,8 @@ static void mtk_dsc_config(struct mtk_ddp_comp *comp,
 			dsc_params->slice_width-1) / dsc_params->slice_width;
 		init_delay_height_min =
 			(init_delay_limit > 15) ? 15 : init_delay_limit;
-		init_delay_height = init_delay_height_min;
+		//init_delay_height = init_delay_height_min;
+		init_delay_height = 4;
 
 		reg_val = (!!dsc_params->slice_mode) |
 					(!!dsc_params->rgb_swap << 2) |

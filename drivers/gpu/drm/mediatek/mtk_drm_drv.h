@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -103,7 +104,6 @@ struct mtk_drm_private {
 	unsigned int num_sessions;
 	enum MTK_DRM_SESSION_MODE session_mode;
 	atomic_t crtc_present[MAX_CRTC];
-	atomic_t crtc_sf_present[MAX_CRTC];
 
 	struct device_node *mutex_node;
 	struct device *mutex_dev;
@@ -174,7 +174,6 @@ struct mtk_drm_private {
 	int need_vds_path_switch;
 	int vds_path_switch_dirty;
 	int vds_path_switch_done;
-	int need_vds_path_switch_back;
 	int vds_path_enable;
 
 	/* Due to 2nd display share 1 secure gce client, need store here */
@@ -235,6 +234,10 @@ extern struct platform_driver mtk_lvds_driver;
 extern struct platform_driver mtk_lvds_tx_driver;
 extern struct platform_driver mtk_disp_dsc_driver;
 extern struct lcm_fps_ctx_t lcm_fps_ctx[MAX_CRTC];
+
+extern atomic_t resume_pending;
+extern wait_queue_head_t resume_wait_q;
+
 extern struct platform_driver mtk_disp_merge_driver;
 #ifdef CONFIG_MTK_HDMI_SUPPORT
 extern struct platform_driver mtk_dp_tx_driver;
@@ -250,8 +253,6 @@ void drm_trigger_repaint(enum DRM_REPAINT_TYPE type,
 int mtk_drm_suspend_release_fence(struct device *dev);
 void mtk_drm_suspend_release_present_fence(struct device *dev,
 					   unsigned int index);
-void mtk_drm_suspend_release_sf_present_fence(struct device *dev,
-					      unsigned int index);
 void mtk_drm_top_clk_prepare_enable(struct drm_device *drm);
 void mtk_drm_top_clk_disable_unprepare(struct drm_device *drm);
 struct mtk_panel_params *mtk_drm_get_lcm_ext_params(struct drm_crtc *crtc);

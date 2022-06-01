@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -150,16 +151,6 @@ void init_crtc_mmp_event(void)
 		g_CRTC_MMP_Events[i].release_present_fence =
 			mmprofile_register_event(crtc_mmp_root,
 				"release_present_fence");
-		g_CRTC_MMP_Events[i].update_sf_present_fence =
-			mmprofile_register_event(crtc_mmp_root,
-				"update_sf_present_fence");
-		g_CRTC_MMP_Events[i].release_sf_present_fence =
-			mmprofile_register_event(crtc_mmp_root,
-				"release_sf_present_fence");
-		g_CRTC_MMP_Events[i].warn_sf_pf_0 =
-			mmprofile_register_event(crtc_mmp_root, "warn_sf_pf_0");
-		g_CRTC_MMP_Events[i].warn_sf_pf_2 =
-			mmprofile_register_event(crtc_mmp_root, "warn_sf_pf_2");
 		g_CRTC_MMP_Events[i].atomic_begin = mmprofile_register_event(
 			crtc_mmp_root, "atomic_begin");
 		g_CRTC_MMP_Events[i].atomic_flush = mmprofile_register_event(

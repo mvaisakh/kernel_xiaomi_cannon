@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -57,7 +58,6 @@ enum MTK_DRM_HELPER_OPT {
 	MTK_DRM_OPT_LAYER_REC,
 	MTK_DRM_OPT_CLEAR_LAYER,
 	MTK_DRM_OPT_VDS_PATH_SWITCH,
-	MTK_DRM_OPT_SF_PF,
 	MTK_DRM_OPT_NUM
 };
 

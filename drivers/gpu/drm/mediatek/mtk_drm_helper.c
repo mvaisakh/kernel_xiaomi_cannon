@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -68,11 +69,10 @@ static struct mtk_drm_helper help_info[] = {
 	{MTK_DRM_OPT_VP_PQ, 0, "MTK_DRM_OPT_VP_PQ"},
 	{MTK_DRM_OPT_GAME_PQ, 0, "MTK_DRM_OPT_GAME_PQ"},
 	{MTK_DRM_OPT_MMPATH, 0, "MTK_DRM_OPT_MMPATH"},
-	{MTK_DRM_OPT_HBM, 0, "MTK_DRM_OPT_HBM"},
+	{MTK_DRM_OPT_HBM, 1, "MTK_DRM_OPT_HBM"},
 	{MTK_DRM_OPT_LAYER_REC, 0, "MTK_DRM_OPT_LAYER_REC"},
 	{MTK_DRM_OPT_CLEAR_LAYER, 0, "MTK_DRM_OPT_CLEAR_LAYER"},
 	{MTK_DRM_OPT_VDS_PATH_SWITCH, 0, "MTK_DRM_OPT_VDS_PATH_SWITCH"},
-	{MTK_DRM_OPT_SF_PF, 0, "MTK_DRM_OPT_SF_PF"},
 };
 
 static const char *mtk_drm_helper_opt_spy(struct mtk_drm_helper *helper_opt,

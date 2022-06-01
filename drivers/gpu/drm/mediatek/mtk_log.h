@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -38,6 +39,10 @@ int mtk_dprec_logger_pr(unsigned int type, char *fmt, ...);
 		if (g_mobile_log)                                              \
 			pr_info(pr_fmt(fmt), ##arg);     \
 	} while (0)
+#define DDPDSIINFO(fmt, arg...)                                                   \
+	do {                                                                   \
+		mtk_dprec_logger_pr(DPREC_LOGGER_DEBUG, fmt, ##arg);           \
+	} while (0)
 
 #define DDPFUNC(fmt, arg...)		\
 	pr_info("[%s line:%d]"pr_fmt(fmt), __func__, __LINE__, ##arg)
@@ -66,8 +71,8 @@ int mtk_dprec_logger_pr(unsigned int type, char *fmt, ...);
 
 #define DDPFENCE(fmt, arg...)                                                  \
 	do {                                                                   \
-		mtk_dprec_logger_pr(DPREC_LOGGER_FENCE, fmt, ##arg);           \
-		if (g_fence_log)                                               \
+		mtk_dprec_logger_pr(DPREC_LOGGER_DEBUG, fmt, ##arg);           \
+		if (1)                                               \
 			pr_info(pr_fmt(fmt), ##arg);     \
 	} while (0)
 
