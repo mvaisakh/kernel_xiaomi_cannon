@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -104,8 +105,6 @@
 #define CONFIG_TCPC_SHUTDOWN_VBUS_DISABLE
 
 #define CONFIG_TCPC_NOTIFIER_LATE_SYNC
-
-#define CONFIG_TCPC_NOTIFICATION_NON_BLOCKING
 
 #ifdef CONFIG_USB_POWER_DELIVERY
 
@@ -255,7 +254,7 @@
 #define CONFIG_USB_PD_RANDOM_FLOW_DELAY
 
 #define CONFIG_USB_PD_DFP_FLOW_DELAY
-#define CONFIG_USB_PD_DFP_FLOW_DELAY_STARTUP
+/* #define CONFIG_USB_PD_DFP_FLOW_DELAY_STARTUP */
 #define CONFIG_USB_PD_DFP_FLOW_DELAY_DRSWAP
 #define CONFIG_USB_PD_DFP_FLOW_DELAY_RESET
 
@@ -386,9 +385,8 @@
 #define CONFIG_USB_PD_PPS_REQUEST_INTERVAL	7000
 #endif	/* CONFIG_USB_PD_PPS_REQUEST_INTERVAL */
 
-#ifdef CONFIG_MTK_CHARGER
-#define CONFIG_TYPEC_WAIT_BC12
-#endif /* CONFIG_MTK_CHARGER */
+/* MTK Wait BC12 */
+/* #define CONFIG_MTK_WAIT_BC12 */
 #endif /* CONFIG_USB_POWER_DELIVERY */
 
 /* debug config */

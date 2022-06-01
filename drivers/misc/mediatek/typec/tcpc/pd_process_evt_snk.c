@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * Power Delivery Process Event For SNK
  *
@@ -188,7 +189,7 @@ static inline bool pd_process_data_msg(
 			return true;
 		break;
 #endif	/* CONFIG_USB_PD_PR_SWAP */
-
+		/* fall-through */
 #ifdef CONFIG_USB_PD_REV30
 #ifdef CONFIG_USB_PD_REV30_ALERT_REMOTE
 	case PD_DATA_ALERT:
@@ -284,8 +285,8 @@ static inline bool pd_process_hw_msg_sink_tx_change(
 	if (pd_port->pe_data.pd_traffic_control == pd_traffic)
 		return false;
 
-	pd_port->pe_data.pd_traffic_control = pd_traffic;
 	dpm_reaction_set_ready_once(pd_port);
+	pd_port->pe_data.pd_traffic_control = pd_traffic;
 #endif	/* CONFIG_USB_PD_REV30_COLLISION_AVOID */
 
 	return false;

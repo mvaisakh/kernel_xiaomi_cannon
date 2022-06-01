@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -32,6 +33,9 @@ static struct {
 	int used;
 	char buf[PD_INFO_BUF_SIZE + 1 + OUT_BUF_MAX];
 } pd_dbg_buffer[2];
+
+static bool dbg_log_en = true;
+module_param(dbg_log_en, bool, 0644);
 
 static struct mutex buff_lock;
 static unsigned int using_buf;
@@ -66,8 +70,7 @@ static inline bool pd_dbg_print_out(void)
 	if (used == 0)
 		return false;
 
-	if (used < (PD_INFO_BUF_SIZE + 1 + OUT_BUF_MAX))
-		pd_dbg_buffer[index].buf[used] = '\0';
+	pd_dbg_buffer[index].buf[used] = '\0';
 
 	pr_info("///PD dbg info %ud\n", used);
 
@@ -78,7 +81,7 @@ static inline bool pd_dbg_print_out(void)
 		while (atomic_read(&busy))
 			usleep_range(1000, 2000);
 
-		pr_notice("%s", pd_dbg_buffer[index].buf + i);
+		printk(pd_dbg_buffer[index].buf + i);
 		pd_dbg_buffer[index].buf[OUT_BUF_MAX + i] = temp;
 	}
 
@@ -112,6 +115,9 @@ int pd_dbg_info(const char *fmt, ...)
 	int used;
 	u64 ts;
 	unsigned long rem_usec;
+
+	if (!dbg_log_en)
+		return 0;
 
 	ts = local_clock();
 	rem_usec = do_div(ts, 1000000000) / 1000 / 1000;

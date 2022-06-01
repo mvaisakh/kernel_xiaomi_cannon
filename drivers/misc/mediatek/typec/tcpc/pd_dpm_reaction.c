@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * PD Device Policy Manager Ready State reactions
  *
@@ -537,12 +538,6 @@ static const struct dpm_ready_reaction dpm_reactions[] = {
 #endif	/* CONFIG_USB_PD_DPM_AUTO_GET_STATUS */
 #endif	/* CONFIG_USB_PD_REV30 */
 
-#ifdef CONFIG_USB_PD_DFP_FLOW_DELAY
-	DECL_DPM_REACTION_DFP(
-		DPM_REACTION_DFP_FLOW_DELAY,
-		dpm_reaction_dfp_flow_delay),
-#endif	/* CONFIG_USB_PD_DFP_FLOW_DELAY */
-
 #ifdef CONFIG_USB_PD_UFP_FLOW_DELAY
 	DECL_DPM_REACTION_UFP(
 		DPM_REACTION_UFP_FLOW_DELAY,
@@ -578,6 +573,12 @@ static const struct dpm_ready_reaction dpm_reactions[] = {
 		DPM_REACTION_REQUEST_DR_SWAP,
 		dpm_reaction_request_dr_swap),
 #endif	/* CONFIG_USB_PD_DR_SWAP */
+
+#ifdef CONFIG_USB_PD_DFP_FLOW_DELAY
+	DECL_DPM_REACTION_DFP(
+		DPM_REACTION_DFP_FLOW_DELAY,
+		dpm_reaction_dfp_flow_delay),
+#endif	/* CONFIG_USB_PD_DFP_FLOW_DELAY */
 
 #ifdef CONFIG_TCPC_VCONN_SUPPLY_MODE
 	DECL_DPM_REACTION_DFP_PD30_CHECK_ONCE(

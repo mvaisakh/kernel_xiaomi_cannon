@@ -1,5 +1,8 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
+ *
+ * Power Delivery Process Event For VDM
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -21,8 +24,6 @@
 #define ENABLE_RT1711_DBG	0
 
 /* RT1711H Private RegMap */
-
-#define RT1711H_REG_CONFIG_GPIO0			(0x71)
 
 #define RT1711H_REG_PHY_CTRL1				(0x80)
 

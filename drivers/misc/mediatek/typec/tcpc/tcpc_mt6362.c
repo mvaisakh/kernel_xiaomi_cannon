@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #include <linux/kernel.h>
@@ -20,7 +21,7 @@
 #include "inc/std_tcpci_v10.h"
 
 #define MT6362_INFO_EN	1
-#define MT6362_DBGINFO_EN	1
+#define MT6362_DBGINFO_EN	0
 #define MT6362_WD1_EN	1
 #define MT6362_WD2_EN	1
 
@@ -254,7 +255,6 @@ static const u8 mt6362_vend_alert_maskall[MT6362_VEND_INT_NUM] = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-#ifdef CONFIG_WATER_DETECTION
 /* reg0x20 ~ reg0x2D */
 static const u8 mt6362_rt2_wd_init_setting[] = {
 	0x50, 0x34, 0x44, 0xCA, 0x68, 0x02, 0x20, 0x03,
@@ -303,13 +303,12 @@ static const u8 mt6362_wd_polling_path[MT6362_WD_CHAN_NUM] = {
 
 static const u8 mt6362_wd_protection_path[MT6362_WD_CHAN_NUM] = {
 	MT6362_MSK_WDSBU1_EN | MT6362_MSK_WDSBU2_EN |
-	MT6362_MSK_WDCC1_EN | MT6362_MSK_WDCC2_EN,
-//	MT6362_MSK_WDDP_EN | MT6362_MSK_WDDM_EN,
+	MT6362_MSK_WDCC1_EN | MT6362_MSK_WDCC2_EN |
+	MT6362_MSK_WDDP_EN | MT6362_MSK_WDDM_EN,
 	MT6362_MSK_WDSBU1_EN | MT6362_MSK_WDSBU2_EN |
-	MT6362_MSK_WDCC1_EN | MT6362_MSK_WDCC2_EN,
-//	MT6362_MSK_WDDP_EN | MT6362_MSK_WDDM_EN,
+	MT6362_MSK_WDCC1_EN | MT6362_MSK_WDCC2_EN |
+	MT6362_MSK_WDDP_EN | MT6362_MSK_WDDM_EN,
 };
-#endif /* CONFIG_WATER_DETECTION */
 
 struct mt6362_tcpc_data {
 	struct device *dev;
@@ -1212,7 +1211,8 @@ static int mt6362_tcpc_init(struct tcpc_device *tcpc, bool sw_reset)
 	mt6362_init_wd(tdata);
 #endif /* CONFIG_WATER_DETECTION */
 
-	tcpci_init_alert_mask(tcpc);
+	if (sw_reset)
+		tcpci_init_alert_mask(tcpc);
 
 	if (tcpc->tcpc_flags & TCPC_FLAGS_WATCHDOG_EN) {
 		/* Set watchdog timer = 3.2s and enable */
@@ -1898,7 +1898,7 @@ static int mt6362_init_irq(struct mt6362_tcpc_data *tdata,
 
 	kthread_init_worker(&tdata->irq_worker);
 	tdata->irq_worker_task = kthread_run(kthread_worker_fn,
-					     &tdata->irq_worker, "%s",
+					     &tdata->irq_worker,
 					     tdata->desc->name);
 	if (IS_ERR(tdata->irq_worker_task)) {
 		dev_err(tdata->dev, "%s create tcpc task fail\n", __func__);

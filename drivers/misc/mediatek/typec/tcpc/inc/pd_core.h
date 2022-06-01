@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -402,7 +403,7 @@
 	| ((ptype_dfp) & 0x07) << 23 \
 	 | (is_modal) << 26 | ((vid) & 0xffff))
 
-#define VDO_IDH_PD20(idh)	(idh & (~(0x1f << 21)))
+#define VDO_IDH_PD20(idh)	(idh & (~(0x07 << 23)))
 
 #define PD_IDH_PTYPE(vdo) (((vdo) >> 27) & 0x7)
 #define PD_IDH_PTYPE_DFP(vdo) (((vdo) >> 23) & 0x7)
@@ -1044,12 +1045,10 @@ struct pd_port {
 	uint8_t cap_miss_match; /* For src_cap miss match */
 };
 
-#ifdef CONFIG_USB_PD_ALT_MODE
 static inline struct dp_data *pd_get_dp_data(struct pd_port *pd_port)
 {
 	return &pd_port->pe_data.dp_data;
 }
-#endif	/* CONFIG_USB_PD_ALT_MODE */
 
 extern int pd_core_init(struct tcpc_device *tcpc_dev);
 

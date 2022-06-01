@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1134,10 +1135,10 @@ extern int tcpm_update_bat_status_wh_no_mutex(struct tcpc_device *tcpc,
 	enum pd_battery_reference ref, uint8_t status, uint16_t wh);
 
 extern int tcpm_update_bat_status_soc(struct tcpc_device *tcpc,
-	enum pd_battery_reference ref, uint8_t status, uint16_t soc);
+	uint8_t status, uint16_t soc);
 
 extern int tcpm_update_bat_status_soc_no_mutex(struct tcpc_device *tcpc,
-	enum pd_battery_reference ref, uint8_t status, uint16_t soc);
+	uint8_t status, uint16_t soc);
 
 /**
  * tcpm_update_bat_last_full

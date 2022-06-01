@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * Mediatek MT6370 Type-C Port Control Driver
  *
@@ -375,8 +376,8 @@ static int rt5081_regmap_init(struct rt5081_chip *chip)
 	if ((!props->name) || (!props->aliases))
 		return -ENOMEM;
 
-	strlcpy((char *)props->name, name, len+1);
-	strlcpy((char *)props->aliases, name, len+1);
+	strlcpy((char *)props->name, name, strlen(name)+1);
+	strlcpy((char *)props->aliases, name, strlen(name)+1);
 	props->io_log_en = 0;
 
 	chip->m_dev = rt_regmap_device_register(props,
@@ -603,7 +604,8 @@ static int rt5081_init_alert(struct tcpc_device *tcpc)
 
 	pr_info("IRQF_NO_THREAD Test\r\n");
 	ret = request_irq(chip->irq, rt5081_intr_handler,
-		IRQF_TRIGGER_FALLING | IRQF_NO_THREAD, name, chip);
+		IRQF_TRIGGER_FALLING | IRQF_NO_THREAD |
+		IRQF_NO_SUSPEND, name, chip);
 	if (ret < 0) {
 		pr_err("Error: failed to request irq%d (gpio = %d, ret = %d)\n",
 			chip->irq, chip->irq_gpio, ret);
@@ -1157,8 +1159,8 @@ static int rt5081_set_bist_carrier_mode(
 	return 0;
 }
 
-/* transmit count (1byte) + message header (2byte) + data object (4byte * 7) */
-#define RT5081_TRANSMIT_MAX_SIZE (1 + sizeof(uint16_t) + sizeof(uint32_t) * 7)
+/* message header (2byte) + data object (7*4) */
+#define RT5081_TRANSMIT_MAX_SIZE	(sizeof(uint16_t) + sizeof(uint32_t)*7)
 
 #ifdef CONFIG_USB_PD_RETRY_CRC_DISCARD
 static int rt5081_retransmit(struct tcpc_device *tcpc)
@@ -1406,7 +1408,7 @@ static int rt5081_tcpcdev_init(struct rt5081_chip *chip, struct device *dev)
 	if (!desc->name)
 		return -ENOMEM;
 
-	strlcpy((char *)desc->name, name, len+1);
+	strlcpy((char *)desc->name, name, strlen(name)+1);
 
 	chip->tcpc_desc = desc;
 

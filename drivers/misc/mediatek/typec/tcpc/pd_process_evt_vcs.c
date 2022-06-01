@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * Power Delivery Process Event For VCS
  *
@@ -17,7 +18,6 @@
 #include "inc/tcpci_event.h"
 #include "inc/pd_process_evt.h"
 
-#ifdef CONFIG_USB_PD_VCONN_SWAP
 /* DPM Event reactions */
 
 DECL_PE_STATE_TRANSITION(PD_DPM_MSG_ACK) = {
@@ -123,4 +123,3 @@ bool pd_process_event_vcs(struct pd_port *pd_port, struct pd_event *pd_event)
 		return false;
 	}
 }
-#endif	/* CONFIG_USB_PD_VCONN_SWAP */

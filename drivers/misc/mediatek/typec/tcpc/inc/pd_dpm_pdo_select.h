@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -57,7 +58,7 @@ extern void dpm_extract_pdo_info(
 			uint32_t pdo, struct dpm_pdo_info_t *info);
 
 extern bool dpm_find_match_req_info(struct dpm_rdo_info_t *req_info,
-	struct dpm_pdo_info_t *sink, int cnt, uint32_t *src_pdos,
+	uint32_t snk_pdo, int cnt, uint32_t *src_pdos,
 	int min_uw, uint32_t select_rule);
 
 #endif	/* PD_DPM_PDO_SELECT_H */
