@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -729,8 +730,14 @@ static inline const char *rt9465_get_irq_name(struct rt9465_info *info,
 	return "not found";
 }
 
-static inline void rt9465_irq_unmask(struct rt9465_info *info,
-	unsigned int irqnum)
+static inline void rt9465_irq_mask(struct rt9465_info *info, int irqnum)
+{
+	dev_dbg(info->dev, "%s: irq = %d, %s\n", __func__, irqnum,
+		rt9465_get_irq_name(info, irqnum));
+	rt9465_irqmask[irqnum / 8] |= (1 << (irqnum % 8));
+}
+
+static inline void rt9465_irq_unmask(struct rt9465_info *info, int irqnum)
 {
 	dev_dbg(info->dev, "%s: irq = %d, %s\n", __func__, irqnum,
 		rt9465_get_irq_name(info, irqnum));
@@ -850,9 +857,7 @@ static int rt9465_register_irq(struct rt9465_info *info)
 	/* request gpio */
 	len = strlen(info->desc->chg_dev_name);
 	name = devm_kzalloc(info->dev, len + 10, GFP_KERNEL);
-	ret = snprintf(name, len + 10, "%s_irq_gpio", info->desc->chg_dev_name);
-	if (ret >= (len + 10))
-		chr_info("%s: name truncated\n", __func__);
+	snprintf(name,  len + 10, "%s_irq_gpio", info->desc->chg_dev_name);
 	ret = devm_gpio_request_one(info->dev, info->intr_gpio, GPIOF_IN, name);
 	if (ret < 0) {
 		chr_err("%s: gpio request fail\n", __func__);

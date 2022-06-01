@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -374,7 +375,7 @@ static int pca_pps_set_wdt(struct prop_chgalgo_device *pca, u32 ms)
 	return 0;
 }
 
-static struct prop_chgalgo_desc pca_ta_pps_desc = {
+static struct prop_chgalgo_desc pca_pps_desc = {
 	.name = "pca_ta_pps",
 	.type = PCA_DEVTYPE_TA,
 };
@@ -477,7 +478,7 @@ static int pca_pps_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	info->pca = prop_chgalgo_device_register(info->dev, &pca_ta_pps_desc,
+	info->pca = prop_chgalgo_device_register(info->dev, &pca_pps_desc,
 						 &pca_pps_ops, NULL, NULL,
 						 info);
 	if (!info->pca) {

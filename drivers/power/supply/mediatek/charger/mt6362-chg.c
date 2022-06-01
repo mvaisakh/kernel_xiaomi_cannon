@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #include <linux/iio/consumer.h>
@@ -24,7 +25,6 @@
 #define MT6362_CHG_DRV_VERSION		"1.0.1_MTK"
 
 static bool dbg_log_en;
-module_param(dbg_log_en, bool, 0644);
 #define mt_dbg(dev, fmt, ...) \
 	do { \
 		if (dbg_log_en) \
@@ -370,9 +370,8 @@ enum mt6362_ic_stat {
 };
 
 static const char * const mt6362_ic_stat_list[] = {
-	"hz", "ready", "trickle_chg", "pre_chg", "fast_chg", "ieoc_chg",
-	"backgnd_chg", "chg_done", "chg_fault", "unknown", "unknown", "unknown",
-	"unknown", "unknown", "unknown", "otg",
+	"hz", "ready", "trickle_chg", "pre_chg", "fast_chg",
+	"ieoc_chg", "backgnd_chg", "chg_done", "chg_fault", "otg",
 };
 
 enum mt6362_chg_adc_channel {
@@ -424,7 +423,7 @@ static inline u32 mt6362_map_real_val(u32 sel, u32 min, u32 max, u32 step)
 static int mt6362_enable_hidden_mode(struct charger_device *chg_dev, bool en)
 {
 	struct mt6362_chg_data *data = charger_get_data(chg_dev);
-	int ret = 0;
+	int ret;
 
 	mt_dbg(data->dev, "%s: en = %d\n", __func__, en);
 	mutex_lock(&data->hidden_mode_lock);
@@ -821,7 +820,7 @@ out:
 
 static int mt6362_enable_otg_parameter(struct mt6362_chg_data *data, bool en)
 {
-	int ret = 0;
+	int ret;
 
 	mt_dbg(data->dev, "%s: en = %d\n", __func__, en);
 	mutex_lock(&data->otg_lock);
@@ -837,8 +836,8 @@ static int mt6362_enable_otg_parameter(struct mt6362_chg_data *data, bool en)
 			ret = __mt6362_enable_otg_parameter(data, en);
 			if (ret < 0)
 				goto err;
+			data->otg_mode_cnt--;
 		}
-		data->otg_mode_cnt--;
 	}
 	goto out;
 err:
@@ -922,7 +921,7 @@ static int mt6362_charger_get_charge_type(struct mt6362_chg_data *data,
 					  union power_supply_propval *val)
 {
 	enum mt6362_ic_stat ic_stat;
-	int ret, type = 0;
+	int ret, type;
 
 	ret = mt6362_get_charging_status(data, &ic_stat);
 	if (ret < 0)
@@ -1127,6 +1126,7 @@ static int mt6362_charger_get_property(struct power_supply *psy,
 	struct mt6362_chg_data *data = power_supply_get_drvdata(psy);
 	int ret = 0;
 
+	dev_dbg(data->dev, "%s: prop = %d\n", __func__, psp);
 	switch (psp) {
 	case POWER_SUPPLY_PROP_ONLINE:
 		ret = mt6362_charger_get_online(data, val);
@@ -1167,8 +1167,6 @@ static int mt6362_charger_get_property(struct power_supply *psy,
 	default:
 		ret = -ENODATA;
 	}
-	mt_dbg(data->dev, "%s: prop = %d, val = %d\n", __func__,
-	       psp, val->intval);
 	return ret;
 }
 
@@ -1179,8 +1177,7 @@ static int mt6362_charger_set_property(struct power_supply *psy,
 	struct mt6362_chg_data *data = power_supply_get_drvdata(psy);
 	int ret;
 
-	mt_dbg(data->dev, "%s: prop = %d, val = %d\n", __func__,
-	       psp, val->intval);
+	dev_dbg(data->dev, "%s: prop = %d\n", __func__, psp);
 	switch (psp) {
 	case POWER_SUPPLY_PROP_ONLINE:
 		ret = mt6362_charger_set_online(data, val);
@@ -2117,7 +2114,7 @@ static int mt6362_dump_registers(struct charger_device *chg_dev)
 	bool chg_en = false;
 	u32 adc_vals[5];
 	u8 chg_stat[2], chg_top[2];
-	u32 chg_eoc = 0;
+	u32 chg_eoc;
 
 	ret = mt6362_kick_wdt(chg_dev);
 	if (ret < 0) {
@@ -2228,8 +2225,6 @@ static int mt6362_enable_bleed_discharge(struct charger_device *chg_dev,
 	mutex_lock(&data->bd_lock);
 	if (en == data->bd_flag)
 		goto out;
-	data->bd_flag = en;
-
 	if (en) {
 		ret = mt6362_get_mivr(chg_dev, &data->bd_mivr);
 		if (ret < 0)
@@ -2250,6 +2245,7 @@ static int mt6362_enable_bleed_discharge(struct charger_device *chg_dev,
 		if (ret < 0)
 			goto out;
 	}
+	data->bd_flag = en;
 out:
 	mutex_unlock(&data->bd_lock);
 	return ret;

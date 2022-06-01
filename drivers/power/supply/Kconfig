@@ -618,7 +618,14 @@ config CUSTOM_BATTERY_EXTERNAL_CHANNEL
 	  Say Y to enable support for Customer external gauge.
 	  if unsure ,choose n.
 
+config MTK_CHARGER_CANNON
+	bool "MTK charger for CANNON"
+	help
+	  Say yes In MTK charger cannon. J22
+
+
 source "drivers/power/supply/mediatek/battery/Kconfig"
+
 source "drivers/power/supply/mediatek/charger/Kconfig"
 
 endif # POWER_SUPPLY

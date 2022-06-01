@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -29,7 +30,7 @@ struct pe50 {
 	bool is_enabled;
 };
 
-#ifdef CONFIG_MTK_PUMP_EXPRESS_50_SUPPORT
+#ifdef CONFIG_MTK_PUMP_EXPRESS_PLUS_50_SUPPORT
 extern int pe50_init(void);
 extern bool pe50_is_ready(void);
 extern int pe50_stop(void);
@@ -54,5 +55,5 @@ static inline  int pe50_run(void)
 {
 	return -ENOTSUPP;
 }
-#endif /* CONFIG_MTK_PUMP_EXPRESS_50_SUPPORT */
+#endif /* CONFIG_MTK_PUMP_EXPRESS_PLUS_50_SUPPORT */
 #endif /* __MTK_PE_50_H */

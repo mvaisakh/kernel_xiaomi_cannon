@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -28,7 +29,7 @@
 #endif /* CONFIG_RT_REGMAP */
 
 /* Information */
-#define RT9759_DRV_VERSION	"1.0.8_MTK"
+#define RT9759_DRV_VERSION	"1.0.7_MTK"
 #define RT9759_DEVID		0x08
 
 /* Registers */
@@ -89,7 +90,6 @@
 #define RT9759_CHGEN_SHFT	7
 #define RT9759_ADCEN_MASK	BIT(7)
 #define RT9759_WDTEN_MASK	BIT(2)
-#define RT9759_WDTMR_MASK	0x03
 #define RT9759_VBUSOVP_MASK	0x7F
 #define RT9759_IBUSOCP_MASK	0x0F
 #define RT9759_VBATOVP_MASK	0x3F
@@ -199,30 +199,6 @@ static const u8 rt9759_reg_sf[RT9759_SF_MAX] = {
 	RT9759_REG_REGFLAGMASK,
 	RT9759_REG_REGTHRES,
 	RT9759_REG_OTHER1,
-};
-
-struct rt9759_reg_defval {
-	u8 reg;
-	u8 value;
-	u8 mask;
-};
-
-static const struct rt9759_reg_defval rt9759_init_chip_check_reg[] = {
-	{
-		.reg = RT9759_REG_VBATOVP,
-		.value = 0x22,
-		.mask = RT9759_VBATOVP_MASK,
-	},
-	{
-		.reg = RT9759_REG_IBATOCP,
-		.value = 0x3D,
-		.mask = RT9759_IBATOCP_MASK,
-	},
-	{
-		.reg = RT9759_REG_CHGCTRL0,
-		.value = 0x00,
-		.mask = RT9759_WDTMR_MASK,
-	},
 };
 
 struct rt9759_desc {
@@ -794,7 +770,6 @@ static u8 rt9759_vacovp_toreg(u32 uV)
 }
 
 static int __rt9759_update_status(struct rt9759_chip *chip);
-static int __rt9759_init_chip(struct rt9759_chip *chip);
 
 static const u8 rt9759_hm_password[2] = {0x69, 0x96};
 static int __maybe_unused __rt9759_enter_hidden_mode(struct rt9759_chip *chip,
@@ -1143,27 +1118,6 @@ static int rt9759_set_ibatocp(struct charger_device *chg_dev, u32 uA)
 	dev_info(chip->dev, "%s %d(0x%02X)\n", __func__, uA, reg);
 	return rt9759_i2c_update_bits(chip, RT9759_REG_IBATOCP, reg,
 				      RT9759_IBATOCP_MASK);
-}
-
-static int rt9759_init_chip(struct charger_device *chg_dev)
-{
-	int i, ret;
-	struct rt9759_chip *chip = charger_get_data(chg_dev);
-	const struct rt9759_reg_defval *reg_defval;
-	u8 val;
-
-	for (i = 0; i < ARRAY_SIZE(rt9759_init_chip_check_reg); i++) {
-		reg_defval = &rt9759_init_chip_check_reg[i];
-		ret = rt9759_i2c_read8(chip, reg_defval->reg, &val);
-		if (ret < 0)
-			return ret;
-		if ((val & reg_defval->mask) == reg_defval->value) {
-			dev_info(chip->dev,
-				"%s chip reset happened, reinit\n", __func__);
-			return __rt9759_init_chip(chip);
-		}
-	}
-	return 0;
 }
 
 static int rt9759_vacovp_irq_handler(struct rt9759_chip *chip)
@@ -1578,7 +1532,6 @@ static const struct charger_ops rt9759_chg_ops = {
 	.set_direct_charging_ibusoc = rt9759_set_ibusocp,
 	.set_direct_charging_vbatov = rt9759_set_vbatovp,
 	.set_direct_charging_ibatoc = rt9759_set_ibatocp,
-	.init_direct_charging_chip = rt9759_init_chip,
 	.set_direct_charging_vbatov_alarm = rt9759_set_vbatovp_alarm,
 	.reset_direct_charging_vbatov_alarm = rt9759_reset_vbatovp_alarm,
 	.set_direct_charging_vbusov_alarm = rt9759_set_vbusovp_alarm,
@@ -1811,7 +1764,7 @@ ignore_intr:
 	return 0;
 }
 
-static int __rt9759_init_chip(struct rt9759_chip *chip)
+static int rt9759_init_chip(struct rt9759_chip *chip)
 {
 	int ret;
 
@@ -1892,7 +1845,7 @@ static int rt9759_i2c_probe(struct i2c_client *client,
 		goto err;
 	}
 #endif /* CONFIG_RT_REGMAP */
-	ret = __rt9759_init_chip(chip);
+	ret = rt9759_init_chip(chip);
 	if (ret < 0) {
 		dev_notice(chip->dev, "%s init chip fail(%d)\n", __func__, ret);
 		goto err_initchip;
@@ -2021,9 +1974,6 @@ MODULE_AUTHOR("ShuFan Lee<shufan_lee@richtek.com>");
 MODULE_VERSION(RT9759_DRV_VERSION);
 
 /*
- * 1.0.8_MTK
- * (1) Add init_chip ops, if register reset happened, init_chip again.
- *
  * 1.0.7_MTK
  * (1) Add ibusucpf_deglitch in dtsi
  *

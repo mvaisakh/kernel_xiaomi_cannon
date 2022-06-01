@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -28,7 +29,6 @@
 #endif /* #if (CONFIG_MTK_GAUGE_VERSION == 30) */
 
 #include "rt9458.h"
-#define RT9458_DRV_VERSION	"1.0.1_MTK"
 
 static bool dbg_log_en;
 module_param(dbg_log_en, bool, 0644);
@@ -228,22 +228,21 @@ out_unlock:
 /* ================== */
 /* Internal Functions */
 /* ================== */
-static const u32 rt9458_support_iaicr[] = {100, 500, 700, 1000};
-static inline int rt9458_set_aicr(struct rt9458_info *ri, u32 uA)
+static const unsigned long rt9458_support_iaicr[] = { 100, 500, 700, 1000};
+static inline int rt9458_set_aicr(struct rt9458_info *ri, unsigned long uA)
 {
 	u8 iaicr_sel, iaicr;
-	u32 mA = uA / 1000;
+	unsigned long mA = uA / 1000;
 	int i, ret = 0;
 	/* change by sw control */
 
-	for (i = 1; i < ARRAY_SIZE(rt9458_support_iaicr); i++) {
+	for (i = 0; i < ARRAY_SIZE(rt9458_support_iaicr); i++) {
 		if (mA < rt9458_support_iaicr[i])
 			break;
 	}
-	if (i == ARRAY_SIZE(rt9458_support_iaicr) &&
-	    mA > rt9458_support_iaicr[i - 1])
+	if (i == ARRAY_SIZE(rt9458_support_iaicr))
 		dev_dbg(ri->dev, "will config to no limit\n");
-	else
+	else if (i > 0)
 		i--;
 	switch (i) {
 	case 0:
@@ -292,7 +291,7 @@ static inline int rt9458_set_aicr(struct rt9458_info *ri, u32 uA)
 	return 0;
 }
 
-static inline int rt9458_set_mivr(struct rt9458_info *ri, u32 uV)
+static inline int rt9458_set_mivr(struct rt9458_info *ri, unsigned long uV)
 {
 	u8 data = 0;
 
@@ -308,7 +307,7 @@ static inline int rt9458_set_mivr(struct rt9458_info *ri, u32 uV)
 				      data << RT9458_MIVR_SHFT);
 }
 
-static inline int rt9458_set_ichg(struct rt9458_info *ri, u32 uA)
+static inline int rt9458_set_ichg(struct rt9458_info *ri, unsigned long uA)
 {
 	u8 data = 0;
 
@@ -321,7 +320,7 @@ static inline int rt9458_set_ichg(struct rt9458_info *ri, u32 uA)
 				      data << RT9458_ICHG_SHFT);
 }
 
-static inline int rt9458_set_ieoc(struct rt9458_info *ri, u32 uA)
+static inline int rt9458_set_ieoc(struct rt9458_info *ri, unsigned long uA)
 {
 	u8 data = 0;
 
@@ -334,7 +333,7 @@ static inline int rt9458_set_ieoc(struct rt9458_info *ri, u32 uA)
 				      data << RT9458_IEOC_SHFT);
 }
 
-static inline int rt9458_set_voreg(struct rt9458_info *ri, u32 uV)
+static inline int rt9458_set_voreg(struct rt9458_info *ri, unsigned long uV)
 {
 	u8 data = 0;
 
@@ -352,7 +351,7 @@ static inline int rt9458_set_voreg(struct rt9458_info *ri, u32 uV)
 				      data << RT9458_VOREG_SHFT);
 }
 
-static inline int rt9458_set_vmreg(struct rt9458_info *ri, u32 uV)
+static inline int rt9458_set_vmreg(struct rt9458_info *ri, unsigned long uV)
 {
 	u8 data = 0;
 
@@ -693,9 +692,8 @@ static int rt9458_charger_dump_registers(struct charger_device *chg_dev)
 		}
 	}
 	dev_info(ri->dev,
-		"%s: ICHG = %dmA, AICR = %dmA%s, MIVR = %dmV, IEOC = %dmA\n",
-		__func__, ichg / 1000, aicr / 1000, (aicr == U32_MAX) ?
-		" (no limit)" : "", mivr / 1000, ieoc / 1000);
+		"%s: ICHG = %dmA, AICR = %dmA, MIVR = %dmV, IEOC = %dmA\n",
+		__func__, ichg / 1000, aicr / 1000, mivr / 1000, ieoc / 1000);
 
 	dev_info(ri->dev,
 		"%s: CV = %dmV, vmreg = %dmV, CHG_EN = %d, CHG_STATUS = %s\n",
@@ -908,7 +906,7 @@ static const irq_handler_t rt9458_irq_desc[RT9458_IRQ_MAX] = {
 static irqreturn_t rt9458_intr_handler(int irq, void *dev_id)
 {
 	struct rt9458_info *ri = (struct rt9458_info *)dev_id;
-	u8 event[RT9458_IRQ_REGNUM] = {0};
+	unsigned char event[RT9458_IRQ_REGNUM] = {0};
 	int i, j, id, ret = 0;
 
 	dev_dbg(ri->dev, "%s triggered\n", __func__);
@@ -923,10 +921,9 @@ static irqreturn_t rt9458_intr_handler(int irq, void *dev_id)
 		if (!event[i])
 			continue;
 		for (j = 0; j < 8; j++) {
-			id = i * 8 + j;
-			if (!(event[i] & (1 << j)) ||
-				(id >= ARRAY_SIZE(rt9458_irq_desc)))
+			if (!(event[i] & (1 << j)))
 				continue;
+			id = i * 8 + j;
 			if (!rt9458_irq_desc[id]) {
 				dev_warn(ri->dev, "no %d irq_handler", id);
 				continue;
@@ -1031,7 +1028,7 @@ static int rt9458_chip_pdata_init(struct rt9458_info *ri)
 
 static int rt9458_chip_reset(struct i2c_client *i2c)
 {
-	u8 tmp[RT9458_IRQ_REGNUM] = {0};
+	unsigned char tmp[RT9458_IRQ_REGNUM] = {0};
 	int ret = 0;
 
 	ret = i2c_smbus_write_byte_data(i2c, RT9458_REG_CTRL4, 0x80);
@@ -1120,8 +1117,7 @@ static int rt9458_i2c_probe(struct i2c_client *i2c,
 	bool use_dt = i2c->dev.of_node;
 	int ret = 0;
 
-	dev_info(&i2c->dev, "%s start(%s)\n", __func__, RT9458_DRV_VERSION);
-
+	dev_info(&i2c->dev, "%s start\n", __func__);
 	ret = rt9458_i2c_detect_devid(i2c);
 	if (ret < 0)
 		return ret;
@@ -1251,15 +1247,4 @@ module_i2c_driver(rt9458_i2c_driver);
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Richtek RT9458 Charger driver");
 MODULE_AUTHOR("CY Huang <cy_huang@richtek.com>");
-MODULE_VERSION(RT9458_DRV_VERSION);
-
-/*
- * Release Note
- * 1.0.1
- * (1) Replace unsigned long/char with u32/u8
- * (2) Fix setting AICR to 1A ends in no limit
- * (3) Show (no limit) for unlimited AICR in rt9458_charger_dump_registers
- *
- * 1.0.0
- * (1) Initial released
- */
+MODULE_VERSION("1.0.0");

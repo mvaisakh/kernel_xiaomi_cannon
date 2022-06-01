@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  * ShuFanLee <shufan_lee@richtek.com>
  *
  * This program is free software; you can redistribute it and/or modify

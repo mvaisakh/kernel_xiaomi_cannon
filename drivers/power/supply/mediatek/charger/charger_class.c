@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -599,16 +600,6 @@ int charger_dev_is_direct_charging_vbuslowerr(
 }
 EXPORT_SYMBOL(charger_dev_is_direct_charging_vbuslowerr);
 
-int charger_dev_init_direct_charging_chip(struct charger_device *chg_dev)
-{
-	if (chg_dev != NULL && chg_dev->ops != NULL &&
-	    chg_dev->ops->init_direct_charging_chip)
-		return chg_dev->ops->init_direct_charging_chip(chg_dev);
-
-	return -ENOTSUPP;
-}
-EXPORT_SYMBOL(charger_dev_init_direct_charging_chip);
-
 int charger_dev_enable_chg_type_det(struct charger_device *chg_dev, bool en)
 {
 	if (chg_dev != NULL && chg_dev->ops != NULL &&
@@ -618,6 +609,17 @@ int charger_dev_enable_chg_type_det(struct charger_device *chg_dev, bool en)
 	return -ENOTSUPP;
 }
 EXPORT_SYMBOL(charger_dev_enable_chg_type_det);
+
+
+int charger_dev_rerun_apsd(struct charger_device *chg_dev, bool en)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+	    chg_dev->ops->rerun_apsd)
+		return chg_dev->ops->rerun_apsd(chg_dev, en);
+
+	return -ENOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_rerun_apsd);
 
 int charger_dev_enable_otg(struct charger_device *chg_dev, bool en)
 {
@@ -834,25 +836,22 @@ struct charger_device *charger_device_register(const char *name,
 	static struct lock_class_key key;
 	struct srcu_notifier_head *head = NULL;
 	int rc;
-	char *charger_name = NULL;
 
 	pr_debug("%s: name=%s\n", __func__, name);
 	chg_dev = kzalloc(sizeof(*chg_dev), GFP_KERNEL);
 	if (!chg_dev)
 		return ERR_PTR(-ENOMEM);
 
-	head = &chg_dev->evt_nh;
-	srcu_init_notifier_head(head);
-	/* Rename srcu's lock to avoid LockProve warning */
-	lockdep_init_map(&(&head->srcu)->dep_map, name, &key, 0);
 	mutex_init(&chg_dev->ops_lock);
 	chg_dev->dev.class = charger_class;
 	chg_dev->dev.parent = parent;
 	chg_dev->dev.release = charger_device_release;
-	charger_name = kasprintf(GFP_KERNEL, "%s", name);
-	dev_set_name(&chg_dev->dev, charger_name);
+	dev_set_name(&chg_dev->dev, name);
 	dev_set_drvdata(&chg_dev->dev, devdata);
-	kfree(charger_name);
+	head = &chg_dev->evt_nh;
+	srcu_init_notifier_head(head);
+	/* Rename srcu's lock to avoid LockProve warning */
+	lockdep_init_map(&(&head->srcu)->dep_map, name, &key, 0);
 
 	/* Copy properties */
 	if (props) {
