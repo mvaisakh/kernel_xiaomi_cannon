@@ -1256,5 +1256,6 @@ config TOUCHSCREEN_MTK_TOUCH
          To compile this dirver for used touch IC.
 
 source "drivers/input/touchscreen/fts8719/Kconfig"
+source "drivers/input/touchscreen/NT36672A/Kconfig"
 
 endif
