@@ -1258,5 +1258,6 @@ config TOUCHSCREEN_MTK_TOUCH
 source "drivers/input/touchscreen/fts8719/Kconfig"
 source "drivers/input/touchscreen/NT36672A/Kconfig"
 source "drivers/input/touchscreen/xiaomi/Kconfig"
+source "drivers/input/touchscreen/xiaomi-spi-tp/Kconfig"
 
 endif
