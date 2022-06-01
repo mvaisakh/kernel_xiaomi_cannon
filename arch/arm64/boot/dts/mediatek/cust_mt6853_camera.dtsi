@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -358,14 +359,14 @@
 	};
 	camera_pins_cam_mipi_switch_en_1: mipi_en@1 {
 		pins_cmd_dat {
-			pinmux = <PINMUX_GPIO131__FUNC_GPIO131>;
+			//pinmux = <PINMUX_GPIO131__FUNC_GPIO131>;
 			slew-rate = <1>;
 			output-high;
 		};
 	};
 	camera_pins_cam_mipi_switch_en_0: mipi_en@0 {
 		pins_cmd_dat {
-			pinmux = <PINMUX_GPIO131__FUNC_GPIO131>;
+			//pinmux = <PINMUX_GPIO131__FUNC_GPIO131>;
 			slew-rate = <1>;
 			output-low;
 		};
@@ -438,8 +439,6 @@
 	pinctrl-16 = <&camera_pins_cam4_pnd_1>;
 	pinctrl-17 = <&camera_pins_cam0_vcamd_0>;
 	pinctrl-18 = <&camera_pins_cam0_vcamd_1>;
-	pinctrl-19 = <&camera_pins_cam0_vcama_0>;
-	pinctrl-20 = <&camera_pins_cam0_vcama_1>;
 	pinctrl-21 = <&camera_pins_cam1_vcamd_0>;
 	pinctrl-22 = <&camera_pins_cam1_vcamd_1>;
 	pinctrl-23 = <&camera_pins_cam1_vcama_0>;
@@ -482,8 +481,6 @@
 	cam2_vcamio-supply = <&mt_pmic_vcamio_ldo_reg>;
 	cam4_vcamio-supply = <&mt_pmic_vcamio_ldo_reg>;
 
-	cam1_enable_sensor = "imx576_mipi_raw";
-
 	status = "okay";
 };
 /* CAMERA GPIO end */
@@ -502,16 +499,18 @@
 		reg = <0x51>;
 		status = "okay";
 	};
-	mtk_camera_eeprom4:camera_eeprom4@50 {
-		compatible = "mediatek,camera_eeprom";
-		reg = <0x50>;
-		status = "okay";
-	};
 };
 &i2c8 {
 	mtk_camera_eeprom0:camera_eeprom0@50 {
 		compatible = "mediatek,camera_eeprom";
 		reg = <0x50>;
+		status = "okay";
+	};
+};
+&i2c9 {
+	mtk_camera_eeprom4:camera_eeprom4@51 {
+		compatible = "mediatek,camera_eeprom";
+		reg = <0x51>;
 		status = "okay";
 	};
 };
