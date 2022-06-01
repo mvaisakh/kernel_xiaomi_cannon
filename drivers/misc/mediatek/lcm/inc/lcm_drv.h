@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -208,10 +209,8 @@ enum LCM_LANE_NUM {
 
 enum LCM_DSI_FORMAT {
 	LCM_DSI_FORMAT_RGB565 = 0,
-	LCM_DSI_FORMAT_RGB666_LOOSELY = 1,
-	LCM_DSI_FORMAT_RGB666 = 2,
-	LCM_DSI_FORMAT_RGB888 = 3,
-	LCM_DSI_FORMAT_RGB101010 = 4,
+	LCM_DSI_FORMAT_RGB666 = 1,
+	LCM_DSI_FORMAT_RGB888 = 2
 };
 
 
@@ -298,6 +297,10 @@ enum LCM_DSI_PLL_CLOCK {
 	LCM_DSI_6589_PLL_CLOCK_520 = 50,
 };
 
+enum LM36273_REG_RW {
+	LM36273_REG_WRITE,
+	LM36273_REG_READ,
+};
 /* ------------------------------------------------------------------------- */
 
 struct LCM_DBI_DATA_FORMAT {
@@ -384,9 +387,8 @@ struct LCM_UFOE_CONFIG_PARAMS {
 /* ------------------------------------------------------------------------- */
 
 struct LCM_DSC_CONFIG_PARAMS {
-	unsigned int ver; /* [7:4] major [3:0] minor */
 	unsigned int slice_width;
-
+	unsigned int slice_hight;
 	unsigned int bit_per_pixel;
 	unsigned int slice_mode;
 	unsigned int rgb_swap;
@@ -395,10 +397,7 @@ struct LCM_DSC_CONFIG_PARAMS {
 	unsigned int bit_per_channel;
 	unsigned int rct_on;
 	unsigned int bp_enable;
-	unsigned int pic_height;/* need to check */
-	unsigned int pic_width;/* need to check */
-	unsigned int slice_height;
-	unsigned int chunk_size;
+
 	unsigned int dec_delay;
 	unsigned int xmit_delay;
 	unsigned int scale_value;
@@ -413,12 +412,7 @@ struct LCM_DSC_CONFIG_PARAMS {
 
 	unsigned int flatness_minqp;
 	unsigned int flatness_maxqp;
-	unsigned int rc_model_size;
-	unsigned int rc_edge_factor;
-	unsigned int rc_quant_incr_limit0;
-	unsigned int rc_quant_incr_limit1;
-	unsigned int rc_tgt_offset_hi;
-	unsigned int rc_tgt_offset_lo;
+	unsigned int rc_mode1_size;
 };
 
 
@@ -537,22 +531,39 @@ enum MIPITX_PHY_PORT {
 	MIPITX_PHY_PORT_1,
 	MIPITX_PHY_PORT_NUM
 };
-
-#define DYNAMIC_FPS_LEVELS 10
-struct dynamic_fps_info {
-	unsigned int fps;
-	unsigned int vfp; /*lines*/
-	/*unsigned int idle_check_interval;*//*ms*/
+/*ARR*/
+/*#define DFPS_LEVELNUM 10*/
+enum DynFPS_LEVEL {
+	DPFS_LEVEL0,
+	DFPS_LEVEL1,
+	DFPS_LEVEL2,
+	DFPS_LEVELNUM,
 };
 
-struct vsync_trigger_time {
+struct dynamic_fps_info {
+	enum DynFPS_LEVEL level;
 	unsigned int fps;
-	unsigned int trigger_after_te;
-	unsigned int config_expense_time;
+	unsigned int vfp; /*lines*/
+};
+enum LCM_DFPS_FRAME_ID {
+	LCM_DFPS_FRAME_PREV = 0,
+	LCM_DFPS_FRAME_CUR = 1,
+	LCM_DFPS_MAX_FRAME_CMD,
+};
+enum LCM_DFPS_SEND_CMD_WAY {
+	LCM_DFPS_SEND_CMD_STOP_VDO,
+	LCM_DFPS_SEND_CMD_VFP,
+	LCM_DFPS_SEND_CMD_VBP,
+};
+
+enum LCM_DFPS_SEND_CMD_SPEED {
+	LCM_DFPS_SEND_CMD_HS,
+	LCM_DFPS_SEND_CMD_LP,
 };
 
 
 /*DynFPS*/
+/*
 enum DynFPS_LEVEL {
 	DFPS_LEVEL0 = 0,
 	DFPS_LEVEL1,
@@ -560,6 +571,7 @@ enum DynFPS_LEVEL {
 };
 
 #define DFPS_LEVELS 2
+*/
 enum FPS_CHANGE_INDEX {
 	DYNFPS_NOT_DEFINED = 0,
 	DYNFPS_DSI_VFP = 1,
@@ -685,7 +697,6 @@ struct LCM_DSI_PARAMS {
 	unsigned int PLL_CLOCK;
 	/* data_rate = PLL_CLOCK x 2 */
 	unsigned int data_rate;
-	unsigned int ap_data_rate;
 	unsigned int PLL_CK_VDO;
 	unsigned int PLL_CK_CMD;
 	unsigned int dsi_clock;
@@ -695,8 +706,6 @@ struct LCM_DSI_PARAMS {
 	unsigned int cont_clock;
 	unsigned int ufoe_enable;
 	unsigned int dsc_enable;
-	unsigned int bdg_dsc_enable;
-	unsigned int bdg_ssc_disable;
 	struct LCM_UFOE_CONFIG_PARAMS ufoe_params;
 	struct LCM_DSC_CONFIG_PARAMS dsc_params;
 	unsigned int edp_panel;
@@ -757,8 +766,14 @@ struct LCM_DSI_PARAMS {
 
 	/*for ARR*/
 	unsigned int dynamic_fps_levels;
-	struct dynamic_fps_info dynamic_fps_table[DYNAMIC_FPS_LEVELS];
-	struct vsync_trigger_time vsync_after_te[DFPS_LEVELS];
+	struct dynamic_fps_info dynamic_fps_table[DFPS_LEVELNUM];
+	unsigned int dfps_need_inform_lcm[LCM_DFPS_MAX_FRAME_CMD];
+	unsigned int dfps_send_cmd_way;
+	unsigned int dfps_send_cmd_speed;
+#if 0
+	unsigned int max_fps;
+	unsigned int min_fps;
+#endif
 
 #ifdef CONFIG_MTK_HIGH_FRAME_RATE
 	/****DynFPS start****/
@@ -771,6 +786,7 @@ struct LCM_DSI_PARAMS {
 	/****DynFPS end****/
 #endif
 };
+
 
 /* ------------------------------------------------------------------------- */
 struct LCM_PARAMS {
@@ -814,9 +830,6 @@ struct LCM_PARAMS {
 	unsigned int min_luminance;
 	unsigned int average_luminance;
 	unsigned int max_luminance;
-
-	unsigned int hbm_en_time;
-	unsigned int hbm_dis_time;
 
 #ifdef CONFIG_MTK_HIGH_FRAME_RATE
 	enum LCM_Send_Cmd_Mode sendmode;
@@ -994,6 +1007,11 @@ struct LCM_UTIL_FUNCS {
 		unsigned char count, unsigned char *para_list,
 		unsigned char force_update, enum LCM_Send_Cmd_Mode sendmode);
 
+	void (*dsi_arr_send_cmd)(enum LCM_DFPS_SEND_CMD_WAY dfps_send_cmd_way,
+		enum LCM_DFPS_SEND_CMD_SPEED dfps_send_cmd_speed,
+		void *cmdq, unsigned int cmd,
+		unsigned char count, unsigned char *para_list,
+		unsigned char force_update);
 };
 enum LCM_DRV_IOCTL_CMD {
 	LCM_DRV_IOCTL_ENABLE_CMD_MODE = 0x100,
@@ -1007,6 +1025,8 @@ struct LCM_DRIVER {
 	void (*init)(void);
 	void (*suspend)(void);
 	void (*resume)(void);
+	void (*set_disp_param)(unsigned int param);
+	int (*get_lockdowninfo_for_tp)(unsigned char *plockdowninfo);
 
 	/* for power-on sequence refinement */
 	void (*init_power)(void);
@@ -1055,17 +1075,17 @@ struct LCM_DRIVER {
 
 	void (*aod)(int enter);
 
-
-	bool (*get_hbm_state)(void);
-	bool (*get_hbm_wait)(void);
-	bool (*set_hbm_wait)(bool wait);
-	bool (*set_hbm_cmdq)(bool en, void *qhandle);
-
 	/* /////////////DynFPS///////////////////////////// */
-	void (*dfps_send_lcm_cmd)(void *cmdq_handle,
+	void (*dynfps_send_lcm_cmd)(void *cmdq_handle,
 		unsigned int from_level, unsigned int to_level, struct LCM_PARAMS *params);
 	bool (*dfps_need_send_cmd)(
 	unsigned int from_level, unsigned int to_level, struct LCM_PARAMS *params);
+	int (*led_i2c_reg_op)(char *buffer, int op, int count);
+	/* /////////////ARR-DFPS///////////////////////////// */
+	void (*dfps_send_lcm_cmd)(enum LCM_DFPS_SEND_CMD_WAY dfps_send_cmd_way,
+	enum LCM_DFPS_SEND_CMD_SPEED dfps_send_cmd_speed,
+	void *cmdq_handle, unsigned int from_fps, unsigned int to_fps,
+	enum LCM_DFPS_FRAME_ID frame_id);
 };
 
 /* LCM Driver Functions */
@@ -1081,6 +1101,29 @@ extern int display_bias_enable(void);
 extern int display_bias_disable(void);
 extern int display_bias_regulator_init(void);
 
+#ifdef CONFIG_BACKLIGHT_SUPPORT_LM36273
+extern int lm36273_reg_write_bytes(unsigned char addr, unsigned char value) ;
+extern int lm36273_reg_read_bytes(char addr, char *buf);
+extern int lm36273_bl_bias_conf(void);
+extern int lm36273_bias_enable(int enable, int delayMs);
+#else
+int lm36273_reg_write_bytes(unsigned char addr, unsigned char value)
+{
+	return 0;
+}
+int lm36273_reg_read_bytes(char addr, char *buf)
+{
+	return 0;
+}
 
+int lm36273_bl_bias_conf(void)
+{
+	return 0;
+}
+int lm36273_bias_enable(int enable, int delayMs)
+{
+	return 0;
+}
+#endif
 
 #endif /* __LCM_DRV_H__ */
