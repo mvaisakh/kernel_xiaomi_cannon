@@ -1013,5 +1013,14 @@ config REGULATOR_WM8994
 	  This driver provides support for the voltage regulators on the
 	  WM8994 CODEC.
 
+config REGULATOR_FAN53870
+	bool "ON Semi Technologies Inc. FAN53870 regulator driver"
+	depends on I2C_MTK
+	help
+	  Say Y here to support the FAN53870 PMIC chip.
+	  This driver controls FAN53870 PMIC chip and the voltage
+	  regulators found in ON Semi Technologies Inc. FAN53870
+	  PMIC.
+
 endif
 
