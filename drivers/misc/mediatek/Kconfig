@@ -281,6 +281,7 @@ endmenu  # Security
 menu "Other Peripherals"
 
 source "drivers/misc/mediatek/accdet/Kconfig"
+source "drivers/misc/mediatek/aw8622_haptic/Kconfig"
 source "drivers/misc/mediatek/dramc/Kconfig"
 source "drivers/misc/mediatek/dbgtop/Kconfig"
 source "drivers/misc/mediatek/l3c_part/Kconfig"
