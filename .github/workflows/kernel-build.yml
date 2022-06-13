@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Build Kernel
         run: |
-          pacman -Syu --needed --noconfirm wget base-devel xmlto inetutils bc cpio python-sphinx python-sphinx_rtd_theme graphviz imagemagick git python2 python zip
+          pacman -Syu --needed --noconfirm inetutils bc cpio git
           git config --global --add safe.directory /__w/kernel_xiaomi_cannon/kernel_xiaomi_cannon
           export token=${TELEGRAM_BOT_TOKEN}
           bash cannon-build.sh
